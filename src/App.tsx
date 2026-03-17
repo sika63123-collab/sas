@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Phone, Map as MapIcon, Layers, Crosshair, Menu, X, ArrowUpRight, Ruler, Compass, Facebook, Instagram } from 'lucide-react';
+import { MapPin, Phone, Map as MapIcon, Layers, Crosshair, Menu, X, ArrowUpRight, Ruler, Compass, Facebook, Instagram, Home, Briefcase, Wrench, MessageCircle } from 'lucide-react';
 
 export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -153,7 +153,7 @@ export default function App() {
                 <motion.div 
                   animate={{ y: [0, -10, 0] }}
                   transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                  className="absolute bottom-8 right-8 bg-white/95 backdrop-blur-md p-5 rounded-3xl shadow-2xl flex items-center gap-5 border border-white/20"
+                  className="absolute bottom-4 right-4 md:bottom-8 md:right-8 bg-white/60 backdrop-blur-xl p-4 md:p-5 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] flex items-center gap-4 md:gap-5 border border-white/60"
                 >
                   <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
                     <Crosshair size={28} />
@@ -252,36 +252,36 @@ export default function App() {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-50px" }}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+            className="flex overflow-x-auto pb-12 -mx-6 px-6 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible md:pb-0 md:mx-0 md:px-0 gap-6 md:gap-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
           >
             {[
               {
-                icon: <MapIcon size={36} />,
+                icon: <MapIcon size={32} strokeWidth={1.5} />,
                 title: "الرفع المساحي",
                 desc: "بنرفعلك حتة الأرض أو المشروع ونطلعلك خريطة كنتورية دقيقة جداً توضح كل تفصيلة ومقاس."
               },
               {
-                icon: <Crosshair size={36} />,
+                icon: <Crosshair size={32} strokeWidth={1.5} />,
                 title: "التوقيع المساحي",
                 desc: "بناخد اللوح الهندسية ونوقعها على الطبيعة بدقة متناهية عشان الشغل يطلع زي الكتاب ما بيقول."
               },
               {
-                icon: <Layers size={36} />,
+                icon: <Layers size={32} strokeWidth={1.5} />,
                 title: "حساب الكميات",
                 desc: "بنحسبلك كميات الحفر والردم بالظبط عشان تعرف ميزانيتك وتكلفتك من غير أي هدر أو مصاريف زيادة."
               },
               {
-                icon: <Ruler size={36} />,
+                icon: <Ruler size={32} strokeWidth={1.5} />,
                 title: "مساحة الطرق",
                 desc: "شغل مساحة متخصص لمسارات الطرق، الكباري، وشبكات الصرف والمية بأعلى معايير الجودة."
               },
               {
-                icon: <MapPin size={36} />,
+                icon: <MapPin size={32} strokeWidth={1.5} />,
                 title: "تحديد الملكيات",
                 desc: "بنحدد حدود أرضك ونفصل التداخلات مع الجيران بناءً على الورق الرسمي والصكوك."
               },
               {
-                icon: <Compass size={36} />,
+                icon: <Compass size={32} strokeWidth={1.5} />,
                 title: "نظم الـ GIS",
                 desc: "بنجمع ونحلل البيانات المكانية ونعملك قواعد بيانات جغرافية متكاملة لمشروعك."
               }
@@ -290,12 +290,18 @@ export default function App() {
                 key={idx}
                 variants={fadeInUp}
                 whileHover={{ y: -10 }}
-                className="p-8 rounded-[2rem] bg-slate-50 border-2 border-slate-100 hover:border-amber-400 hover:shadow-2xl hover:shadow-amber-500/10 transition-all group relative overflow-hidden"
+                className="min-w-[85vw] sm:min-w-[300px] md:min-w-0 snap-center p-8 rounded-[2rem] bg-slate-50 border-2 border-slate-100 hover:border-amber-400 hover:shadow-2xl hover:shadow-amber-500/10 transition-all group relative overflow-hidden flex-shrink-0 md:flex-shrink"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full -z-10 group-hover:bg-amber-500/20 transition-colors"></div>
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-md flex items-center justify-center text-amber-500 mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                  {service.icon}
+                
+                {/* Refined Icon Container */}
+                <div className="relative w-16 h-16 mb-8">
+                  <div className="absolute inset-0 bg-amber-200 rounded-2xl rotate-6 group-hover:rotate-12 group-hover:scale-110 transition-all duration-300 opacity-50"></div>
+                  <div className="absolute inset-0 bg-white rounded-2xl shadow-sm flex items-center justify-center text-amber-600 group-hover:-translate-y-1 group-hover:shadow-md transition-all duration-300 border border-amber-50">
+                    {service.icon}
+                  </div>
                 </div>
+
                 <h3 className="text-2xl font-black text-slate-900 mb-4">{service.title}</h3>
                 <p className="text-slate-600 leading-relaxed font-medium text-lg">{service.desc}</p>
               </motion.div>
@@ -432,8 +438,39 @@ export default function App() {
         </div>
       </section>
 
+      {/* Floating Action Button (FAB) */}
+      <a 
+        href="tel:+201287424741"
+        className="fixed bottom-24 md:bottom-8 left-6 z-50 w-14 h-14 bg-amber-500 text-slate-900 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:scale-110 transition-transform"
+      >
+        <span className="absolute inset-0 rounded-full bg-amber-500 animate-ping opacity-20"></span>
+        <Phone size={24} className="fill-slate-900" />
+      </a>
+
+      {/* Mobile Bottom Navigation (Glassmorphism) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pt-2 pointer-events-none">
+        <div className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] rounded-3xl flex justify-between items-center px-6 py-3 pointer-events-auto">
+          <a href="#" className="flex flex-col items-center gap-1 text-slate-400 hover:text-amber-500 transition-colors">
+            <Home size={20} />
+            <span className="text-[10px] font-bold">الرئيسية</span>
+          </a>
+          <a href="#services" className="flex flex-col items-center gap-1 text-slate-400 hover:text-amber-500 transition-colors">
+            <Briefcase size={20} />
+            <span className="text-[10px] font-bold">خدماتي</span>
+          </a>
+          <a href="#equipment" className="flex flex-col items-center gap-1 text-slate-400 hover:text-amber-500 transition-colors">
+            <Wrench size={20} />
+            <span className="text-[10px] font-bold">أجهزتنا</span>
+          </a>
+          <a href="#contact" className="flex flex-col items-center gap-1 text-slate-400 hover:text-amber-500 transition-colors">
+            <MessageCircle size={20} />
+            <span className="text-[10px] font-bold">تواصل</span>
+          </a>
+        </div>
+      </div>
+
       {/* Footer */}
-      <footer className="py-10 border-t border-slate-200 bg-slate-50 text-center text-slate-500 font-bold">
+      <footer className="py-10 pb-28 md:pb-10 border-t border-slate-200 bg-slate-50 text-center text-slate-500 font-bold">
         <p>© {new Date().getFullYear()} سيد محمد مؤسس الموقع. كل الحقوق محفوظة.</p>
       </footer>
     </div>
