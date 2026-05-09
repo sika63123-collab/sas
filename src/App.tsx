@@ -3,6 +3,7 @@ import { Store, ChevronDown, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Cashier from './components/Cashier';
 import Inventory from './components/Inventory';
+import { InventoryAdd } from './components/InventoryAdd';
 import Reports from './components/Reports';
 import { AppProvider, useAppStore } from './store';
 import { TransactionType } from './types';
@@ -17,10 +18,12 @@ type ViewMode =
   | 'home' 
   | 'cashier' 
   | 'inventory' 
+  | 'inventory-add'
   | 'reports-visa' 
   | 'reports-cash' 
   | 'reports-shift' 
   | 'reports-item-card'
+  | 'reports-profit-margin'
   | 'installments-add'
   | 'installments-pay'
   | 'installments-late'
@@ -92,7 +95,7 @@ function MainApp() {
               </div>
            )}
 
-           {(isAdmin || p.reports || p.storeQuantities || p.itemCard) && (
+           {(isAdmin || p.reports) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('reports')}
@@ -103,31 +106,29 @@ function MainApp() {
                 
                 {openMenu === 'reports' && (
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
-                     {(isAdmin || p.reports) && (
-                         <div className="relative group/sub">
-                           <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center transition-colors">
-                             كشف حساب
-                             <ChevronDown className="h-3 w-3 rotate-90" />
-                           </button>
-                           <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 rounded-sm">
-                              <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب الفيزا</button>
-                              <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب نقدي</button>
-                              <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقفيل وردية</button>
-                           </div>
-                         </div>
-                     )}
-                     {(isAdmin || p.storeQuantities || p.itemCard) && (
-                         <div className="relative group/sub border-t border-gray-100">
-                           <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center transition-colors">
-                             المخزن
-                             <ChevronDown className="h-3 w-3 rotate-90" />
-                           </button>
-                           <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 rounded-sm">
-                              {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كميات الاصناف</button>}
-                              {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كرت الصنف</button>}
-                           </div>
-                         </div>
-                     )}
+                      <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب الفيزا</button>
+                      <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب نقدي</button>
+                      <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقفيل وردية</button>
+                      <button onClick={() => selectView('reports-profit-margin')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقرير هامش الربح</button>
+                  </div>
+                )}
+              </div>
+           )}
+
+           {(isAdmin || p.storeQuantities || p.itemCard || p.addItem) && (
+              <div className="relative menubar-item h-full">
+                <button 
+                  onClick={() => handleMenuClick('store')}
+                  className={`px-4 h-full flex items-center gap-1 transition-colors ${openMenu === 'store' ? 'bg-[#c3d8fc] text-[#003399]' : 'text-black hover:bg-[#e0e7f0]'}`}
+                >
+                  المخزن
+                </button>
+                
+                {openMenu === 'store' && (
+                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
+                     {(isAdmin || p.addItem) && <button onClick={() => selectView('inventory-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة اصناف</button>}
+                     {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كميات الاصناف</button>}
+                     {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كارت الصنف</button>}
                   </div>
                 )}
               </div>
@@ -202,6 +203,7 @@ function MainApp() {
          )}
          {activeView === 'cashier' && <Cashier key={cashierMode} initialType={cashierMode} />}
          {activeView === 'inventory' && <Inventory />}
+         {activeView === 'inventory-add' && <InventoryAdd />}
          {activeView.startsWith('reports-') && <Reports view={activeView.replace('reports-', '') as any} />}
          {activeView === 'installments-add' && <InstallmentsAdd />}
          {activeView === 'installments-pay' && <InstallmentsPay />}

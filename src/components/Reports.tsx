@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
+import { FileText, CreditCard, Box, Calendar, Wallet, TrendingUp } from 'lucide-react';
 
-export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' }) {
-  const { transactions } = useAppStore();
+export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
+  const { transactions, products } = useAppStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Filter transactions by selected date
@@ -22,6 +22,41 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment').reduce((sum, t) => sum + getAmount(t), 0);
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
+
+  // --- Profit Logic ---
+  const calculateItemCost = (productId: string) => {
+    const p = products.find(prod => prod.id === productId);
+    return p ? (p.costPrice || 0) : 0;
+  };
+
+  const getProfit = () => {
+    let totalSalesRevenue = 0;
+    let totalSalesCost = 0;
+    let totalReturnsRevenue = 0;
+    let totalReturnsCost = 0;
+
+    dailyTransactions.forEach(t => {
+      if (t.type === 'sale' || t.type === 'deposit_sale') {
+        t.items.forEach(item => {
+          totalSalesRevenue += (item.price * item.quantity);
+          totalSalesCost += (calculateItemCost(item.productId) * item.quantity);
+        });
+      } else if (t.type === 'return' || t.type === 'deposit_return') {
+        t.items.forEach(item => {
+          totalReturnsRevenue += (item.price * item.quantity);
+          totalReturnsCost += (calculateItemCost(item.productId) * item.quantity);
+        });
+      }
+    });
+
+    const netRevenue = totalSalesRevenue - totalReturnsRevenue;
+    const netCost = totalSalesCost - totalReturnsCost;
+    const netProfit = netRevenue - netCost;
+
+    return { netRevenue, netCost, netProfit };
+  };
+
+  const profitData = view === 'profit-margin' ? getProfit() : { netRevenue: 0, netCost: 0, netProfit: 0 };
 
   const getMethodName = (method: string) => {
     switch(method) {
@@ -49,6 +84,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       case 'visa': return 'كشف حساب الفيزا والإلكتروني';
       case 'shift': return 'تقفيل وردية';
       case 'item-card': return 'كرت الصنف';
+      case 'profit-margin': return 'تقرير هامش الربح';
     }
   };
 
@@ -268,6 +304,35 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                  </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {view === 'profit-margin' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto">
+          <div className="bg-indigo-50 border-b border-indigo-100 p-4">
+            <h2 className="text-lg font-bold text-indigo-800 flex items-center gap-2">
+              <span className="bg-indigo-200 p-1 rounded-md"><TrendingUp className="h-5 w-5 text-indigo-700" /></span>
+              تقرير هامش الربح
+            </h2>
+            <p className="text-sm text-indigo-600/80 mt-1">يعرض صافي المبيعات وتكلفتها والربح المحقق لليوم المحدد</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+              <span className="text-gray-600 text-lg">إجمالي قيمة المبيعات (الصافي):</span>
+              <span className="font-bold text-2xl text-gray-900">{profitData.netRevenue} ج.م</span>
+            </div>
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+              <span className="text-gray-600 text-lg">إجمالي تكلفة المبيعات:</span>
+              <span className="font-bold text-xl text-orange-600">- {profitData.netCost} ج.م</span>
+            </div>
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-xl font-bold text-gray-800">صافي الأرباح:</span>
+              <span className="text-3xl font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-inner">{profitData.netProfit} ج.م</span>
+            </div>
+          </div>
+          <div className="bg-gray-50 p-4 border-t border-gray-200 text-sm text-gray-500">
+            * ملحوظة: يتم حساب التكلفة بناءً على سعر التكلفة الحالي للأصناف المسجلة في المخزن. قد يكون الربح غير دقيق إذا لم تقم بإدخال أسعار التكلفة لجميع الأصناف.
           </div>
         </div>
       )}

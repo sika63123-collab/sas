@@ -27,8 +27,10 @@ export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_retu
 
 export interface Product {
   id: string;
+  category?: string;
   name: string;
   price: number;
+  costPrice?: number;
   stock: number;
   barcode?: string;
 }

@@ -101,7 +101,7 @@ export function InstallmentsLate() {
                     <td className="py-3 px-2 border-l border-gray-300">{contract.pageNumber || '-'}</td>
                     <td className="py-3 px-2 border-l border-gray-300 text-[#543b3b]">{contract.customerName}</td>
                     <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{contract.customerPhone}</td>
-                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{new Date(contract.startDate).toLocaleDateString('en-GB')}</td>
+                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{contract.payments.length > 0 ? new Date(contract.payments[0].dueDate).toLocaleDateString('en-GB') : '-'}</td>
                     <td className="py-3 px-2 border-l border-gray-300 text-gray-700">{contract.latePayments.length}</td>
                     <td className="py-3 px-2 text-gray-700">{contract.latePayments.reduce((sum: number, p: any) => sum + p.amount, 0).toFixed(2)}</td>
                   </tr>
