@@ -30,25 +30,27 @@ export function InstallmentsPay() {
   const handlePay = (paymentId: string) => {
     if (!selectedContract) return;
     
-    const paidVal = Number(paymentInputs[paymentId]);
+    // Find the original payment amount in case the input is untouched
+    const originalPayment = selectedContract.payments.find(p => p.id === paymentId);
+    
+    const inputValue = paymentInputs[paymentId];
+    const paidVal = inputValue !== undefined ? Number(inputValue) : (originalPayment ? originalPayment.amount : 0);
+
     if (!paidVal || paidVal <= 0) {
       alert('الرجاء كتابة مبلغ الدفع');
       return;
     }
 
-    if (window.confirm(`هل أنت متأكد من سداد مبلغ ${paidVal} ج.م لهذا القسط؟`)) {
-      payInstallment(selectedContract.id, paymentId, paidVal);
+    payInstallment(selectedContract.id, paymentId, paidVal);
       
-      // Update local view
-      setSelectedContract(prev => {
-         if (!prev) return prev;
-         return {
-            ...prev,
-            payments: prev.payments.map(p => p.id === paymentId ? { ...p, isPaid: true, paidDate: new Date().toISOString(), paidAmount: paidVal } : p)
-         }
-      })
-      alert('تم سداد القسط بنجاح');
-    }
+    // Update local view
+    setSelectedContract(prev => {
+       if (!prev) return prev;
+       return {
+          ...prev,
+          payments: prev.payments.map(p => p.id === paymentId ? { ...p, isPaid: true, paidDate: new Date().toISOString(), paidAmount: paidVal } : p)
+       }
+    })
   };
 
   // derived values based on the layout
@@ -165,55 +167,67 @@ export function InstallmentsPay() {
             </div>
 
             {/* Table */}
-            <div className="border border-indigo-900 min-h-[300px]">
-                <table className="w-full text-center text-lg">
+            {selectedContract && (
+            <div className="border border-indigo-900 min-h-[300px] overflow-hidden">
+                <table className="w-full text-center text-lg table-auto">
                     <thead>
-                       <tr>
-                          <th className="border-b border-l border-indigo-900 border-dashed py-3 font-bold text-blue-800 bg-[#eef5fa]">رقم القسط</th>
-                          <th className="border-b border-l border-indigo-900 border-dashed py-3 font-bold bg-[#eef5fa]">تاريخ الدفعات</th>
-                          <th className="border-b border-l border-indigo-900 border-dashed py-3 font-bold bg-[#eef5fa]">مبلغ الدفع</th>
-                          <th className="border-b border-l border-indigo-900 border-dashed py-3 font-bold bg-[#eef5fa]">تاريخ الدفع</th>
-                          <th className="border-b border-indigo-900 border-dashed py-3 font-bold bg-[#eef5fa]">إجراء</th>
+                       <tr className="bg-black text-white text-sm">
+                          <th className="py-2 border-l border-gray-600 font-bold w-16">إجراء</th>
+                          <th className="py-2 border-l border-gray-600 font-bold w-1/4">تاريخ الدفع (الفعلي)</th>
+                          <th className="py-2 border-l border-gray-600 font-bold w-1/5">مبلغ الدفع</th>
+                          <th className="py-2 border-l border-gray-600 font-bold w-1/4">تاريخ الدفعات (المتوقع)</th>
+                          <th className="py-2 font-bold w-16">رقم القسط</th>
                        </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="bg-white">
                        {selectedContract?.payments.map((p, index) => {
                           const nextUnpaid = selectedContract.payments.find(pay => !pay.isPaid);
                           const isCurrent = nextUnpaid?.id === p.id;
                           return (
-                           <tr key={p.id} className={p.isPaid ? "bg-green-50" : "hover:bg-gray-50"}>
-                              <td className="border-b border-l border-indigo-900 border-dashed py-2 font-bold">{index + 1}</td>
-                              <td className="border-b border-l border-indigo-900 border-dashed py-2" dir="ltr">{new Date(p.dueDate).toLocaleDateString('ar-EG')}</td>
-                              <td className="border-b border-l border-indigo-900 border-dashed py-2 font-bold flex justify-center">
+                           <tr key={p.id} className={p.isPaid ? "bg-gray-100" : "hover:bg-blue-50/50"}>
+                              <td className="border-b border-l border-gray-300 py-1.5">
+                                 {!p.isPaid && isCurrent && (
+                                     <button onClick={() => handlePay(p.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-1 text-xs rounded border border-blue-800 shadow-sm focus:outline-none">
+                                        تسجيل الدفع
+                                     </button>
+                                 )}
+                              </td>
+                              <td className="border-b border-l border-gray-300 py-1.5 font-bold text-sm text-gray-700">
+                                 {p.isPaid ? new Date(p.paidDate!).toLocaleDateString('en-GB') : ''}
+                              </td>
+                              <td className="border-b border-l border-gray-300 py-1.5 flex justify-center items-center">
                                  {p.isPaid ? (
-                                    <span className="text-green-800">{p.paidAmount !== undefined ? p.paidAmount : p.amount} ج.م</span>
+                                    <span className="font-bold text-sm text-gray-800">{p.paidAmount !== undefined ? p.paidAmount : p.amount}</span>
                                  ) : (
                                     <input 
                                        type="number"
                                        disabled={!isCurrent}
-                                       className={`w-28 h-8 border border-gray-400 shadow-inner text-center font-bold outline-none ${isCurrent ? 'bg-[#fffadc]' : 'bg-gray-100 opacity-50 cursor-not-allowed'}`}
+                                       className={`w-28 h-7 border border-blue-400 text-center font-bold text-sm text-blue-700 outline-none ${isCurrent ? 'bg-white focus:border-blue-600' : 'bg-gray-50 opacity-50 cursor-not-allowed'}`}
                                        placeholder={p.amount.toString()}
-                                       value={paymentInputs[p.id] || ''}
+                                       value={paymentInputs[p.id] !== undefined ? paymentInputs[p.id] : p.amount.toString()}
                                        onChange={(e) => setPaymentInputs(prev => ({...prev, [p.id]: e.target.value}))}
                                     />
                                  )}
                               </td>
-                              <td className="border-b border-l border-indigo-900 border-dashed py-2 font-bold text-green-700">
-                                 {p.isPaid ? new Date(p.paidDate!).toLocaleDateString('ar-EG') : '-'}
-                              </td>
-                              <td className="border-b border-indigo-900 border-dashed py-2">
-                                 {!p.isPaid && isCurrent && (
-                                     <button onClick={() => handlePay(p.id)} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-1 text-sm shadow">
-                                        سداد الان
-                                     </button>
-                                 )}
-                              </td>
+                              <td className="border-b border-l border-gray-300 py-1.5 text-sm font-bold text-gray-700" dir="ltr">{new Date(p.dueDate).toLocaleDateString('en-GB')}</td>
+                              <td className="border-b border-gray-300 py-1.5 font-bold text-sm text-gray-800">{index + 1}</td>
                            </tr>
                           )
                        })}
+                       {/* Total Row */}
+                       <tr className="bg-gray-200/60">
+                           <td className="border-b border-l border-gray-300 py-2"></td>
+                           <td className="border-b border-l border-gray-300 py-2 font-bold text-red-600 text-lg">
+                              {selectedContract?.payments.filter(p => !p.isPaid).reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+                           </td>
+                           <td colSpan={3} className="border-b border-gray-300 py-2 font-bold text-red-600 text-right pr-4 text-sm">
+                              :المبلغ المتبقي للعميل
+                           </td>
+                       </tr>
                     </tbody>
                 </table>
             </div>
+            )}
 
         </div>
     </div>

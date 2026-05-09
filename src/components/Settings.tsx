@@ -126,15 +126,15 @@ export function Settings() {
         <div className="max-w-7xl mx-auto space-y-6">
             
             {/* Top Row: Users & Form */}
-            <div className="flex gap-6 items-start">
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
                {/* Left (Visual Right) - User Form */}
-               <div className="flex-1 bg-white p-6 shadow-sm border border-gray-300 min-h-[400px]">
+               <div className="w-full lg:flex-1 bg-white p-6 shadow-sm border border-gray-300 min-h-[400px]">
                   <h3 className="font-bold text-2xl mb-6 text-blue-900 border-b-2 border-gray-100 pb-2 flex justify-between items-center">
                      {editingCode ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}
                      {editingCode && <button onClick={handleCancel} className="text-sm text-gray-500 hover:text-red-500">إلغاء التعديل</button>}
                   </h3>
                   
-                  <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-6">
                      <div>
                         <div className="flex justify-between mb-1">
                             <span className="text-red-500 text-sm">*</span>
@@ -172,10 +172,10 @@ export function Settings() {
                      <h4 className="absolute -top-3 right-4 bg-blue-100 text-blue-800 font-bold px-4 py-1 rounded text-sm shadow-sm">
                         صلاحيات النظام (كاشير)
                      </h4>
-                     <div className="border border-blue-200 bg-gray-50/50 p-6 pt-8 flex justify-between gap-6">
+                     <div className="border border-blue-200 bg-gray-50/50 p-6 pt-8 flex flex-wrap justify-between gap-6">
                          
                          {/* الحركة */}
-                         <div className="flex-1 bg-white border border-gray-200 p-4 relative">
+                         <div className="flex-1 min-w-[200px] bg-white border border-gray-200 p-4 relative">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 font-bold text-sm text-gray-700">
                                خانة الحركة
                             </div>
@@ -189,7 +189,7 @@ export function Settings() {
                          </div>
 
                          {/* المخزن */}
-                         <div className="flex-1 bg-white border border-gray-200 p-4 relative">
+                         <div className="flex-1 min-w-[200px] bg-white border border-gray-200 p-4 relative">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 font-bold text-sm text-gray-700">
                                خانة المخزن
                             </div>
@@ -201,7 +201,7 @@ export function Settings() {
                          </div>
 
                          {/* الاقساط */}
-                         <div className="flex-1 bg-white border border-gray-200 p-4 relative">
+                         <div className="flex-1 min-w-[200px] bg-white border border-gray-200 p-4 relative">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 font-bold text-sm text-gray-700">
                                الاقساط
                             </div>
@@ -213,7 +213,7 @@ export function Settings() {
                          </div>
 
                          {/* التقارير */}
-                         <div className="flex-1 bg-white border border-gray-200 p-4 relative">
+                         <div className="flex-1 min-w-[200px] bg-white border border-gray-200 p-4 relative">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 font-bold text-sm text-gray-700">
                                إضافية
                             </div>
@@ -231,7 +231,7 @@ export function Settings() {
                </div>
 
                {/* Right (Visual Left) - Users List */}
-               <div className="w-[30%] bg-white p-6 shadow-sm border border-gray-300 min-h-[400px]">
+               <div className="w-full lg:w-[30%] bg-white p-6 shadow-sm border border-gray-300 min-h-[400px]">
                   <div className="flex justify-between mb-4 border-b pb-2 items-center">
                      <h3 className="font-bold text-xl text-blue-900">المستخدمين</h3>
                      <button onClick={handleCancel} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 shadow-sm font-bold">
@@ -275,7 +275,7 @@ export function Settings() {
             <div className="bg-white p-6 shadow-sm border border-gray-300">
                 <h3 className="font-bold text-xl mb-6 text-gray-800 border-b pb-2">النسخ الاحتياطي والاسترجاع</h3>
                 
-                <div className="flex gap-6">
+                <div className="flex flex-col md:flex-row gap-6">
                    {/* Backup */}
                    <div className="flex-1 bg-blue-50/30 border border-blue-200 p-8 flex flex-col items-center justify-center text-center gap-3">
                       <h4 className="text-blue-900 font-bold text-lg">أخذ نسخة احتياطية</h4>

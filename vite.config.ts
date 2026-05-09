@@ -14,9 +14,9 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
         manifest: {
-          name: 'نظام إدارة محل موبايلات',
-          short_name: 'كاشير الموبايلات',
-          description: 'نظام نقاط بيع أوفلاين لمحل موبايلات',
+          name: 'X_PHONE SYSTEM',
+          short_name: 'X_PHONE',
+          description: 'نظام إدارة محل موبايلات',
           theme_color: '#0f172a',
           background_color: '#ffffff',
           display: 'standalone',

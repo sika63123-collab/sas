@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Store, ChevronDown, LogOut } from 'lucide-react';
+import { motion } from 'framer-motion';
 import Cashier from './components/Cashier';
 import Inventory from './components/Inventory';
 import Reports from './components/Reports';
@@ -62,120 +63,140 @@ function MainApp() {
   return (
     <div className="flex flex-col h-screen bg-[#c5d8e1] font-sans text-gray-900" dir="rtl">
       {/* Top Windows-style Menu Bar */}
-      <div className="bg-[#e4ebf1] border-b border-[#a0b8c4] flex items-center px-4 py-1 text-sm z-50">
-         <div className="flex items-center gap-2 font-bold text-[#1e3f66] mr-4 ml-6 cursor-pointer" onClick={() => selectView('home')}>
+      <div className="bg-[#e4ebf1] border-b border-[#a0b8c4] flex flex-wrap items-center px-4 py-1 text-sm z-50">
+         <div className="flex items-center gap-2 font-bold text-[#1e3f66] mr-4 ml-6 cursor-pointer shrink-0" onClick={() => selectView('home')}>
            <Store className="h-5 w-5" />
-           <span>پرو فون</span>
+           <span>X_PHONE SYSTEM</span>
          </div>
          
-         {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.depositReturn) && (
-            <div className="relative menubar-item">
-              <button 
-                onClick={() => handleMenuClick('transaction')}
-                className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 ${openMenu === 'transaction' ? 'bg-[#c5d8e1]' : ''}`}
-              >
-                الحركة <ChevronDown className="h-3 w-3" />
-              </button>
-              
-              {openMenu === 'transaction' && (
-                <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50">
-                   {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50">الكاشير</button>}
-                   {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50">مرتجع كاشير</button>}
-                   {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50">مبيعات عربون</button>}
-                   {(isAdmin || p.depositPay) && <button onClick={() => selectView('deposit-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50">سداد وتسليم عربون</button>}
-                   {(isAdmin || p.depositReturn) && <button onClick={() => selectView('cashier', 'deposit_return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 border-t border-gray-100">مرتجع مبيعات عربون</button>}
-                </div>
-              )}
-            </div>
-         )}
+         <div className="flex items-center shrink-0">
+           {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.depositReturn) && (
+              <div className="relative menubar-item">
+                <button 
+                  onClick={() => handleMenuClick('transaction')}
+                  className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 transition-colors ${openMenu === 'transaction' ? 'bg-[#c5d8e1]' : ''}`}
+                >
+                  الحركة <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {openMenu === 'transaction' && (
+                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm">
+                     {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
+                     {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
+                     {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مبيعات عربون</button>}
+                     {(isAdmin || p.depositPay) && <button onClick={() => selectView('deposit-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">سداد وتسليم عربون</button>}
+                     {(isAdmin || p.depositReturn) && <button onClick={() => selectView('cashier', 'deposit_return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 border-t border-gray-100 transition-colors">مرتجع مبيعات عربون</button>}
+                  </div>
+                )}
+              </div>
+           )}
 
-         {(isAdmin || p.reports || p.storeQuantities || p.itemCard) && (
-            <div className="relative menubar-item">
-              <button 
-                onClick={() => handleMenuClick('reports')}
-                className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 ${openMenu === 'reports' ? 'bg-[#c5d8e1]' : ''}`}
-              >
-                التقارير <ChevronDown className="h-3 w-3" />
-              </button>
-              
-              {openMenu === 'reports' && (
-                <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50">
-                   {(isAdmin || p.reports) && (
-                       <div className="relative group/sub">
-                         <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center">
-                           كشف حساب
-                           <ChevronDown className="h-3 w-3 rotate-90" />
-                         </button>
-                         <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1">
-                            <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50">كشف حساب الفيزا</button>
-                            <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50">كشف حساب نقدي</button>
-                            <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50">تقفيل وردية</button>
+           {(isAdmin || p.reports || p.storeQuantities || p.itemCard) && (
+              <div className="relative menubar-item">
+                <button 
+                  onClick={() => handleMenuClick('reports')}
+                  className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 transition-colors ${openMenu === 'reports' ? 'bg-[#c5d8e1]' : ''}`}
+                >
+                  التقارير <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {openMenu === 'reports' && (
+                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm">
+                     {(isAdmin || p.reports) && (
+                         <div className="relative group/sub">
+                           <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center transition-colors">
+                             كشف حساب
+                             <ChevronDown className="h-3 w-3 rotate-90" />
+                           </button>
+                           <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 rounded-sm">
+                              <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب الفيزا</button>
+                              <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب نقدي</button>
+                              <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقفيل وردية</button>
+                           </div>
                          </div>
-                       </div>
-                   )}
-                   {(isAdmin || p.storeQuantities || p.itemCard) && (
-                       <div className="relative group/sub border-t border-gray-100">
-                         <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center">
-                           المخزن
-                           <ChevronDown className="h-3 w-3 rotate-90" />
-                         </button>
-                         <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1">
-                            {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50">كميات الاصناف</button>}
-                            {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50">كرت الصنف</button>}
+                     )}
+                     {(isAdmin || p.storeQuantities || p.itemCard) && (
+                         <div className="relative group/sub border-t border-gray-100">
+                           <button className="w-full text-right px-4 py-2 hover:bg-blue-50 flex justify-between items-center transition-colors">
+                             المخزن
+                             <ChevronDown className="h-3 w-3 rotate-90" />
+                           </button>
+                           <div className="hidden group-hover/sub:block absolute top-0 right-full w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 rounded-sm">
+                              {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كميات الاصناف</button>}
+                              {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كرت الصنف</button>}
+                           </div>
                          </div>
-                       </div>
-                   )}
-                </div>
-              )}
-            </div>
-         )}
+                     )}
+                  </div>
+                )}
+              </div>
+           )}
 
-         {(isAdmin || p.installmentsAdd || p.installmentsPay || p.installmentsLate) && (
-            <div className="relative menubar-item">
-              <button 
-                onClick={() => handleMenuClick('installments')}
-                className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 ${openMenu === 'installments' ? 'bg-[#c5d8e1]' : ''}`}
-              >
-                التقسيط <ChevronDown className="h-3 w-3" />
-              </button>
-              
-              {openMenu === 'installments' && (
-                <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50">
-                   {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50">اضافة عميل جديد</button>}
-                   {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50">تسديد قسط عميل</button>}
-                   {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50">عملاء متأخرون عن السداد</button>}
-                </div>
-              )}
-            </div>
-         )}
+           {(isAdmin || p.installmentsAdd || p.installmentsPay || p.installmentsLate) && (
+              <div className="relative menubar-item">
+                <button 
+                  onClick={() => handleMenuClick('installments')}
+                  className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 transition-colors ${openMenu === 'installments' ? 'bg-[#c5d8e1]' : ''}`}
+                >
+                  التقسيط <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {openMenu === 'installments' && (
+                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm">
+                     {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
+                     {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
+                     {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
+                  </div>
+                )}
+              </div>
+           )}
 
-         {isAdmin && (
-            <div className="relative menubar-item">
-              <button 
-                onClick={() => selectView('settings')}
-                className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 ${activeView === 'settings' ? 'bg-[#c5d8e1]' : ''}`}
-              >
-                إعدادات البرنامج
-              </button>
-            </div>
-         )}
+           {isAdmin && (
+              <div className="relative menubar-item">
+                <button 
+                  onClick={() => selectView('settings')}
+                  className={`px-4 py-1.5 hover:bg-[#c5d8e1] flex items-center gap-1 transition-colors ${activeView === 'settings' ? 'bg-[#c5d8e1]' : ''}`}
+                >
+                  إعدادات البرنامج
+                </button>
+              </div>
+           )}
+         </div>
          
          {/* User Info & Logout */}
-         <div className="mr-auto flex items-center gap-4 text-[#1e3f66] ml-2">
+         <div className="mr-auto flex items-center gap-2 md:gap-4 text-[#1e3f66] ml-2 shrink-0">
             <span className="font-bold text-xs" dir="rtl">مرحباً: <span className="text-blue-800">{currentUser.name}</span></span>
-            <button onClick={logout} className="flex items-center gap-1 text-red-600 hover:text-red-800 font-bold px-2 border border-transparent hover:border-red-200">
+            <button onClick={logout} className="flex items-center gap-1 text-red-600 hover:text-red-800 font-bold px-2 py-1 rounded-sm border border-transparent hover:border-red-200 transition-colors">
                <LogOut className="h-4 w-4" /> خروج
             </button>
          </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden flex flex-col relative bg-[#b8cdd6]">
+      <div className="flex-1 overflow-auto flex flex-col relative bg-[#b8cdd6]">
          {activeView === 'home' && (
-           <div className="flex-1 flex flex-col items-center justify-center text-[#1e3f66] opacity-30">
-             <Store className="w-48 h-48 mb-4 drop-shadow-lg" />
-             <h1 className="text-6xl font-black tracking-widest drop-shadow-md">پرو فون</h1>
-           </div>
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.9 }}
+             animate={{ opacity: 1, scale: 1 }}
+             transition={{ duration: 0.8, ease: "easeOut" }}
+             className="flex-1 flex flex-col items-center justify-center text-[#1e3f66] px-4"
+           >
+             <motion.div
+                animate={{ y: [0, -15, 0] }}
+                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                className="opacity-30"
+             >
+                <Store className="w-32 h-32 md:w-48 md:h-48 mb-6 drop-shadow-xl" />
+             </motion.div>
+             <motion.h1 
+               initial={{ y: 20, opacity: 0 }}
+               animate={{ y: 0, opacity: 0.4 }}
+               transition={{ delay: 0.3, duration: 0.8 }}
+               className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-widest drop-shadow-md text-center"
+             >
+               X_PHONE SYSTEM
+             </motion.h1>
+           </motion.div>
          )}
          {activeView === 'cashier' && <Cashier key={cashierMode} initialType={cashierMode} />}
          {activeView === 'inventory' && <Inventory />}

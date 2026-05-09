@@ -110,10 +110,10 @@ export function InstallmentsAdd() {
             بـــرنـامـــج الـتـقـسـيـــــط
         </h2>
 
-        <div className="flex w-full max-w-5xl gap-6">
+        <div className="flex flex-col md:flex-row w-full max-w-5xl gap-6">
             
             {/* Side Action (Right side visually because of RTL) */}
-            <div className="w-48 bg-[#e0e0e0] border border-gray-400 p-4 shadow-sm flex flex-col justify-start">
+            <div className="w-full md:w-48 bg-[#e0e0e0] border border-gray-400 p-4 shadow-sm flex flex-col justify-start shrink-0">
                <button 
                   onClick={resetForm}
                   className="w-full bg-[#cfd8db] border border-gray-400 hover:bg-gray-300 text-black font-bold py-2 px-2 shadow-sm text-lg"

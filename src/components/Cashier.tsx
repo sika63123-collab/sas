@@ -229,12 +229,12 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
 
   return (
-    <div className="flex flex-col h-full bg-[#b8cdd6] font-sans" dir="rtl">
+    <div className="flex flex-col min-h-full bg-[#b8cdd6] font-sans" dir="rtl">
       
       {/* Top Controls */}
-      <div className="p-4 flex flex-col gap-2 border-b border-[#9eb5c0]">
+      <div className="p-2 md:p-4 flex flex-col gap-2 border-b border-[#9eb5c0]">
         
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex flex-wrap items-center gap-1 justify-end">
            <div className={`h-6 px-3 text-xs font-bold text-white shadow border border-gray-400 flex items-center justify-center ml-auto ${
                transactionType === 'sale' ? 'bg-blue-600' : 
                transactionType === 'return' ? 'bg-red-600' : 
@@ -267,16 +267,16 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
            </div>
         </div>
 
-        <div className="flex items-center gap-1 justify-end">
-          <input className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100" readOnly />
+        <div className="flex flex-wrap items-center gap-1 justify-end">
+          <input className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100 hidden sm:block" readOnly />
           <input 
-              className="w-48 h-6 border shadow-inner outline-none px-2 text-sm bg-white" 
+              className="w-full sm:w-48 h-6 border shadow-inner outline-none px-2 text-sm bg-white flex-1 sm:flex-none" 
               value={itemName} 
               onChange={e => setItemName(e.target.value)}
               list="productNames"
               onKeyDown={handleKeyDown}
           />
-          <div className="bg-black text-white px-2 py-1 font-bold text-xs w-20 text-center flex-shrink-0">اسم الصنف :</div>
+          <div className="bg-black text-white px-2 py-1 font-bold text-xs sm:w-20 text-center flex-shrink-0">اسم الصنف :</div>
           
           <button className="bg-[#ff6600] w-6 h-6 flex items-center justify-center border border-gray-400 text-white font-bold" onClick={handleAddItem}>...</button>
           <input 
@@ -291,7 +291,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
           <div className="bg-black text-white px-2 py-1 font-bold text-xs w-16 text-center flex-shrink-0">الكود :</div>
         </div>
 
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex flex-wrap items-center gap-1 justify-end">
           <select 
               className="w-24 h-6 border shadow-inner outline-none bg-white text-xs px-1 disabled:bg-gray-200 disabled:text-gray-500"
               value={actualPaymentMethod}
@@ -419,27 +419,23 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
       {/* Bottom Controls */}
       <div className="p-4 border-t border-[#9eb5c0]">
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-[#b8cdd6]">
            {/* Actions on the left */}
-           <div className="flex gap-2">
-             <button onClick={handleNewInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200">
+           <div className="flex gap-2 w-full sm:w-auto">
+             <button onClick={handleNewInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200 flex-1 sm:flex-none">
                 جديد
              </button>
-             <button onClick={handleSaveInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200">
+             <button onClick={handleSaveInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200 flex-1 sm:flex-none">
                 حفظ
              </button>
            </div>
            
-           <div className="flex items-center gap-1 mx-auto">
-             {/* Spacing */}
-           </div>
-
            {/* Total on the right */}
-           <div className="flex gap-2 items-center">
-             <div className="bg-white border-2 border-black px-4 py-1 font-bold text-xl min-w-[120px] text-center shadow-inner tracking-wider">
+           <div className="flex gap-2 items-center w-full sm:w-auto justify-end">
+             <div className="bg-white border-2 border-black px-4 py-1 font-bold text-xl w-full sm:min-w-[120px] text-center shadow-inner tracking-wider">
                {totalAmount}
              </div>
-             <div className="bg-black text-white px-2 py-1 flex flex-col justify-center items-center text-xs font-bold leading-none h-10 w-24">
+             <div className="bg-black text-white px-2 py-1 flex flex-col justify-center items-center text-xs font-bold leading-none h-10 min-w-[80px]">
                 <span>إجمالي</span>
                 <span>الفاتورة:</span>
              </div>
