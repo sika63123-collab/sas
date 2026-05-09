@@ -229,71 +229,84 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
 
   return (
-    <div className="flex flex-col min-h-full bg-[#b8cdd6] font-sans" dir="rtl">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#a3bcc9] font-sans p-2 pb-0" dir="rtl">
       
-      {/* Top Controls */}
-      <div className="p-2 md:p-4 flex flex-col gap-2 border-b border-[#9eb5c0]">
-        
-        <div className="flex flex-wrap items-center gap-1 justify-end">
-           <div className={`h-6 px-3 text-xs font-bold text-white shadow border border-gray-400 flex items-center justify-center ml-auto ${
-               transactionType === 'sale' ? 'bg-blue-600' : 
-               transactionType === 'return' ? 'bg-red-600' : 
-               transactionType === 'deposit_sale' ? 'bg-orange-600' : 
-               'bg-purple-600'
-             }`}>
-             {transactionType === 'sale' ? 'كاشير' : 
-              transactionType === 'return' ? 'مرتجع كاشير' : 
-              transactionType === 'deposit_sale' ? 'مبيعات عربون' : 'مرتجع مبيعات عربون'}
-           </div>
-
-           {isReturn && (
-             <>
-               <button onClick={handleSearchInvoice} className="bg-[#ff6600] w-6 h-6 flex items-center justify-center border border-gray-400 text-white font-bold text-xs" title="بحث برقم الحركة">...</button>
-               <input 
-                 className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-white font-bold text-red-600" 
-                 value={returnInvoiceNo} 
-                 onChange={e => setReturnInvoiceNo(e.target.value)} 
-               />
-               <div className="bg-black text-white px-2 py-1 font-bold text-xs tracking-wider">رقم الحركة :</div>
-             </>
-           )}
-
-           {!isReturn && (
-             <button className="bg-[#ff6600] w-6 h-6 flex items-center justify-center border border-gray-400 text-white font-bold text-xs">...</button>
-           )}
-           <input className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100 font-bold" value={invoiceNumber} readOnly />
-           <div className="bg-black text-white px-2 py-1 font-bold text-xs tracking-wider whitespace-nowrap">
-             {isReturn ? 'رقم فاتورة المرتجع :' : 'رقم الفاتورة :'}
-           </div>
+      {/* Top Header Row */}
+      <div className="flex justify-between items-center mb-2 px-2">
+        <h2 className={`text-2xl font-bold ${isReturn ? 'text-red-700' : 'text-[#143c75]'}`}>
+          {transactionType === 'sale' ? 'مبيعات الكاشير' : 
+           transactionType === 'return' ? 'مرتجع كاشير' : 
+           transactionType === 'deposit_sale' ? 'مبيعات عربون' : 
+           'مرتجع مبيعات عربون'}
+        </h2>
+        <div className="flex items-center">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm tracking-widest text-center min-w-[100px]">رقم الفاتورة :</div>
+          <input className="w-16 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner font-bold outline-none bg-white" value={invoiceNumber} readOnly />
+          {isReturn ? (
+             <button onClick={handleSearchInvoice} className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]" title="بحث برقم الحركة">.....</button>
+          ) : (
+             <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
+          )}
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-1 justify-end">
-          <input className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100 hidden sm:block" readOnly />
-          <input 
-              className="w-full sm:w-48 h-6 border shadow-inner outline-none px-2 text-sm bg-white flex-1 sm:flex-none" 
-              value={itemName} 
-              onChange={e => setItemName(e.target.value)}
-              list="productNames"
-              onKeyDown={handleKeyDown}
-          />
-          <div className="bg-black text-white px-2 py-1 font-bold text-xs sm:w-20 text-center flex-shrink-0">اسم الصنف :</div>
-          
-          <button className="bg-[#ff6600] w-6 h-6 flex items-center justify-center border border-gray-400 text-white font-bold" onClick={handleAddItem}>...</button>
+      {/* Row 2: Code and Item Name */}
+      <div className="flex items-center mb-2 gap-2 px-2">
+        <div className="flex items-center">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">الكود :</div>
           <input 
               id="itemCodeInput"
-              className="w-20 h-6 text-center text-sm border shadow-inner outline-none" 
+              className="w-24 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
               value={itemCode} 
               onChange={e => setItemCode(e.target.value)}
               onKeyDown={handleKeyDown}
               list="productCodes"
               autoFocus
           />
-          <div className="bg-black text-white px-2 py-1 font-bold text-xs w-16 text-center flex-shrink-0">الكود :</div>
+          <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 justify-end">
+        <div className="flex items-center flex-1">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[100px]">اسم الصنف :</div>
+          <input 
+              className="flex-1 h-8 border border-[#6eb1d6] shadow-inner outline-none px-2 text-sm bg-white font-bold" 
+              placeholder="بحث..."
+              value={itemName} 
+              onChange={e => setItemName(e.target.value)}
+              list="productNames"
+              onKeyDown={handleKeyDown}
+          />
+        </div>
+      </div>
+
+      {/* Row 3: Quantity, Price, Payment Method, Add Button */}
+      <div className="flex items-center mb-2 px-2 gap-2">
+        <div className="flex items-center flex-shrink-0">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">الكمية :</div>
+          <input 
+              type="number"
+              min="1"
+              className="w-16 h-8 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none font-bold" 
+              value={itemQty} 
+              onChange={e => setItemQty(e.target.value === '' ? '' : Number(e.target.value))}
+              onKeyDown={handleKeyDown}
+          />
+        </div>
+
+        <div className="flex items-center flex-shrink-0">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">السعر :</div>
+          <input 
+              className="w-24 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
+              value={itemPrice} 
+              readOnly 
+          />
+          <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
+        </div>
+
+        <div className="flex items-center flex-shrink-0">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[110px]">طريقة السداد :</div>
           <select 
-              className="w-24 h-6 border shadow-inner outline-none bg-white text-xs px-1 disabled:bg-gray-200 disabled:text-gray-500"
+              className="w-32 h-8 border border-[#6eb1d6] shadow-inner outline-none bg-white text-sm px-2 disabled:bg-gray-200 disabled:text-gray-500 font-bold"
               value={actualPaymentMethod}
               onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}
               disabled={isReturn}
@@ -303,77 +316,14 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               <option value="instapay">انستا باي</option>
               <option value="vodafone_cash">فودافون كاش</option>
           </select>
-          <div className="bg-black text-white px-2 py-1 font-bold text-[10px] w-20 text-center flex-shrink-0">طريقة السداد :</div>
-          
-          <input 
-              className="w-16 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100" 
-              value={itemPrice} 
-              readOnly 
-          />
-          <div className="bg-black text-white px-2 py-1 font-bold text-xs w-16 text-center flex-shrink-0">السعر :</div>
-          
-          <input 
-              type="number"
-              min="1"
-              className="w-16 h-6 text-center text-sm border shadow-inner outline-none" 
-              value={itemQty} 
-              onChange={e => setItemQty(e.target.value === '' ? '' : Number(e.target.value))}
-              onKeyDown={handleKeyDown}
-          />
-          <div className="bg-black text-white px-2 py-1 font-bold text-xs w-16 text-center flex-shrink-0">الكمية :</div>
         </div>
 
-        {isDeposit && (
-          <div className="bg-[#aec3cc] p-2 mt-2 border border-[#83a1b3] shadow-inner mb-2 w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-               {/* Right Side (Deposit Details) */}
-               <div className="flex flex-col gap-2 border-l border-[#83a1b3] pl-4">
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-24 h-6 text-center text-sm border shadow-inner outline-none font-bold text-red-600 bg-[#e4ebf1]" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value === '' ? '' : Number(e.target.value))} />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-28 text-center border-2 border-white">العربون :</div>
-                  </div>
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-24 h-6 text-center text-sm border shadow-inner outline-none bg-gray-100 font-bold" value={totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)} readOnly />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-28 text-center border-2 border-white">سدد الباقى :</div>
-                  </div>
-                  <div className="flex items-center gap-1 justify-end">
-                     <div className="w-48 h-6 flex items-center justify-around border shadow-inner bg-white px-2">
-                       <label className="flex items-center gap-1 cursor-pointer">
-                         <input type="radio" checked={isDelivered} onChange={() => setIsDelivered(true)} className="w-3 h-3 accent-green-600" />
-                         <span className="text-[10px] font-bold text-green-700">تم التسليم</span>
-                       </label>
-                       <label className="flex items-center gap-1 cursor-pointer">
-                         <input type="radio" checked={!isDelivered} onChange={() => setIsDelivered(false)} className="w-3 h-3 accent-red-600" />
-                         <span className="text-[10px] font-bold text-red-700">لم يسلم</span>
-                       </label>
-                     </div>
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-28 text-center border-2 border-white">حالة التسليم :</div>
-                  </div>
-               </div>
-
-               {/* Left Side (Customer details) */}
-               <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-48 h-6 px-1 text-sm border shadow-inner outline-none bg-[#e4ebf1] text-right font-bold" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-24 text-center border-2 border-white">التليفون :</div>
-                  </div>
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-48 h-6 px-1 text-sm border shadow-inner outline-none bg-[#e4ebf1] text-right font-bold" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-24 text-center border-2 border-white">اسم العميل :</div>
-                  </div>
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-48 h-6 px-1 text-sm border shadow-inner outline-none bg-[#e4ebf1] text-right font-bold" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-24 text-center border-2 border-white">العنوان :</div>
-                  </div>
-                  <div className="flex items-center gap-1 justify-end">
-                     <input className="w-48 h-6 px-1 text-sm border shadow-inner outline-none bg-[#e4ebf1] text-right font-bold" value={pageNumber} onChange={e => setPageNumber(e.target.value)} />
-                     <div className="bg-black text-[#8bbdf9] px-2 py-1 font-bold text-xs w-24 text-center border-2 border-white">رقم الصفحة :</div>
-                  </div>
-               </div>
-            </div>
-          </div>
-        )}
-
+        <button 
+           onClick={handleAddItem}
+           className="bg-[#64a1e6] hover:bg-[#528cc7] text-white font-bold h-8 px-6 text-sm flex items-center justify-center"
+        >
+          + إضافة
+        </button>
       </div>
 
       <datalist id="productNames">
@@ -384,64 +334,155 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
       </datalist>
 
       {/* Table Section */}
-      <div className="flex-1 overflow-auto bg-[#c5d8e1] p-1">
-        <div className="bg-white border border-[#83a1b3] min-h-full">
+      <div className="flex-1 bg-[#e9eced] flex flex-col mx-2 border border-[#9eaab3] shadow-inner mt-4 mb-2 overflow-hidden min-h-[150px]">
+        <div className="overflow-auto flex-1">
           <table className="w-full text-center text-sm">
-            <thead className="bg-[#b8cdd6] text-black border-b border-[#83a1b3]">
+            <thead className="bg-[#eaeced] border-b border-[#a9b7c2] sticky top-0" style={{ zIndex: 10 }}>
               <tr>
-                <th className="py-1 px-2 font-bold border-l border-[#83a1b3]">الاجمالي</th>
-                <th className="py-1 px-2 font-bold border-l border-[#83a1b3]">الكمية</th>
-                <th className="py-1 px-2 font-bold border-l border-[#83a1b3]">سعر الوحدة</th>
-                <th className="py-1 px-2 font-bold border-l border-[#83a1b3] text-right w-1/3">اسم الصنف</th>
-                <th className="py-1 px-2 font-bold border-l border-[#83a1b3]">الكود</th>
-                <th className="w-6"></th>
+                <th className="py-2 px-2 font-bold text-gray-800 border-l border-white w-1/6">الكود</th>
+                <th className="py-2 px-2 font-bold text-gray-800 border-l border-white w-1/3 text-right pr-4">اسم الصنف</th>
+                <th className="py-2 px-2 font-bold text-gray-800 border-l border-white w-1/6">سعر الوحدة</th>
+                <th className="py-2 px-2 font-bold text-gray-800 border-l border-white w-1/6">الكمية</th>
+                <th className="py-2 px-2 font-bold text-gray-800 border-l border-white w-1/6">الاجمالي</th>
+                <th className="py-2 px-2 w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {cart.map((item, idx) => (
-                <tr key={item.id} className="hover:bg-[#2b6eb5] hover:text-white transition-colors cursor-default text-black bg-transparent">
-                  <td className="py-0.5 px-2 font-bold border-l border-[#e0e0e0]">{item.price * item.cartQuantity}</td>
-                  <td className="py-0.5 px-2 border-l border-[#e0e0e0]">{item.cartQuantity}</td>
-                  <td className="py-0.5 px-2 border-l border-[#e0e0e0]">{item.price}</td>
-                  <td className="py-0.5 px-2 border-l border-[#e0e0e0] font-bold text-right truncate">{item.name}</td>
-                  <td className="py-0.5 px-2 border-l border-[#e0e0e0]">{item.id}</td>
-                  <td className="py-0.5 px-1 text-center">
-                    <button onClick={() => removeFromCart(item.id)} className="text-red-500 hover:text-red-700">
-                      <Trash2 className="w-4 h-4 mx-auto" />
-                    </button>
-                  </td>
+              {cart.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-4 text-center text-gray-400 font-bold">الفاتورة فارغة، يرجى إضافة عناصر.</td>
                 </tr>
-              ))}
+              ) : (
+                cart.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-blue-50 transition-colors cursor-default text-black bg-white border-b border-gray-200">
+                    <td className="py-1 px-2 border-l border-gray-100 font-bold text-gray-600">{item.id}</td>
+                    <td className="py-1 px-2 border-l border-gray-100 font-bold text-right pr-4">{item.name}</td>
+                    <td className="py-1 px-2 border-l border-gray-100 font-bold text-gray-700">{item.price}</td>
+                    <td className="py-1 px-2 border-l border-gray-100 font-bold">{item.cartQuantity}</td>
+                    <td className="py-1 px-2 border-l border-gray-100 font-bold text-gray-800">{item.price * item.cartQuantity}</td>
+                    <td className="py-1 px-1 text-center">
+                      <button onClick={() => removeFromCart(item.id)} className="text-red-500 hover:text-red-700">
+                        <Trash2 className="w-4 h-4 mx-auto" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Bottom Controls */}
-      <div className="p-4 border-t border-[#9eb5c0]">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-[#b8cdd6]">
-           {/* Actions on the left */}
-           <div className="flex gap-2 w-full sm:w-auto">
-             <button onClick={handleNewInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200 flex-1 sm:flex-none">
-                جديد
-             </button>
-             <button onClick={handleSaveInvoice} className="bg-gray-100 border border-[#83a1b3] shadow px-4 py-1 text-sm font-bold hover:bg-gray-200 flex-1 sm:flex-none">
-                حفظ
-             </button>
+      {isDeposit && (
+         <div className="mx-2 mb-2 bg-[#eaeced] p-2 border border-[#a9b7c2] shadow-sm flex flex-col md:flex-row gap-4 text-sm mt-auto">
+           {/* Right Box (Customer & Delivery Data) */}
+           <div className="flex-1 flex flex-col gap-2 order-2 md:order-1">
+             <div className="flex flex-col md:flex-row gap-2">
+               <div className="flex-1 flex items-center">
+                 <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">تاريخ السداد :</div>
+                 <input type="date" className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" />
+               </div>
+               <div className="flex-1 flex items-center">
+                 <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">رقم البطاقة :</div>
+                 <input className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold text-left" value={pageNumber} onChange={e => setPageNumber(e.target.value)} dir="ltr" />
+               </div>
+             </div>
+             
+             <div className="flex flex-col md:flex-row gap-2">
+               <div className="flex-1 flex items-center">
+                 <div className="bg-[#4988e0] text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">التليفون :</div>
+                 <input className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold text-left" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} dir="ltr" />
+               </div>
+               <div className="flex-1 flex items-center">
+                 <div className="bg-[#4988e0] text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">العنوان :</div>
+                 <input className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+               </div>
+             </div>
+             
+             <div className="flex flex-col md:flex-row gap-2">
+               <div className="flex-1 flex items-center">
+                 <div className="bg-[#4988e0] text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">اسم العميل :</div>
+                 <input className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+               </div>
+               <div className="flex-1 flex items-center">
+                 <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[100px] h-8 flex flex-col justify-center">التسليم :</div>
+                 <select className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" value={isDelivered ? 'yes' : 'no'} onChange={(e) => setIsDelivered(e.target.value === 'yes')}>
+                   <option value="no">لم يتم التسليم</option>
+                   <option value="yes">تم التسليم</option>
+                 </select>
+               </div>
+             </div>
            </div>
-           
-           {/* Total on the right */}
-           <div className="flex gap-2 items-center w-full sm:w-auto justify-end">
-             <div className="bg-white border-2 border-black px-4 py-1 font-bold text-xl w-full sm:min-w-[120px] text-center shadow-inner tracking-wider">
+
+           {/* Left Box (Financials) */}
+           <div className="w-full md:w-[350px] flex flex-col gap-2 md:border-r border-[#a9b7c2] md:pr-4 order-1 md:order-2 shrink-0">
+             <div className="flex items-center">
+               <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[140px] h-8 flex flex-col justify-center tracking-wide">العربون :</div>
+               <input type="number" className="flex-1 h-8 text-center border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold text-black" value={depositAmount} onChange={e => setDepositAmount(e.target.value === '' ? '' : Number(e.target.value))} />
+             </div>
+             <div className="flex items-center">
+               <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[140px] h-8 flex flex-col justify-center tracking-wide">سدد الباقى :</div>
+               <input className="flex-1 h-8 text-center border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-[#e9eced] font-bold text-black" value={totalAmount > 0 ? (totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)).toFixed(2) : '0'} readOnly />
+             </div>
+             <div className="flex items-center">
+               <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[140px] h-8 flex flex-col justify-center tracking-wide">إجمالي الفاتورة :</div>
+               <input className="flex-1 h-8 text-center border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold text-black" value={totalAmount > 0 ? totalAmount.toFixed(2) : '0'} readOnly />
+             </div>
+             <div className="flex items-center">
+               <div className="bg-black text-white px-3 py-1 font-bold text-center min-w-[140px] h-8 flex flex-col justify-center tracking-wide">طريقة السداد :</div>
+               <select 
+                 className="flex-1 h-8 px-2 border-y border-l border-[#6eb1d6] shadow-inner outline-none bg-white font-bold"
+                 value={actualPaymentMethod}
+                 onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}
+                 disabled={isReturn}
+               >
+                 <option value="cash">نقدية</option>
+                 <option value="visa">فيزا</option>
+                 <option value="instapay">انستا باي</option>
+                 <option value="vodafone_cash">فودافون كاش</option>
+               </select>
+             </div>
+           </div>
+         </div>
+      )}
+
+      {/* Bottom Controls */}
+      {!isDeposit && (
+        <div className="flex justify-between items-center px-2 pb-4 mt-auto">
+          {/* Left: Total Amount */}
+          <div className="flex items-center shadow-md">
+             <div className="bg-black text-white px-4 h-10 flex items-center justify-center text-sm font-bold tracking-wider">
+               اجمالي الفاتورة:
+             </div>
+             <div className="bg-white border-y border-l border-gray-300 h-10 px-8 flex items-center justify-center font-bold text-xl text-black">
                {totalAmount}
              </div>
-             <div className="bg-black text-white px-2 py-1 flex flex-col justify-center items-center text-xs font-bold leading-none h-10 min-w-[80px]">
-                <span>إجمالي</span>
-                <span>الفاتورة:</span>
-             </div>
-           </div>
+          </div>
+
+          {/* Right: Buttons */}
+          <div className="flex gap-2">
+            <button onClick={handleSaveInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
+              حفظ
+            </button>
+            <button onClick={handleNewInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
+              جديد
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {isDeposit && (
+        <div className="flex justify-end px-2 pb-4 mt-1">
+          <div className="flex gap-2">
+            <button onClick={handleNewInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
+              جديد
+            </button>
+            <button onClick={handleSaveInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
+              حفظ
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Checkout Modal */}
       {showCheckoutModal && (

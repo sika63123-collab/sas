@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 
 export function InstallmentsLate() {
   const { installmentContracts } = useAppStore();
 
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState('2026-01-01');
+  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
   const [searched, setSearched] = useState(false);
 
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -42,82 +42,73 @@ export function InstallmentsLate() {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-[calc(100vh-64px)] bg-[#b0bec5] font-sans p-6" dir="rtl">
+    <div className="flex flex-col items-center min-h-screen bg-[#a8bec9] font-sans p-6" dir="rtl">
       
       <h2 className="text-center font-bold text-4xl text-blue-600 mb-8 tracking-wider" style={{ textShadow: '1px 1px 0px white, -1px -1px 0px white, 1px -1px 0px white, -1px 1px 0px white' }}>
         الأقساط المتأخرة
       </h2>
 
-      <div className="w-full max-w-4xl bg-white p-6 shadow-md border border-gray-400 mb-6 flex items-center gap-4">
-          <div className="flex flex-1 border border-gray-300 shadow-inner h-10">
-              <div className="bg-[#111] text-white px-6 font-bold text-sm flex items-center justify-center">من تاريخ:</div>
-              <input 
-                type="date" 
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
-                className="flex-1 px-4 outline-none text-sm font-bold bg-white" 
-              />
-          </div>
-          <div className="flex flex-1 border border-gray-300 shadow-inner h-10">
-              <div className="bg-[#111] text-white px-6 font-bold text-sm flex items-center justify-center">إلى تاريخ:</div>
+      <div className="w-full max-w-4xl bg-[#e5ebed] p-4 shadow-sm border border-gray-300 mb-6 flex flex-row-reverse items-center justify-between gap-4">
+          <button 
+             onClick={handleSearch}
+             className="bg-blue-600 w-24 h-10 text-white font-bold hover:bg-blue-700 shadow flex items-center justify-center cursor-pointer"
+          >
+             بحث
+          </button>
+          <div className="flex flex-1 border border-gray-300 shadow-inner h-10 bg-white items-center max-w-[300px]">
+              <div className="bg-[#3e3432] text-white px-4 h-full font-bold text-sm flex items-center justify-center whitespace-nowrap">إلى تاريخ:</div>
               <input 
                  type="date" 
                  value={toDate}
                  onChange={e => setToDate(e.target.value)}
-                 className="flex-1 px-4 outline-none text-sm font-bold bg-white" 
+                 className="flex-1 px-2 outline-none text-sm font-bold bg-transparent mx-2" 
               />
           </div>
-          <button 
-             onClick={handleSearch}
-             className="bg-blue-600 w-24 h-10 text-white font-bold hover:bg-blue-700 shadow-md"
-          >
-             بحث
-          </button>
+          <div className="flex flex-1 border border-gray-300 shadow-inner h-10 bg-white items-center max-w-[300px]">
+              <div className="bg-[#3e3432] text-white px-4 h-full font-bold text-sm flex items-center justify-center whitespace-nowrap">من تاريخ:</div>
+              <input 
+                type="date" 
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                className="flex-1 px-2 outline-none text-sm font-bold bg-transparent mx-2" 
+              />
+          </div>
       </div>
 
       {searched && (
-        <div className="w-full max-w-4xl space-y-4">
-          {searchResults.length === 0 ? (
-            <div className="text-center text-gray-700 font-bold p-6 bg-white shadow-md border border-gray-400 text-xl">لا يوجد أقساط متأخرة في هذه الفترة</div>
-          ) : (
-            searchResults.map(contract => (
-               <div key={contract.id} className="bg-red-50 p-4 shadow-md border border-red-300">
-                  <div className="flex justify-between items-start mb-4 border-b border-red-200 pb-2">
-                    <div>
-                      <h3 className="font-bold text-xl text-red-900">{contract.customerName}</h3>
-                      <div className="text-sm text-red-700 font-bold mt-1">تليفون: <span dir="ltr">{contract.customerPhone}</span> | العنوان: {contract.customerAddress} | صفحة: {contract.pageNumber}</div>
-                    </div>
-                    <div className="text-left font-bold text-red-900 bg-white px-4 py-2 border border-red-200 shadow-sm">
-                      الأقساط المتأخرة: <span className="text-2xl text-red-600 mx-2">{contract.latePayments.length}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white border border-red-200 shadow-inner">
-                    <table className="w-full text-center">
-                      <thead>
-                        <tr className="border-b border-red-200 bg-red-100/50">
-                          <th className="p-2 font-bold text-red-900 border-l border-red-200">رقم القسط</th>
-                          <th className="p-2 font-bold text-red-900 border-l border-red-200">تاريخ الاستحقاق</th>
-                          <th className="p-2 font-bold text-red-900">المبلغ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {contract.latePayments.map((payment: any) => {
-                          const idx = contract.payments.findIndex((p: any) => p.id === payment.id) + 1;
-                          return (
-                            <tr key={payment.id} className="border-b border-red-100 last:border-0 hover:bg-red-50 text-red-800 font-bold">
-                              <td className="p-2 border-l border-red-100">قسط #{idx}</td>
-                              <td className="p-2 border-l border-red-100" dir="ltr">{new Date(payment.dueDate).toLocaleDateString('ar-EG')}</td>
-                              <td className="p-2">{payment.amount} ج.م</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-               </div>
-            ))
-          )}
+        <div className="w-full max-w-4xl bg-white border border-gray-300 shadow-sm mt-4">
+          <table className="w-full text-center table-fixed">
+            <thead>
+              <tr className="bg-[#3e3432] text-white text-sm">
+                <th className="py-3 px-2 font-bold border-l border-[#5a4c4a]">رقم الصفحة</th>
+                <th className="py-3 px-2 font-bold border-l border-[#5a4c4a]">اسم العميل</th>
+                <th className="py-3 px-2 font-bold border-l border-[#5a4c4a]">رقم التليفون</th>
+                <th className="py-3 px-2 font-bold border-l border-[#5a4c4a]">بداية القسط</th>
+                <th className="py-3 px-2 font-bold border-l border-[#5a4c4a]">عدد الأقساط (المتأخرة)</th>
+                <th className="py-3 px-2 font-bold">إجمالي المبلغ المستحق</th>
+              </tr>
+            </thead>
+            <tbody>
+              {searchResults.length === 0 ? (
+                <tr>
+                   <td colSpan={6} className="py-8 text-center text-gray-700 font-bold bg-[#eef5fa]">
+                     لا يوجد أقساط متأخرة في هذه الفترة
+                   </td>
+                </tr>
+              ) : (
+                searchResults.map(contract => (
+                  <tr key={contract.id} className="border-t border-gray-300 hover:bg-gray-50 bg-[#eef5fa] text-gray-800 font-bold text-sm">
+                    <td className="py-3 px-2 border-l border-gray-300">{contract.pageNumber || '-'}</td>
+                    <td className="py-3 px-2 border-l border-gray-300 text-[#543b3b]">{contract.customerName}</td>
+                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{contract.customerPhone}</td>
+                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{new Date(contract.startDate).toLocaleDateString('en-GB')}</td>
+                    <td className="py-3 px-2 border-l border-gray-300 text-gray-700">{contract.latePayments.length}</td>
+                    <td className="py-3 px-2 text-gray-700">{contract.latePayments.reduce((sum: number, p: any) => sum + p.amount, 0).toFixed(2)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
