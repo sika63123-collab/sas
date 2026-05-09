@@ -20,7 +20,9 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const [senderWallet, setSenderWallet] = useState('');
   const [receiverWallet, setReceiverWallet] = useState('');
   const [returnInvoiceNo, setReturnInvoiceNo] = useState('');
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   
   // Deposit States
   const [customerName, setCustomerName] = useState('');
@@ -118,11 +120,14 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     }
 
     const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
-    if (isEWallet) {
-        setShowCheckoutModal(true);
-    } else {
-        submitTransaction(); 
+    if (isEWallet && !isReturn) {
+      if (senderWallet.length !== 4 || receiverWallet.length !== 4) {
+        alert('يجب ادخال اخر 4 ارقام من المحفظة المرسلة والمستلمة بشكل صحيح');
+        return;
+      }
     }
+
+    submitTransaction();
   };
 
   const submitTransaction = () => {
@@ -159,7 +164,6 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
     // Reset
     handleNewInvoice();
-    setShowCheckoutModal(false);
   };
 
   const handleNewInvoice = () => {
@@ -183,7 +187,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   };
 
   const handleSearchInvoice = () => {
-    if (!isReturn || !returnInvoiceNo.trim()) return;
+    if (!returnInvoiceNo.trim()) return;
     // Try finding by exact id, or by 1-based index (since invoice format right now just uses length + 1 on creation)
     let originalTx = transactions.find(t => String(t.id) === returnInvoiceNo);
     if (!originalTx) {
@@ -221,9 +225,12 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
        setCustomerAddress(originalTx.customerAddress || '');
        setPageNumber(originalTx.pageNumber || '');
        setIsDelivered(originalTx.isDelivered || false);
+       setTransactionType('deposit_return');
+    } else {
+       setTransactionType('return');
     }
     
-    alert('تم تحميل أصناف الفاتورة، يمكنك حذف الأصناف أو تعديل الكميات للمرتجع');
+    alert('تم تحميل أصناف الفاتورة للمرتجع. يمكنك تعديل الكميات أو حذف الأصناف التي لن يتم إرجاعها.');
   };
 
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
@@ -233,21 +240,17 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
       
       {/* Top Header Row */}
       <div className="flex justify-between items-center mb-2 px-2">
+        <div className="flex items-center">
+          <div className="bg-black text-white px-3 py-1 font-bold text-sm tracking-widest text-center min-w-[100px]">رقم الفاتورة :</div>
+          <input className="w-16 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner font-bold outline-none bg-white" value={invoiceNumber} readOnly />
+          <button onClick={() => setShowSearchModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6] cursor-pointer" title="بحث برقم الحركة">.....</button>
+        </div>
         <h2 className={`text-2xl font-bold ${isReturn ? 'text-red-700' : 'text-[#143c75]'}`}>
           {transactionType === 'sale' ? 'مبيعات الكاشير' : 
            transactionType === 'return' ? 'مرتجع كاشير' : 
            transactionType === 'deposit_sale' ? 'مبيعات عربون' : 
            'مرتجع مبيعات عربون'}
         </h2>
-        <div className="flex items-center">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm tracking-widest text-center min-w-[100px]">رقم الفاتورة :</div>
-          <input className="w-16 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner font-bold outline-none bg-white" value={invoiceNumber} readOnly />
-          {isReturn ? (
-             <button onClick={handleSearchInvoice} className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]" title="بحث برقم الحركة">.....</button>
-          ) : (
-             <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
-          )}
-        </div>
       </div>
 
       {/* Row 2: Code and Item Name */}
@@ -263,19 +266,20 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               list="productCodes"
               autoFocus
           />
-          <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
+          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
         </div>
 
-        <div className="flex items-center flex-1">
+        <div className="flex items-center w-[350px]">
           <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[100px]">اسم الصنف :</div>
           <input 
-              className="flex-1 h-8 border border-[#6eb1d6] shadow-inner outline-none px-2 text-sm bg-white font-bold" 
+              className="flex-1 h-8 border-y border-r border-[#6eb1d6] shadow-inner outline-none px-2 text-sm bg-white font-bold" 
               placeholder="بحث..."
               value={itemName} 
               onChange={e => setItemName(e.target.value)}
               list="productNames"
               onKeyDown={handleKeyDown}
           />
+          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
         </div>
       </div>
 
@@ -296,11 +300,10 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         <div className="flex items-center flex-shrink-0">
           <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">السعر :</div>
           <input 
-              className="w-24 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
+              className="w-24 h-8 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
               value={itemPrice} 
               readOnly 
           />
-          <button className="bg-[#ff6600] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
         </div>
 
         <div className="flex items-center flex-shrink-0">
@@ -317,6 +320,15 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               <option value="vodafone_cash">فودافون كاش</option>
           </select>
         </div>
+
+        {isEWallet && !isReturn && (
+          <div className="flex items-center gap-1 bg-[#eaeced] px-2 h-8 border border-[#6eb1d6]">
+             <div className="text-xs font-bold text-blue-900">مرسل:</div>
+             <input className="w-12 h-6 text-center text-sm border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={senderWallet} onChange={e => setSenderWallet(e.target.value.replace(/\D/g, ''))} />
+             <div className="text-xs font-bold text-blue-900 mr-1">مستلم:</div>
+             <input className="w-12 h-6 text-center text-sm border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={receiverWallet} onChange={e => setReceiverWallet(e.target.value.replace(/\D/g, ''))} />
+          </div>
+        )}
 
         <button 
            onClick={handleAddItem}
@@ -410,9 +422,9 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                    <option value="no">لم يتم التسليم</option>
                    <option value="yes">تم التسليم</option>
                  </select>
-               </div>
-             </div>
-           </div>
+              </div>
+              </div>
+            </div>
 
            {/* Left Box (Financials) */}
            <div className="w-full md:w-[350px] flex flex-col gap-2 md:border-r border-[#a9b7c2] md:pr-4 order-1 md:order-2 shrink-0">
@@ -484,63 +496,114 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         </div>
       )}
 
-      {/* Checkout Modal */}
-      {showCheckoutModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-              <h3 className="font-bold text-2xl text-gray-800">تأكيد الفاتورة والدفع</h3>
-              <button onClick={() => setShowCheckoutModal(false)} className="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
+      {/* Search Invoice Modal */}
+      {showSearchModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800">بحث عن فاتورة (للمرتجع)</h3>
+              <button onClick={() => setShowSearchModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
-            <div className="p-6 space-y-6 text-lg">
-              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
-                 <span className="font-medium text-gray-600">{isDeposit ? 'قيمة العربون المطلوب:' : 'المبلغ المطلوب:'}</span>
-                 <span className="font-bold text-3xl text-green-600">{isDeposit ? typeof depositAmount === 'number' ? depositAmount : 0 : totalAmount} ج.م</span>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-gray-700 mb-2 font-bold text-sm">رقم الفاتورة الأصلي</label>
+                <input 
+                  type="text" 
+                  value={returnInvoiceNo}
+                  onChange={e => setReturnInvoiceNo(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none tracking-widest text-lg"
+                  placeholder="أدخل رقم الفاتورة..."
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                       handleSearchInvoice();
+                       setShowSearchModal(false);
+                    }
+                  }}
+                />
               </div>
-
-              {isEWallet && (
-                <div className="space-y-4 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
-                  <p className="text-sm text-blue-800 font-bold mb-2">بيانات المحفظة (مطلوب)</p>
-                  <div>
-                    <label className="block text-gray-700 mb-2 font-medium">اخر 4 ارقام - المحفظة المرسلة</label>
-                    <input 
-                      type="text" 
-                      maxLength={4}
-                      value={senderWallet}
-                      onChange={e => setSenderWallet(e.target.value.replace(/\D/g, ''))}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center tracking-widest text-2xl font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="XXXX"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-gray-700 mb-2 font-medium">اخر 4 ارقام - المحفظة المستلمة</label>
-                    <input 
-                      type="text" 
-                      maxLength={4}
-                      value={receiverWallet}
-                      onChange={e => setReceiverWallet(e.target.value.replace(/\D/g, ''))}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center tracking-widest text-2xl font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="XXXX"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2 pt-2">
                 <button 
-                  onClick={() => setShowCheckoutModal(false)}
-                  className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-4 rounded-xl transition-colors"
+                  onClick={() => setShowSearchModal(false)}
+                  className="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2 rounded-lg transition-colors"
                 >
-                  رجوع
+                  إلغاء
                 </button>
                 <button 
-                  onClick={submitTransaction}
-                  disabled={isEWallet && (senderWallet.length !== 4 || receiverWallet.length !== 4)}
-                  className="flex-[2] bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-xl"
+                  onClick={() => {
+                    handleSearchInvoice();
+                    setShowSearchModal(false);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors"
                 >
-                  <CheckCircle className="h-6 w-6" />
-                  حفظ وطباعة
+                  بحث وتحميل
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Product Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-800">بحث عن صنف</h3>
+              <button onClick={() => setShowProductModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="p-4">
+              <input 
+                type="text" 
+                value={productSearchTerm}
+                onChange={e => setProductSearchTerm(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-right font-bold focus:ring-2 focus:ring-blue-500 outline-none text-lg"
+                placeholder="ابحث بالكود أو اسم الصنف..."
+                autoFocus
+              />
+            </div>
+            <div className="overflow-auto flex-1 bg-gray-50 p-4">
+              <div className="space-y-2">
+                {productSearchTerm.trim() === '' ? (
+                  <div className="text-center text-gray-500 py-8 font-bold text-lg">
+                    يرجى كتابة اسم أو كود الصنف للبحث...
+                  </div>
+                ) : (
+                  <>
+                    {products.filter(p => p.name.includes(productSearchTerm) || p.id.includes(productSearchTerm) || (p.barcode && p.barcode.includes(productSearchTerm))).map(p => (
+                      <div 
+                        key={p.id} 
+                        onClick={() => {
+                          setItemCode(p.id);
+                          setItemName(p.name);
+                          setItemPrice(p.price);
+                          setSelectedProduct(p);
+                          setShowProductModal(false);
+                          setProductSearchTerm('');
+                        }}
+                        className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors flex justify-between items-center"
+                      >
+                        <div className="flex gap-4">
+                          <div className="bg-gray-100 px-3 py-1 rounded text-sm font-bold text-gray-600">{p.id}</div>
+                          <div className="font-bold text-gray-800 text-lg">{p.name}</div>
+                        </div>
+                        <div className="flex gap-6 items-center">
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500 font-bold">الرصيد</div>
+                            <div className={`font-bold ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>{p.stock}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500 font-bold">السعر</div>
+                            <div className="font-bold text-blue-700 text-lg">{p.price} ج.م</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {products.filter(p => p.name.includes(productSearchTerm) || p.id.includes(productSearchTerm) || (p.barcode && p.barcode.includes(productSearchTerm))).length === 0 && (
+                       <div className="text-center text-gray-500 py-8 font-bold">لم يتم العثور على أصناف</div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
