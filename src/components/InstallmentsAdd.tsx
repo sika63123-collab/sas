@@ -5,6 +5,7 @@ import { InstallmentPayment } from '../types';
 export function InstallmentsAdd() {
   const { addInstallmentContract, installmentContracts } = useAppStore();
   
+  const [contractDate, setContractDate] = useState(new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('');
   const [pageNumber, setPageNumber] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -41,19 +42,19 @@ export function InstallmentsAdd() {
 
   // Calculations
   const remaining = Math.max(0, pPrice - dPayment);
-  // Simple monthly interest: Total Interest = remaining * (rate / 100) * months
-  const totalInterest = remaining * (rate / 100) * m;
+  // Flat percentage interest: Total Interest = remaining * (rate / 100)
+  const totalInterest = remaining * (rate / 100);
   const totalAmount = remaining + totalInterest;
-  const monthlyPayment = m > 0 ? Math.ceil(totalAmount / m) : 0;
+  const monthlyPayment = m > 0 ? (totalAmount / m) : 0;
 
   const handleSave = () => {
-    if (!customerName || !customerPhone || !deviceName || m <= 0) {
+    if (!customerName || !customerPhone || !deviceName || m <= 0 || !contractDate) {
       alert('برجاء استكمال البيانات الأساسية وعـدد الشهور بشكل صحيح');
       return;
     }
 
     const payments: InstallmentPayment[] = [];
-    const date = new Date();
+    const date = new Date(contractDate);
     
     for (let i = 1; i <= m; i++) {
         const dueDate = new Date(date);
@@ -84,12 +85,13 @@ export function InstallmentsAdd() {
         payments
     });
 
-    alert(`تم تسجيل بيانات التقسيط بنجاح\nرقم العميل: ${installmentContracts.length + 1}`);
+    alert(`تم تسجيل بيانات التقسيط بنجاح\nرقم الصفحة: ${pageNumber}`);
     
     resetForm();
   };
 
   const resetForm = () => {
+     setContractDate(new Date().toISOString().split('T')[0]);
      setCustomerName('');
      setPageNumber('');
      setCustomerPhone('');
@@ -133,77 +135,89 @@ export function InstallmentsAdd() {
                 </div>
 
                 <div className="border border-gray-400 mt-12 p-6">
+                    {/* Top Top bar for Date and Search conceptually, we just add Date and maybe page number if we want to extract it, but keeping inside the grid is fine. Let's add Date on top. */}
+                    <div className="flex justify-between items-center mb-6 border-b border-gray-300 pb-4">
+                        <div className="flex items-center gap-2">
+                            <label className="bg-black text-white font-bold px-4 py-1 text-sm">التاريخ :</label>
+                            <input className="border border-gray-400 h-8 px-2 text-center shadow-inner outline-none font-bold text-sm w-40" type="date" value={contractDate} onChange={e => setContractDate(e.target.value)} />
+                        </div>
+                        {/* Optional page number here if we want to mimic screenshot completely, but user just said "contract date at the top". Let's leave pageNumber in the main grid for now as it's part of the pairs, or we can move it up. The grid is fine. */}
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                         {/* Right Column (Customer Info) */}
                         <div className="flex flex-col gap-4">
                             <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">اسم العميل</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">اسم العميل :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                             </div>
                             <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center leading-tight">رقم الصفحة<br/>(الدفتر)</label>
-                                <input className="flex-1 h-10 border-y border-l border-gray-400 shadow-inner px-2 outline-none" value={pageNumber} onChange={e => setPageNumber(e.target.value)} />
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">رقم الصفحة :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right" value={pageNumber} onChange={e => setPageNumber(e.target.value)} />
                             </div>
                             <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">رقم الهاتف</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none text-left" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} dir="ltr" />
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">رقم التليفون :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-left" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} dir="ltr" />
                             </div>
                             <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">الضامن</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none" value={guarantorName} onChange={e => setGuarantorName(e.target.value)} />
-                            </div>
-                            <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">رقم الهاتف</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none text-left" value={guarantorPhone} onChange={e => setGuarantorPhone(e.target.value)} dir="ltr" />
-                            </div>
-                            <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">اسم الجهاز</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none" value={deviceName} onChange={e => setDeviceName(e.target.value)} />
-                            </div>
-                            <div className="flex">
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">العنوان</label>
-                                <input className="flex-1 h-8 border-y border-l border-gray-400 shadow-inner px-2 outline-none" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">العنوان :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
                             </div>
                         </div>
 
-                        {/* Left Column (Calculations) */}
+                        {/* Left Column (Calculations & Guarantor) */}
                         <div className="flex flex-col gap-4">
                             <div className="flex">
-                                <input className="flex-1 h-8 border-y border-r border-gray-400 shadow-inner px-2 outline-none text-center" type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))} />
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">سعر الشراء</label>
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">الضامن :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right" value={guarantorName} onChange={e => setGuarantorName(e.target.value)} />
                             </div>
                             <div className="flex">
-                                <input className="flex-1 h-8 border-y border-r border-gray-400 shadow-inner px-2 outline-none text-center" type="number" value={downPayment} onChange={e => setDownPayment(e.target.value === '' ? '' : Number(e.target.value))} />
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">المقدم</label>
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center text-xs leading-tight">رقم الهاتف<br/>(الضامن) :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-left" value={guarantorPhone} onChange={e => setGuarantorPhone(e.target.value)} dir="ltr" />
                             </div>
                             <div className="flex">
-                                <input className="flex-1 h-8 border-y border-r border-gray-400 shadow-inner px-2 outline-none text-center" type="number" value={interestRate} onChange={e => setInterestRate(e.target.value === '' ? '' : Number(e.target.value))} />
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">النسبة (%)</label>
+                                <label className="w-36 bg-[#eeffec] text-green-800 font-bold px-2 py-1 border border-green-200 text-center flex items-center justify-center">اسم الجهاز :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right" value={deviceName} onChange={e => setDeviceName(e.target.value)} />
                             </div>
                             <div className="flex">
-                                <input className="flex-1 h-10 border-y border-r border-gray-400 shadow-inner px-2 outline-none text-center font-bold text-blue-900 bg-blue-50" value={totalAmount > 0 ? totalAmount.toFixed(2) : ''} readOnly />
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center leading-tight">الاجمالي بعد<br/>المقدم</label>
-                            </div>
-                            <div className="flex">
-                                <input className="flex-1 h-8 border-y border-r border-gray-400 shadow-inner px-2 outline-none text-center font-bold" type="number" value={months} onChange={e => setMonths(e.target.value === '' ? '' : Number(e.target.value))} />
-                                <label className="w-36 bg-[#90caf9] text-black font-bold px-2 py-1 border border-gray-400 text-center flex items-center justify-center">عدد الشهور</label>
-                            </div>
-
-                            <div className="flex flex-col mt-4 border border-gray-400">
-                                <div className="bg-[#ffebee] text-red-700 font-bold text-center py-1 border-b border-gray-400">
-                                    الدفعات الشهرية
-                                </div>
-                                <div className="bg-white text-red-600 font-bold text-xl text-center py-2 h-10 flex items-center justify-center">
-                                    {monthlyPayment > 0 ? monthlyPayment.toFixed(2) : '0.00'}
-                                </div>
+                                <label className="w-36 bg-[#eeffec] text-green-800 font-bold px-2 py-1 border border-green-200 text-center flex items-center justify-center">سعر الجهاز :</label>
+                                <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold" type="number" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))} />
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-8 flex justify-center">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                        <div className="flex">
+                            <label className="w-32 bg-[#fff8e1] text-amber-900 font-bold px-2 py-1 border border-amber-200 text-center flex items-center justify-center text-sm">المقدم :</label>
+                            <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold" type="number" value={downPayment} onChange={e => setDownPayment(e.target.value === '' ? '' : Number(e.target.value))} />
+                        </div>
+                        <div className="flex">
+                            <label className="w-32 bg-[#fff8e1] text-amber-900 font-bold px-2 py-1 border border-amber-200 text-center flex items-center justify-center text-sm">النسبة (%) :</label>
+                            <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold" type="number" value={interestRate} onChange={e => setInterestRate(e.target.value === '' ? '' : Number(e.target.value))} />
+                        </div>
+                        <div className="flex">
+                            <label className="w-32 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center text-xs leading-tight">الاجمالي بعد<br/>المقدم :</label>
+                            <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold text-blue-700 bg-gray-50" value={totalAmount > 0 ? totalAmount.toFixed(2) : ''} readOnly />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="flex">
+                            <label className="w-40 bg-[#fff8e1] text-amber-900 font-bold px-2 py-1 border border-amber-200 text-center flex items-center justify-center">عدد الشهور :</label>
+                            <input className="flex-1 h-10 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold text-xl" type="number" value={months} onChange={e => setMonths(e.target.value === '' ? '' : Number(e.target.value))} />
+                        </div>
+                        <div className="flex">
+                            <label className="w-40 bg-[#ffebee] text-red-800 font-bold px-2 py-1 border border-red-200 text-center flex items-center justify-center">الدفعات الشهرية :</label>
+                            <div className="flex-1 h-10 border border-gray-300 bg-white text-red-600 font-bold text-2xl text-center flex items-center justify-center shadow-inner">
+                                {monthlyPayment > 0 ? monthlyPayment.toFixed(2) : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 flex justify-center border-t border-gray-300 pt-6">
                         <button 
                           onClick={handleSave}
-                          className="bg-[#f5f5f5] border border-gray-400 hover:bg-gray-300 text-gray-800 font-bold text-xl py-2 px-12 shadow"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xl py-3 px-16 shadow rounded transition-colors"
                         >
                             تسجيل العميل
                         </button>
