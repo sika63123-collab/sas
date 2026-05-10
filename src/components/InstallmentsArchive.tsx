@@ -49,6 +49,20 @@ export function InstallmentsArchive() {
     return { label: 'نشط', color: 'text-blue-700 bg-blue-100' };
   };
 
+  // Calculate overall total remaining for all contracts
+  const grandTotalRemaining = useMemo(() => {
+    let total = 0;
+    installmentContracts.forEach(c => {
+      const totalContractAmount = c.totalAmount + c.downPayment;
+      let paid = c.downPayment;
+      c.payments.forEach(p => {
+        if (p.isPaid) paid += (p.paidAmount ?? p.amount);
+      });
+      total += (totalContractAmount - paid);
+    });
+    return total;
+  }, [installmentContracts]);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#a8bec9] font-sans p-4" dir="rtl">
       <h2 className="text-center font-bold text-3xl text-blue-800 mb-4 tracking-wider"
@@ -77,6 +91,12 @@ export function InstallmentsArchive() {
       <div className="flex gap-4 flex-1">
         {/* Customer List */}
         <div className="w-64 shrink-0 flex flex-col gap-1 overflow-auto max-h-[calc(100vh-200px)]">
+          {/* Grand Total Box */}
+          <div className="bg-white border-2 border-[#1a3a5c] p-2 mb-1 shadow-sm text-center rounded-sm">
+            <div className="text-[10px] font-bold text-gray-500 mb-0.5">إجمالي المتبقي لجميع العملاء</div>
+            <div className="text-lg font-black text-[#1a3a5c]">{grandTotalRemaining.toLocaleString()} <span className="text-xs">ج.م</span></div>
+          </div>
+
           <div className="bg-black text-white text-center font-bold py-1 text-sm">
             العملاء ({customerGroups.length})
           </div>
