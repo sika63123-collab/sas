@@ -36,7 +36,11 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const isDeposit = transactionType.includes('deposit');
   const actualPaymentMethod = isReturn ? 'cash' : paymentMethod;
 
-  const invoiceNumber = transactions.length + 1;
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  
+  const isViewingHistory = viewingIndex !== null;
+  const currentTransaction = isViewingHistory ? transactions[viewingIndex] : null;
+  const invoiceNumber = isViewingHistory && currentTransaction ? currentTransaction.id : transactions.length + 1;
 
   // Handle item search by ID/Code or Name
   useEffect(() => {
@@ -183,6 +187,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     setPageNumber('');
     setDepositAmount('');
     setIsDelivered(false);
+    setViewingIndex(null);
     document.getElementById('itemCodeInput')?.focus();
   };
 
@@ -226,6 +231,11 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
        setPageNumber(originalTx.pageNumber || '');
        setIsDelivered(originalTx.isDelivered || false);
     }
+    
+    const foundIndex = transactions.findIndex(t => t.id === originalTx?.id);
+    if (foundIndex !== -1) {
+       setViewingIndex(foundIndex);
+    }
 
     if (isReturn) {
       if (originalTx.type === 'deposit_sale') {
@@ -239,64 +249,123 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     }
   };
 
+  const handlePrevious = () => {
+     let newIndex = viewingIndex === null ? transactions.length - 1 : viewingIndex - 1;
+     if (newIndex >= 0 && newIndex < transactions.length) {
+        setViewingIndex(newIndex);
+        loadTransactionFromHistory(transactions[newIndex]);
+     }
+  };
+
+  const handleNext = () => {
+     if (viewingIndex !== null) {
+        let newIndex = viewingIndex + 1;
+        if (newIndex < transactions.length) {
+           setViewingIndex(newIndex);
+           loadTransactionFromHistory(transactions[newIndex]);
+        } else {
+           handleNewInvoice();
+        }
+     }
+  };
+
+  const loadTransactionFromHistory = (tx: any) => {
+    setCart(tx.items.map((item: any) => ({
+      product: { id: item.productId, name: item.name, price: item.price, stock: 0 },
+      id: item.productId,
+      name: item.name,
+      price: item.price,
+      stock: 0,
+      cartQuantity: item.quantity,
+    })));
+
+    if (tx.type === 'deposit_sale') {
+       setDepositAmount(tx.depositAmount || 0);
+       setCustomerName(tx.customerName || '');
+       setCustomerPhone(tx.customerPhone || '');
+       setCustomerAddress(tx.customerAddress || '');
+       setPageNumber(tx.pageNumber || '');
+       setIsDelivered(tx.isDelivered || false);
+    }
+
+    setTransactionType(tx.type);
+    setPaymentMethod(tx.paymentMethod);
+    if (tx.eWalletDetails) {
+       setSenderWallet(tx.eWalletDetails.sender || '');
+       setReceiverWallet(tx.eWalletDetails.receiver || '');
+    }
+  };
+
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#a3bcc9] font-sans p-2 pb-0" dir="rtl">
       
       {/* Top Header Row */}
-      <div className="flex justify-between items-center mb-2 px-2">
+      <div className="flex items-center mb-1 px-2 gap-2 flex-wrap">
+        {/* Invoice number + search */}
         <div className="flex items-center">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm tracking-widest text-center min-w-[100px]">رقم الفاتورة :</div>
-          <input className="w-16 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner font-bold outline-none bg-white" value={invoiceNumber} readOnly />
-          <button onClick={() => setShowSearchModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6] cursor-pointer" title="بحث برقم الحركة">.....</button>
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs tracking-widest text-center min-w-[80px] h-7">رقم الفاتورة :</div>
+          <input className="w-12 h-7 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner font-bold outline-none bg-white" value={invoiceNumber} readOnly />
+          <button onClick={() => setShowSearchModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] text-white px-2 h-7 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6] cursor-pointer text-xs" title="بحث">بحث</button>
         </div>
-        <h2 className={`text-2xl font-bold ${isReturn ? 'text-red-700' : 'text-[#143c75]'}`}>
+
+        {/* Title */}
+        <h2 className={`text-lg font-bold flex-1 text-center ${isReturn ? 'text-red-700' : 'text-[#143c75]'}`}>
           {transactionType === 'sale' ? 'مبيعات الكاشير' : 
            transactionType === 'return' ? 'مرتجع كاشير' : 
            transactionType === 'deposit_sale' ? 'مبيعات عربون' : 
            'مرتجع مبيعات عربون'}
         </h2>
+
+        {/* Action Buttons - centered */}
+        <div className="flex items-center gap-1">
+          <button onClick={handlePrevious} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-7 px-3 text-xs shadow hover:bg-[#d8e3ea] transition-colors">‹ السابق</button>
+          <button onClick={handleNext} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-7 px-3 text-xs shadow hover:bg-[#d8e3ea] transition-colors">التالي ›</button>
+          <div className="w-px h-5 bg-gray-400 mx-1"></div>
+          <button onClick={handleNewInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-7 px-4 text-xs shadow hover:bg-[#d8e3ea] transition-colors">جديد</button>
+          <button onClick={handleSaveInvoice} className="bg-[#1a5276] hover:bg-[#154360] text-white font-bold h-7 px-4 text-xs shadow transition-colors">حفظ</button>
+        </div>
       </div>
 
-      {/* Row 2: Code and Item Name */}
-      <div className="flex items-center mb-2 gap-2 px-2">
+      {/* Row 2: Code and Item Name - compact */}
+      <div className="flex items-center mb-1 gap-2 px-2">
         <div className="flex items-center">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">الكود :</div>
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs text-center min-w-[55px] h-7">الكود :</div>
           <input 
               id="itemCodeInput"
-              className="w-24 h-8 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
+              className="w-20 h-7 text-center text-sm border-y border-r border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
               value={itemCode} 
               onChange={e => setItemCode(e.target.value)}
               onKeyDown={handleKeyDown}
               list="productCodes"
               autoFocus
           />
-          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
+          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-7 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6] text-xs">...</button>
         </div>
 
-        <div className="flex items-center w-[350px]">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[100px]">اسم الصنف :</div>
+        <div className="flex items-center w-[300px]">
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs text-center min-w-[80px] h-7">اسم الصنف :</div>
           <input 
-              className="flex-1 h-8 border-y border-r border-[#6eb1d6] shadow-inner outline-none px-2 text-sm bg-white font-bold" 
+              className="flex-1 h-7 border-y border-r border-[#6eb1d6] shadow-inner outline-none px-2 text-sm bg-white font-bold" 
               placeholder="بحث..."
               value={itemName} 
               onChange={e => setItemName(e.target.value)}
               list="productNames"
               onKeyDown={handleKeyDown}
           />
-          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-8 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6]">.....</button>
+          <button onClick={() => setShowProductModal(true)} className="bg-[#ff6600] hover:bg-[#e65c00] cursor-pointer text-white px-2 h-7 font-bold flex items-center justify-center border-y border-l border-[#6eb1d6] text-xs">...</button>
         </div>
       </div>
 
-      {/* Row 3: Quantity, Price, Payment Method, Add Button */}
-      <div className="flex items-center mb-2 px-2 gap-2">
+      {/* Row 3: Quantity, Price, Payment Method, Add Button - compact */}
+      <div className="flex items-center mb-1 px-2 gap-2">
         <div className="flex items-center flex-shrink-0">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">الكمية :</div>
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs text-center min-w-[55px] h-7">الكمية :</div>
           <input 
               type="number"
               min="1"
-              className="w-16 h-8 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none font-bold" 
+              className="w-14 h-7 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none font-bold" 
               value={itemQty} 
               onChange={e => setItemQty(e.target.value === '' ? '' : Number(e.target.value))}
               onKeyDown={handleKeyDown}
@@ -304,18 +373,18 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         </div>
 
         <div className="flex items-center flex-shrink-0">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[70px]">السعر :</div>
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs text-center min-w-[55px] h-7">السعر :</div>
           <input 
-              className="w-24 h-8 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
+              className="w-20 h-7 text-center text-sm border border-[#6eb1d6] shadow-inner outline-none bg-white font-bold" 
               value={itemPrice} 
               readOnly 
           />
         </div>
 
         <div className="flex items-center flex-shrink-0">
-          <div className="bg-black text-white px-3 py-1 font-bold text-sm text-center min-w-[110px]">طريقة السداد :</div>
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-xs text-center min-w-[90px] h-7">طريقة السداد :</div>
           <select 
-              className="w-32 h-8 border border-[#6eb1d6] shadow-inner outline-none bg-white text-sm px-2 disabled:bg-gray-200 disabled:text-gray-500 font-bold"
+              className="w-28 h-7 border border-[#6eb1d6] shadow-inner outline-none bg-white text-xs px-2 disabled:bg-gray-200 disabled:text-gray-500 font-bold"
               value={actualPaymentMethod}
               onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}
               disabled={isReturn}
@@ -328,17 +397,18 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         </div>
 
         {isEWallet && !isReturn && (
-          <div className="flex items-center gap-1 bg-[#eaeced] px-2 h-8 border border-[#6eb1d6]">
+          <div className="flex items-center gap-1 bg-[#eaeced] px-2 h-7 border border-[#6eb1d6]">
              <div className="text-xs font-bold text-blue-900">مرسل:</div>
-             <input className="w-12 h-6 text-center text-sm border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={senderWallet} onChange={e => setSenderWallet(e.target.value.replace(/\D/g, ''))} />
+             <input className="w-10 h-5 text-center text-xs border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={senderWallet} onChange={e => setSenderWallet(e.target.value.replace(/\D/g, ''))} />
              <div className="text-xs font-bold text-blue-900 mr-1">مستلم:</div>
-             <input className="w-12 h-6 text-center text-sm border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={receiverWallet} onChange={e => setReceiverWallet(e.target.value.replace(/\D/g, ''))} />
+             <input className="w-10 h-5 text-center text-xs border border-gray-400 outline-none font-bold placeholder-gray-300" maxLength={4} value={receiverWallet} onChange={e => setReceiverWallet(e.target.value.replace(/\D/g, ''))} />
           </div>
         )}
 
+
         <button 
            onClick={handleAddItem}
-           className="bg-[#64a1e6] hover:bg-[#528cc7] text-white font-bold h-8 px-6 text-sm flex items-center justify-center"
+           className="bg-[#64a1e6] hover:bg-[#528cc7] text-white font-bold h-7 px-5 text-sm flex items-center justify-center"
         >
           + إضافة
         </button>
@@ -352,7 +422,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
       </datalist>
 
       {/* Table Section */}
-      <div className="flex-1 bg-[#e9eced] flex flex-col mx-2 border border-[#9eaab3] shadow-inner mt-4 mb-2 overflow-hidden min-h-[150px]">
+      <div className="bg-[#e9eced] flex flex-col mr-2 ml-auto border border-[#9eaab3] shadow-inner mt-1 mb-1 overflow-hidden" style={{height: '220px', width: '70%'}}>
         <div className="overflow-auto flex-1">
           <table className="w-full text-center text-sm">
             <thead className="bg-[#eaeced] border-b border-[#a9b7c2] sticky top-0" style={{ zIndex: 10 }}>
@@ -463,44 +533,14 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
            </div>
          </div>
       )}
-
-      {/* Bottom Controls */}
-      {!isDeposit && (
-        <div className="flex justify-between items-center px-2 pb-4 mt-auto">
-          {/* Left: Total Amount */}
-          <div className="flex items-center shadow-md">
-             <div className="bg-black text-white px-4 h-10 flex items-center justify-center text-sm font-bold tracking-wider">
-               اجمالي الفاتورة:
-             </div>
-             <div className="bg-white border-y border-l border-gray-300 h-10 px-8 flex items-center justify-center font-bold text-xl text-black">
-               {totalAmount}
-             </div>
-          </div>
-
-          {/* Right: Buttons */}
-          <div className="flex gap-2">
-            <button onClick={handleSaveInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
-              حفظ
-            </button>
-            <button onClick={handleNewInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
-              جديد
-            </button>
-          </div>
+      {/* Bottom Controls Bar - total only */}
+      <div className="flex justify-between items-center px-2 pb-3 mt-auto">
+        <div className="flex items-center shadow-md">
+          <div className="bg-black text-white px-3 h-9 flex items-center justify-center text-sm font-bold tracking-wider">اجمالي الفاتورة:</div>
+          <div className="bg-white border-y border-l border-gray-300 h-9 px-6 flex items-center justify-center font-bold text-xl text-black">{totalAmount}</div>
         </div>
-      )}
+      </div>
 
-      {isDeposit && (
-        <div className="flex justify-end px-2 pb-4 mt-1">
-          <div className="flex gap-2">
-            <button onClick={handleNewInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
-              جديد
-            </button>
-            <button onClick={handleSaveInvoice} className="bg-[#e4ebf1] border border-[#a2b5bf] text-[#2c4b63] font-bold h-10 w-24 flex justify-center items-center text-sm shadow hover:bg-[#d8e3ea] transition-colors">
-              حفظ
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Search Invoice Modal */}
       {showSearchModal && (

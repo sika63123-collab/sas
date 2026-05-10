@@ -10,6 +10,7 @@ import { TransactionType } from './types';
 import { InstallmentsAdd } from './components/InstallmentsAdd';
 import { InstallmentsPay } from './components/InstallmentsPay';
 import { InstallmentsLate } from './components/InstallmentsLate';
+import { InstallmentsArchive } from './components/InstallmentsArchive';
 import { DepositPay } from './components/DepositPay';
 import { Login } from './components/Login';
 import { Settings } from './components/Settings';
@@ -27,6 +28,7 @@ type ViewMode =
   | 'installments-add'
   | 'installments-pay'
   | 'installments-late'
+  | 'installments-archive'
   | 'deposit-pay'
   | 'settings';
 
@@ -148,6 +150,7 @@ function MainApp() {
                      {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
                      {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
                      {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
+                     {isAdmin && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 border-t border-gray-100 transition-colors">أرشيف العملاء</button>}
                   </div>
                 )}
               </div>
@@ -209,6 +212,7 @@ function MainApp() {
          {activeView === 'installments-add' && <InstallmentsAdd />}
          {activeView === 'installments-pay' && <InstallmentsPay />}
          {activeView === 'installments-late' && <InstallmentsLate />}
+         {activeView === 'installments-archive' && <InstallmentsArchive />}
          {activeView === 'deposit-pay' && <DepositPay />}
          {activeView === 'settings' && <Settings />}
       </div>
