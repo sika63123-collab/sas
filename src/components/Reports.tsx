@@ -1,13 +1,33 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FileText, CreditCard, Box, Calendar, Wallet, TrendingUp } from 'lucide-react';
+import { FileText, CreditCard, Box, Calendar, Wallet, TrendingUp, Filter } from 'lucide-react';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
   const { transactions, products } = useAppStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedProductId, setSelectedProductId] = useState<string>('all');
+
+  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
   // Filter transactions by selected date
   const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
+
+  // Filter by category/product for item-card view
+  const filteredItemTransactions = view === 'item-card' ? dailyTransactions.filter(t => {
+    if (selectedCategory === 'all' && selectedProductId === 'all') return true;
+    return t.items.some(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (!product) return false;
+      if (selectedProductId !== 'all') return product.id === selectedProductId;
+      if (selectedCategory !== 'all') return product.category === selectedCategory;
+      return true;
+    });
+  }) : dailyTransactions;
+
+  const filteredProducts = view === 'item-card' && selectedCategory !== 'all'
+    ? products.filter(p => p.category === selectedCategory)
+    : products;
 
   // Helper to calculate actual paid/returned amount
   const getAmount = (t: any) => t.type.includes('deposit') ? (t.depositAmount || 0) : t.totalAmount;
@@ -234,16 +254,46 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
 
       {view === 'item-card' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-             <div className="flex items-center gap-2">
+          <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+             <div className="flex items-center gap-2 flex-wrap">
                <Box className="h-5 w-5 text-gray-700" />
                <h3 className="font-bold text-gray-800">حركة الأصناف</h3>
              </div>
-             <span className="text-xs text-gray-500">يرحل كل الأصناف التي يتم بيعها أو استرجاعها</span>
+             <div className="flex items-center gap-2 flex-wrap">
+               {categories.length > 0 && (
+                 <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
+                   <Filter className="h-3.5 w-3.5 text-gray-500" />
+                   <select
+                     value={selectedCategory}
+                     onChange={e => { setSelectedCategory(e.target.value); setSelectedProductId('all'); }}
+                     className="bg-transparent border-none text-xs font-medium text-gray-700 outline-none cursor-pointer"
+                   >
+                     <option value="all">كل المجموعات</option>
+                     {categories.map((cat, i) => (
+                       <option key={i} value={cat as string}>{cat as string}</option>
+                     ))}
+                   </select>
+                 </div>
+               )}
+               {selectedCategory !== 'all' && (
+                 <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
+                   <select
+                     value={selectedProductId}
+                     onChange={e => setSelectedProductId(e.target.value)}
+                     className="bg-transparent border-none text-xs font-medium text-gray-700 outline-none cursor-pointer"
+                   >
+                     <option value="all">كل الأصناف</option>
+                     {filteredProducts.map(p => (
+                       <option key={p.id} value={p.id}>{p.name}</option>
+                     ))}
+                   </select>
+                 </div>
+               )}
+             </div>
           </div>
           
           <div className="p-0 overflow-x-auto">
-            {dailyTransactions.length === 0 ? (
+            {filteredItemTransactions.length === 0 ? (
                <div className="p-8 text-center text-gray-500">لا توجد حركات في هذا اليوم</div>
             ) : (
               <table className="w-full text-right text-sm min-w-[500px]">
@@ -256,7 +306,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100">
-                   {dailyTransactions.map(t => (
+                   {filteredItemTransactions.map(t => (
                      <tr key={t.id} className="hover:bg-gray-50">
                        <td className="px-6 py-4 text-gray-500 whitespace-nowrap" dir="ltr">{new Date(t.timestamp).toLocaleTimeString('ar-EG')}</td>
                        <td className="px-6 py-4">
