@@ -225,12 +225,18 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
        setCustomerAddress(originalTx.customerAddress || '');
        setPageNumber(originalTx.pageNumber || '');
        setIsDelivered(originalTx.isDelivered || false);
-       setTransactionType('deposit_return');
-    } else {
-       setTransactionType('return');
     }
-    
-    alert('تم تحميل أصناف الفاتورة للمرتجع. يمكنك تعديل الكميات أو حذف الأصناف التي لن يتم إرجاعها.');
+
+    if (isReturn) {
+      if (originalTx.type === 'deposit_sale') {
+         setTransactionType('deposit_return');
+      } else {
+         setTransactionType('return');
+      }
+      alert('تم تحميل أصناف الفاتورة للمرتجع. يمكنك تعديل الكميات أو حذف الأصناف التي لن يتم إرجاعها.');
+    } else {
+      alert('تم تحميل الفاتورة للعرض أو الاستعلام.');
+    }
   };
 
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
@@ -501,12 +507,12 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-gray-800">بحث عن فاتورة (للمرتجع)</h3>
+              <h3 className="font-bold text-lg text-gray-800">{isReturn ? 'بحث عن فاتورة (للمرتجع)' : 'بحث عن فاتورة'}</h3>
               <button onClick={() => setShowSearchModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-gray-700 mb-2 font-bold text-sm">رقم الفاتورة الأصلي</label>
+                <label className="block text-gray-700 mb-2 font-bold text-sm">{isReturn ? 'رقم الفاتورة الأصلي' : 'رقم الفاتورة'}</label>
                 <input 
                   type="text" 
                   value={returnInvoiceNo}
