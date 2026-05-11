@@ -1,55 +1,50 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Users, Search, Target, FileText } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 export default function InstallmentsArchive() {
   const { installmentContracts } = useAppStore();
+  
   const [searchTerm, setSearchTerm] = useState('');
+  // We'll store the selected customer key
+  const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
 
   // Group contracts by customer phone and name to ensure uniqueness
   const customers = useMemo(() => {
     const customerMap = new Map<string, {
+      key: string;
       name: string;
       phone: string;
       contractsCount: number;
-      totalFinanced: number;
-      totalPaid: number;
       totalRemaining: number;
       lastContractDate: string;
+      contracts: typeof installmentContracts;
     }>();
 
     installmentContracts.forEach(c => {
       const key = `${c.customerName}-${c.customerPhone}`;
       
-      const totalPaidForContract = c.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0) + c.downPayment;
-      // totalAmount is the total amount financed (including downpayment or not? In InstallmentsAdd: totalAmount = purchasePrice - dPayment + totalInterest)
-      // Actually totalRequired = c.totalAmount + c.downPayment? Let's check InstallmentsPay for logic:
-      // InstallmentsPay logic for total remaining: Math.max(0, selectedContract.totalAmount - selectedContract.payments.reduce(...))
-      // It means totalAmount is the sum of all installments, and downpayment is paid separately. 
-      // Let's rely on total financed = c.totalAmount (sum of installments for the device)
-      
       const totalFinanced = c.totalAmount;
       const installmentsPaid = c.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
-      const totalRemaining = Math.max(0, totalFinanced - installmentsPaid);
+      const remaining = Math.max(0, totalFinanced - installmentsPaid);
 
       if (customerMap.has(key)) {
         const existing = customerMap.get(key)!;
         existing.contractsCount += 1;
-        existing.totalFinanced += totalFinanced;
-        existing.totalPaid += installmentsPaid;
-        existing.totalRemaining += totalRemaining;
+        existing.totalRemaining += remaining;
+        existing.contracts.push(c);
         if (new Date(c.createdAt || c.startDate) > new Date(existing.lastContractDate)) {
           existing.lastContractDate = c.createdAt || c.startDate;
         }
       } else {
         customerMap.set(key, {
+          key,
           name: c.customerName,
           phone: c.customerPhone,
           contractsCount: 1,
-          totalFinanced: totalFinanced,
-          totalPaid: installmentsPaid,
-          totalRemaining: totalRemaining,
-          lastContractDate: c.createdAt || c.startDate
+          totalRemaining: remaining,
+          lastContractDate: c.createdAt || c.startDate,
+          contracts: [c]
         });
       }
     });
@@ -57,95 +52,195 @@ export default function InstallmentsArchive() {
     return Array.from(customerMap.values()).sort((a, b) => new Date(b.lastContractDate).getTime() - new Date(a.lastContractDate).getTime());
   }, [installmentContracts]);
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.includes(searchTerm) || 
-    c.phone.includes(searchTerm)
-  );
+  const filteredCustomers = useMemo(() => {
+    if (!searchTerm) return customers;
+    return customers.filter(c => 
+      c.name.includes(searchTerm) || 
+      c.phone.includes(searchTerm) ||
+      c.contracts.some(con => String(con.customerNumber === searchTerm || con.pageNumber === searchTerm || con.deviceName.includes(searchTerm)))
+    );
+  }, [searchTerm, customers]);
+
+  useEffect(() => {
+    if (filteredCustomers.length > 0 && (!selectedCustomerKey || !filteredCustomers.find(c => c.key === selectedCustomerKey))) {
+      setSelectedCustomerKey(filteredCustomers[0].key);
+    } else if (filteredCustomers.length === 0) {
+      setSelectedCustomerKey(null);
+    }
+  }, [filteredCustomers, selectedCustomerKey]);
+
+  const selectedCustomer = customers.find(c => c.key === selectedCustomerKey);
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#f5f5f7] font-sans p-6" dir="rtl">
-      <div className="max-w-6xl mx-auto w-full">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-blue-600 p-3 rounded-2xl shadow-sm text-white">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">أرشيف العملاء</h1>
-            <p className="text-gray-500 text-sm font-medium">سجل بأسماء وتفاصيل عملاء التقسيط</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col min-h-[500px]">
-          
-          <div className="flex items-center justify-between mb-6">
-            <div className="relative w-full max-w-md">
-              <Search className="w-5 h-5 absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="ابحث بالاسم أو رقم الهاتف..." 
-                className="w-full h-12 pr-12 pl-4 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium text-sm transition-all shadow-sm"
+    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#b0bec5] font-sans p-6" dir="rtl">
+        {/* Search Bar */}
+        <div className="flex justify-center items-center mb-6">
+            <input 
+                className="w-1/2 max-w-lg h-12 px-4 shadow-sm outline-none text-right placeholder-gray-400 text-lg font-bold rounded-r-sm"
+                placeholder="اكتب اسم العميل..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-              />
+            />
+            <div className="bg-black text-white px-6 py-[14px] font-bold text-lg text-center rounded-l-sm min-w-[200px]">
+                بحث باسم العميل:
             </div>
-            <div className="flex gap-4">
-              <div className="px-5 py-2.5 bg-red-50 text-red-800 font-bold rounded-xl text-sm border border-red-100">
-                إجمالي المتبقي: {filteredCustomers.reduce((sum, c) => sum + c.totalRemaining, 0).toFixed(2)} ج.م
-              </div>
-              <div className="px-5 py-2.5 bg-blue-50 text-blue-800 font-bold rounded-xl text-sm border border-blue-100">
-                إجمالي العملاء: {filteredCustomers.length}
-              </div>
-            </div>
-          </div>
-
-          <div className="border border-gray-100 rounded-2xl overflow-hidden flex-1 flex flex-col bg-gray-50/50">
-            <div className="overflow-auto flex-1">
-              <table className="w-full text-center text-sm">
-                <thead className="bg-gray-100 border-b border-gray-200 text-gray-500 font-semibold sticky top-0">
-                  <tr>
-                    <th className="py-4 px-4 text-right pr-6 w-1/4">اسم العميل</th>
-                    <th className="py-4 px-4 w-1/6">رقم الهاتف</th>
-                    <th className="py-4 px-4 w-1/6 text-center">عدد العقود</th>
-                    <th className="py-4 px-4 w-1/6 text-center">إجمالي المديونية</th>
-                    <th className="py-4 px-4 w-1/6 text-center">المدفوع</th>
-                    <th className="py-4 px-4 w-1/6 text-center">المتبقي</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-400 font-medium">
-                        لا يوجد عملاء متاحين بالبيانات المدخلة
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCustomers.map((customer, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4 text-right pr-6 font-bold text-gray-800 flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs">
-                             {customer.name.substring(0, 1)}
-                           </div>
-                           {customer.name}
-                        </td>
-                        <td className="py-4 px-4 font-medium text-gray-600" dir="ltr">{customer.phone}</td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold border border-gray-200">
-                            {customer.contractsCount}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 font-bold text-gray-800">{customer.totalFinanced.toFixed(2)}</td>
-                        <td className="py-4 px-4 font-bold text-green-600">{customer.totalPaid.toFixed(2)}</td>
-                        <td className="py-4 px-4 font-bold text-red-600">{customer.totalRemaining.toFixed(2)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
-      </div>
+        <div className="flex gap-4 w-full max-w-7xl mx-auto h-[75vh]">
+           {/* Sidebar: List of Customers */}
+           <div className="w-[300px] flex flex-col bg-black shadow-md border-l border-gray-400 shrink-0">
+               <div className="text-white py-2.5 text-center font-bold text-base shrink-0">العملاء ({filteredCustomers.length})</div>
+               <div className="flex-1 overflow-auto bg-[#eaeff1] w-full items-center flex flex-col pt-2">
+                   {filteredCustomers.map((c) => {
+                       const isSelected = selectedCustomerKey === c.key;
+                       
+                       return (
+                           <div 
+                               key={c.key} 
+                               onClick={() => setSelectedCustomerKey(c.key)}
+                               className={`w-[96%] mb-2 p-3 cursor-pointer shadow-sm border ${isSelected ? 'bg-[#e3f2fd] border-blue-300' : 'bg-white border-white hover:border-gray-300'} transition-colors`}
+                           >
+                               <div className="flex justify-between items-center">
+                                   <div className={`font-bold text-sm ${c.totalRemaining > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                       {c.totalRemaining > 0 ? `متبقي: ${c.totalRemaining}` : 'خالص'}
+                                   </div>
+                                   <div className="text-right">
+                                       <div className="font-bold text-gray-900">{c.name}</div>
+                                       <div className="text-xs text-gray-500 mt-1">{c.contractsCount} عقد</div>
+                                   </div>
+                               </div>
+                           </div>
+                       )
+                   })}
+               </div>
+           </div>
+
+           {/* Main Detail Area */}
+           <div className="flex-1 bg-[#eaeff1] shadow-md flex flex-col min-w-0 overflow-auto">
+               {selectedCustomer ? (
+                  <div className="flex flex-col gap-8 p-4">
+                     {selectedCustomer.contracts.map((contract, contractIndex) => {
+                        const paid = contract.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
+                        const remaining = Math.max(0, contract.totalAmount - paid);
+                        const paidCount = contract.payments.filter(p => p.isPaid).length;
+                        const totalCount = contract.payments.length;
+                        const latePayments = contract.payments.filter(p => !p.isPaid && new Date(p.dueDate) < today);
+                        const totalPaidAmount = contract.downPayment + paid;
+                        // Find true index in overall contracts for UI consistency #1, #2...
+                        const globalIndex = installmentContracts.findIndex(c => c.id === contract.id) + 1;
+
+                        return (
+                           <div key={contract.id} className="bg-white border border-gray-300 shadow-sm flex flex-col">
+                              <div className="bg-[#1a365d] text-white px-4 py-2.5 flex justify-between items-center shrink-0">
+                                 {latePayments.length > 0 ? (
+                                    <div className="bg-red-100 text-red-600 px-3 py-1 font-bold text-sm">متأخر {latePayments.length} قسط</div>
+                                 ) : <div/>}
+                                 <div className="font-bold text-lg">عقد #{globalIndex} — {contract.deviceName}</div>
+                              </div>
+
+                              <div className="p-6 pb-2 shrink-0">
+                                  <div className="grid grid-cols-4 gap-4 text-center">
+                                      {/* Row 1 */}
+                                      <div className="flex flex-col gap-2">
+                                         <span className="text-gray-500 font-medium text-sm">رقم الصفحة</span>
+                                         <span className="font-bold text-gray-900">{contract.pageNumber || '-'}</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2">
+                                         <span className="text-gray-500 font-medium text-sm">التليفون</span>
+                                         <span className="font-bold text-gray-900" dir="ltr">{contract.customerPhone}</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2">
+                                         <span className="text-gray-500 font-medium text-sm">العنوان</span>
+                                         <span className="font-bold text-gray-900">{contract.customerAddress || '-'}</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2">
+                                         <span className="text-gray-500 font-medium text-sm">الضامن</span>
+                                         <span className="font-bold text-gray-900">{contract.guarantorName || '-'}</span>
+                                      </div>
+                                      
+                                      {/* Row 2 */}
+                                      <div className="flex flex-col gap-2 mt-4 relative pb-5 border-b-2 border-blue-600">
+                                         <span className="text-gray-500 font-medium text-sm">سعر الجهاز</span>
+                                         <span className="font-bold text-gray-900">{contract.purchasePrice} ج.م</span>
+                                         <span className="text-green-600 text-xs font-bold absolute bottom-0 left-0 right-0">مدفوع: {totalPaidAmount} ج.م</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2 mt-4">
+                                         <span className="text-gray-500 font-medium text-sm">المقدم</span>
+                                         <span className="font-bold text-blue-600">{contract.downPayment} ج.م</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2 mt-4">
+                                         <span className="text-gray-500 font-medium text-sm">القسط الشهري</span>
+                                         <span className="font-bold text-gray-900">{contract.monthlyPayment} ج.م</span>
+                                      </div>
+                                      <div className="flex flex-col gap-2 mt-4">
+                                         <span className="text-gray-500 font-medium text-sm">الأقساط</span>
+                                         <span className="font-bold text-gray-900">{paidCount}/{totalCount} دفع</span>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div className="px-6 py-2 pt-4 flex justify-start shrink-0">
+                                 <span className="text-red-600 font-bold mt-2">متبقي: {remaining} ج.م</span>
+                              </div>
+
+                              {/* Table Area */}
+                              <div className="overflow-auto mt-2 pb-6">
+                                  <table className="w-full text-center">
+                                      <thead className="bg-[#cbd5e1] text-gray-800">
+                                          <tr>
+                                              <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-12">#</th>
+                                              <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/4">تاريخ الاستحقاق</th>
+                                              <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/5">المبلغ</th>
+                                              <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/4">تاريخ الدفع</th>
+                                              <th className="py-2.5 font-bold text-sm">الحالة</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="bg-white">
+                                          {contract.payments.map((p, idx) => {
+                                              const dueDate = new Date(p.dueDate);
+                                              const isLate = !p.isPaid && dueDate < today;
+                                              
+                                              return (
+                                                  <tr key={p.id} className={`${isLate ? 'bg-[#ffebee]' : 'even:bg-gray-50'} border-b border-gray-200`}>
+                                                      <td className="py-2 text-sm font-bold border-l border-gray-200">{idx + 1}</td>
+                                                      <td className="py-2 text-sm font-bold border-l border-gray-200" dir="ltr">{dueDate.toLocaleDateString('en-GB')}</td>
+                                                      <td className="py-2 text-sm font-bold border-l border-gray-200 text-gray-900">
+                                                          {p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : p.amount}
+                                                      </td>
+                                                      <td className="py-2 text-sm font-bold border-l border-gray-200 text-gray-600">
+                                                          {p.isPaid ? new Date(p.paidDate!).toLocaleDateString('en-GB') : '—'}
+                                                      </td>
+                                                      <td className="py-2 text-sm font-bold">
+                                                          {p.isPaid ? (
+                                                              <span className="text-green-600">تم الدفع</span>
+                                                          ) : isLate ? (
+                                                              <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded">متأخر</span>
+                                                          ) : (
+                                                              <span className="text-gray-600">قادم</span>
+                                                          )}
+                                                      </td>
+                                                  </tr>
+                                              )
+                                          })}
+                                      </tbody>
+                                  </table>
+                              </div>
+                           </div>
+                        );
+                     })}
+                  </div>
+               ) : (
+                  <div className="flex-1 flex justify-center items-center text-gray-500 font-bold text-lg">
+                      لا يوجد عميل محدد
+                  </div>
+               )}
+           </div>
+
+        </div>
     </div>
   );
 }
+
