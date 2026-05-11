@@ -33,9 +33,6 @@ export interface Product {
   costPrice?: number;
   stock: number;
   barcode?: string;
-  deviceStatus?: string;
-  storage?: string;
-  ram?: string;
 }
 
 export interface CartItem extends Product {

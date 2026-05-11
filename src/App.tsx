@@ -10,7 +10,7 @@ import { TransactionType } from './types';
 import { InstallmentsAdd } from './components/InstallmentsAdd';
 import { InstallmentsPay } from './components/InstallmentsPay';
 import { InstallmentsLate } from './components/InstallmentsLate';
-import { InstallmentsArchive } from './components/InstallmentsArchive';
+import InstallmentsArchive from './components/InstallmentsArchive';
 import { DepositPay } from './components/DepositPay';
 import { Login } from './components/Login';
 import { Settings } from './components/Settings';
@@ -77,7 +77,7 @@ function MainApp() {
               الرئيسية
             </button>
 
-            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.depositReturn) && (
+            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('transaction')}
@@ -86,13 +86,13 @@ function MainApp() {
                   الحركة
                 </button>
                 
-                 {openMenu === 'transaction' && (
-                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
-                      {(isAdmin || p.cashier || p.depositSale) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
-                      {(isAdmin || p.cashierReturn || p.depositReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
-                      {(isAdmin || p.depositPay) && <button onClick={() => selectView('deposit-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 border-t border-gray-100 transition-colors">سداد العربون</button>}
-                   </div>
-                 )}
+                {openMenu === 'transaction' && (
+                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
+                     {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
+                     {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
+                     {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مبيعات عربون</button>}
+                  </div>
+                )}
               </div>
            )}
 
@@ -110,7 +110,7 @@ function MainApp() {
                       <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب الفيزا</button>
                       <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب نقدي</button>
                       <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقفيل وردية</button>
-                      <button onClick={() => selectView('reports-profit-margin')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقرير هامش الربح</button>
+                      <button onClick={() => selectView('reports-profit-margin')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">هامش الربح</button>
                   </div>
                 )}
               </div>
@@ -149,7 +149,7 @@ function MainApp() {
                      {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
                      {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
                      {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
-                     {isAdmin && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 border-t border-gray-100 transition-colors">أرشيف العملاء</button>}
+                     {(isAdmin) && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">أرشيف العملاء</button>}
                   </div>
                 )}
               </div>
@@ -203,8 +203,7 @@ function MainApp() {
              </motion.h1>
            </motion.div>
          )}
-         {/* @ts-ignore */}
-         {activeView === 'cashier' && <Cashier key={cashierMode} initialType={cashierMode} />}
+         {activeView === 'cashier' && <Cashier initialType={cashierMode} />}
          {activeView === 'inventory' && <Inventory />}
          {activeView === 'inventory-add' && <InventoryAdd />}
          {activeView.startsWith('reports-') && <Reports view={activeView.replace('reports-', '') as any} />}
