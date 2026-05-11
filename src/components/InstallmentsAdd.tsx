@@ -121,6 +121,31 @@ export function InstallmentsAdd() {
      setMonths('');
   };
 
+  // Auto-fill customer info if exists
+  useEffect(() => {
+    if (customerName.trim().length > 2) {
+      const match = installmentContracts.find(c => c.customerName.trim() === customerName.trim());
+      if (match) {
+        if (!customerPhone && match.customerPhone) setCustomerPhone(match.customerPhone);
+        if (!customerAddress && match.customerAddress) setCustomerAddress(match.customerAddress);
+        if (!guarantorName && match.guarantorName) setGuarantorName(match.guarantorName);
+        if (!guarantorPhone && match.guarantorPhone) setGuarantorPhone(match.guarantorPhone);
+      }
+    }
+  }, [customerName, installmentContracts]);
+
+  useEffect(() => {
+    if (customerPhone.trim().length > 5) {
+      const match = installmentContracts.find(c => c.customerPhone && c.customerPhone.trim() === customerPhone.trim());
+      if (match) {
+        if (!customerName && match.customerName) setCustomerName(match.customerName);
+        if (!customerAddress && match.customerAddress) setCustomerAddress(match.customerAddress);
+        if (!guarantorName && match.guarantorName) setGuarantorName(match.guarantorName);
+        if (!guarantorPhone && match.guarantorPhone) setGuarantorPhone(match.guarantorPhone);
+      }
+    }
+  }, [customerPhone, installmentContracts]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] bg-[#b0bec5] font-sans p-6" dir="rtl">
         
