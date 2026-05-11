@@ -9,10 +9,11 @@ export default function InstallmentsArchive() {
   // We'll store the selected customer key
   const [selectedCustomerKey, setSelectedCustomerKey] = useState<string | null>(null);
 
-  // Group contracts by customer phone and name to ensure uniqueness
+  // Group contracts by customer number
   const customers = useMemo(() => {
-    const customerMap = new Map<string, {
+    const customerMap = new Map<number, {
       key: string;
+      number: number;
       name: string;
       phone: string;
       contractsCount: number;
@@ -22,14 +23,15 @@ export default function InstallmentsArchive() {
     }>();
 
     installmentContracts.forEach(c => {
-      const key = `${c.customerName}-${c.customerPhone}`;
+      const num = c.customerNumber || 0;
+      const keyStr = num.toString();
       
       const totalFinanced = c.totalAmount;
       const installmentsPaid = c.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
       const remaining = Math.max(0, totalFinanced - installmentsPaid);
 
-      if (customerMap.has(key)) {
-        const existing = customerMap.get(key)!;
+      if (customerMap.has(num)) {
+        const existing = customerMap.get(num)!;
         existing.contractsCount += 1;
         existing.totalRemaining += remaining;
         existing.contracts.push(c);
@@ -37,8 +39,9 @@ export default function InstallmentsArchive() {
           existing.lastContractDate = c.createdAt || c.startDate;
         }
       } else {
-        customerMap.set(key, {
-          key,
+        customerMap.set(num, {
+          key: keyStr,
+          number: num,
           name: c.customerName,
           phone: c.customerPhone,
           contractsCount: 1,
@@ -57,7 +60,11 @@ export default function InstallmentsArchive() {
     return customers.filter(c => 
       c.name.includes(searchTerm) || 
       c.phone.includes(searchTerm) ||
-      c.contracts.some(con => String(con.customerNumber === searchTerm || con.pageNumber === searchTerm || con.deviceName.includes(searchTerm)))
+      c.contracts.some(con => 
+        String(con.customerNumber) === searchTerm || 
+        String(con.pageNumber) === searchTerm || 
+        con.deviceName.includes(searchTerm)
+      )
     );
   }, [searchTerm, customers]);
 
@@ -80,12 +87,12 @@ export default function InstallmentsArchive() {
         <div className="flex justify-center items-center mb-6">
             <input 
                 className="w-1/2 max-w-lg h-12 px-4 shadow-sm outline-none text-right placeholder-gray-400 text-lg font-bold rounded-r-sm"
-                placeholder="اكتب اسم العميل..."
+                placeholder="الاسم، الموبايل، رقم الصفحة..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
             />
             <div className="bg-black text-white px-6 py-[14px] font-bold text-lg text-center rounded-l-sm min-w-[200px]">
-                بحث باسم العميل:
+                بحث سريع:
             </div>
         </div>
 

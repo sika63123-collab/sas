@@ -16,7 +16,7 @@ export function InstallmentsPay() {
     return installmentContracts.filter(c => 
       String(c.customerNumber) === searchTerm || 
       c.customerPhone === searchTerm || 
-      c.pageNumber === searchTerm ||
+      String(c.pageNumber) === searchTerm ||
       c.customerName.includes(searchTerm) ||
       c.deviceName.includes(searchTerm)
     );
@@ -71,12 +71,12 @@ export function InstallmentsPay() {
         <div className="flex justify-center items-center mb-6">
             <input 
                 className="w-1/2 max-w-lg h-12 px-4 shadow-sm outline-none text-right placeholder-gray-400 text-lg font-bold rounded-r-sm"
-                placeholder="اكتب اسم العميل..."
+                placeholder="الاسم، الموبايل، رقم الصفحة..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
             />
             <div className="bg-black text-white px-6 py-[14px] font-bold text-lg text-center rounded-l-sm min-w-[200px]">
-                بحث باسم العميل:
+                بحث سريع:
             </div>
         </div>
 
