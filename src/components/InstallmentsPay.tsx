@@ -82,31 +82,39 @@ export function InstallmentsPay() {
 
         <div className="flex gap-4 w-full max-w-7xl mx-auto h-[75vh]">
            {/* Sidebar: List of Contracts */}
-           <div className="w-[300px] flex flex-col bg-black shadow-md border-l border-gray-400 shrink-0">
-               <div className="text-white py-2.5 text-center font-bold text-base shrink-0">العملاء ({filteredContracts.length})</div>
-               <div className="flex-1 overflow-auto bg-[#eaeff1] w-full items-center flex flex-col pt-2">
-                   {filteredContracts.map((c, idx) => {
-                       const rem = getRemainingAmount(c);
-                       const isSelected = selectedContract?.id === c.id;
-                       
-                       return (
-                           <div 
-                               key={c.id} 
-                               onClick={() => setSelectedContract(c)}
-                               className={`w-[96%] mb-2 p-3 cursor-pointer shadow-sm border ${isSelected ? 'bg-[#e3f2fd] border-blue-300' : 'bg-white border-white hover:border-gray-300'} transition-colors`}
-                           >
-                               <div className="flex justify-between items-center">
-                                   <div className={`font-bold text-sm ${rem > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                       {rem > 0 ? `متبقي: ${rem}` : 'خالص'}
-                                   </div>
-                                   <div className="text-right">
-                                       <div className="font-bold text-gray-900">{c.customerName}</div>
-                                       <div className="text-xs text-gray-500 mt-1">{c.payments.filter(p => p.isPaid).length} من {c.payments.length} قسط</div>
+           <div className="w-[300px] flex flex-col shrink-0 gap-4">
+               {/* Total Box */}
+               <div className="bg-[#eaeff1] border border-gray-400 p-4 flex flex-col items-center justify-center shadow-sm">
+                   <div className="text-gray-600 font-bold text-sm mb-2">إجمالي المتبقي لجميع العملاء</div>
+                   <div className="text-gray-900 font-extrabold text-xl">{filteredContracts.reduce((sum, c) => sum + getRemainingAmount(c), 0).toLocaleString()} ج.م</div>
+               </div>
+               
+               <div className="w-full flex flex-col flex-1 bg-black shadow-md border-l border-gray-400 overflow-hidden">
+                   <div className="text-white py-2.5 text-center font-bold text-base shrink-0">العملاء ({filteredContracts.length})</div>
+                   <div className="flex-1 overflow-auto bg-[#eaeff1] w-full items-center flex flex-col pt-2 border-t border-gray-400">
+                       {filteredContracts.map((c, idx) => {
+                           const rem = getRemainingAmount(c);
+                           const isSelected = selectedContract?.id === c.id;
+                           
+                           return (
+                               <div 
+                                   key={c.id} 
+                                   onClick={() => setSelectedContract(c)}
+                                   className={`w-[96%] mb-2 p-3 cursor-pointer shadow-sm border ${isSelected ? 'bg-[#e3f2fd] border-blue-300' : 'bg-white border-white hover:border-gray-300'} transition-colors`}
+                               >
+                                   <div className="flex justify-between items-center">
+                                       <div className={`font-bold text-sm ${rem > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                           {rem > 0 ? `متبقي: ${rem}` : 'خالص'}
+                                       </div>
+                                       <div className="text-right">
+                                           <div className="font-bold text-gray-900">{c.customerName}</div>
+                                           <div className="text-xs text-gray-500 mt-1">{c.payments.filter(p => p.isPaid).length} من {c.payments.length} قسط</div>
+                                       </div>
                                    </div>
                                </div>
-                           </div>
-                       )
-                   })}
+                           )
+                       })}
+                   </div>
                </div>
            </div>
 
