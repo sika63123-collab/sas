@@ -54,15 +54,31 @@ export function InstallmentsAdd() {
     }
 
     const payments: InstallmentPayment[] = [];
-    const date = new Date(contractDate);
+    const [yearStr, monthStr, dayStr] = contractDate.split('-');
+    let currYear = parseInt(yearStr, 10);
+    let currMonth = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
     
     for (let i = 1; i <= m; i++) {
-        const dueDate = new Date(date);
-        dueDate.setMonth(dueDate.getMonth() + i);
+        let nMonth = currMonth + i;
+        let nYear = currYear;
+        while (nMonth > 12) {
+            nMonth -= 12;
+            nYear++;
+        }
+        
+        // Handle last day of month if necessary
+        const targetDate = new Date(Date.UTC(nYear, nMonth - 1, day));
+        // JS Date auto-corrects overflow (e.g. Feb 31 -> Mar 3)
+        // If we want to clamp to month end:
+        if (targetDate.getUTCMonth() !== (nMonth - 1)) {
+            targetDate.setUTCDate(0); // set to last day of previous month
+        }
+
         payments.push({
             id: `pay-${i}-${Date.now()}`,
             amount: monthlyPayment,
-            dueDate: dueDate.toISOString(),
+            dueDate: targetDate.toISOString().split('T')[0] + 'T00:00:00.000Z',
             isPaid: false
         });
     }
@@ -81,7 +97,7 @@ export function InstallmentsAdd() {
         months: m,
         monthlyPayment,
         totalAmount, // This is total after downpayment in this context
-        startDate: date.toISOString(),
+        startDate: new Date(contractDate).toISOString(),
         payments
     });
 

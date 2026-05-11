@@ -7,27 +7,26 @@ export function InventoryAdd() {
   
   const [newCode, setNewCode] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
   const [newName, setNewName] = useState('');
   const [newCostPrice, setNewCostPrice] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newStock, setNewStock] = useState('');
-  const [deviceStatus, setDeviceStatus] = useState('جديد');
-  const [storage, setStorage] = useState('');
-  const [ram, setRam] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  // Device specific fields
+  const [deviceCondition, setDeviceCondition] = useState('جديد');
+  const [deviceStorage, setDeviceStorage] = useState('');
+  const [deviceRam, setDeviceRam] = useState('');
+
+  const predefinedCategories = ['اجهزة', 'اكسسوارات'];
+  const categories = Array.from(new Set([...predefinedCategories, ...products.map(p => p.category).filter(Boolean)]));
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalCategory = showNewCategoryInput ? customCategory : newCategory;
+    const finalCategory = newCategory === 'NEW' ? customCategory : newCategory;
     
-    if (!newCode || !newName || !newCostPrice || !newPrice || !finalCategory) {
-      alert('الرجاء إكمال كافة الحقول المطلوبة');
-      return;
-    }
+    if (!newCode || !newName || !newCostPrice || !newPrice || !finalCategory) return;
     
     // Check if code already exists
     if (products.some(p => p.id === newCode)) {
@@ -35,50 +34,48 @@ export function InventoryAdd() {
       return;
     }
 
-    const isDevice = finalCategory.includes('اجهزة') || finalCategory.includes('أجهزة');
+    let finalName = newName;
+    if (finalCategory === 'اجهزة') {
+      const specs = [deviceStorage, deviceRam && `${deviceRam} RAM`, deviceCondition].filter(Boolean).join(' - ');
+      if (specs) {
+        finalName += ` (${specs})`;
+      }
+    }
 
     addProduct({
       id: newCode,
       category: finalCategory,
-      name: newName,
+      name: finalName,
       costPrice: Number(newCostPrice),
       price: Number(newPrice),
-      stock: newStock ? Number(newStock) : 0,
-      ...(isDevice && {
-        deviceStatus,
-        storage,
-        ram
-      })
+      stock: newStock ? Number(newStock) : 0
     });
     
-    setSuccessMsg(`تمت الاضافة بنجاح للمخزن بمسمي ${newName} وبسعر ${newPrice}`);
+    setSuccessMsg(`تمت الاضافة بنجاح للمخزن بمسمي ${finalName} وبسعر ${newPrice}`);
     
     setNewCode('');
     setNewCategory('');
     setCustomCategory('');
-    setShowNewCategoryInput(false);
     setNewName('');
     setNewCostPrice('');
     setNewPrice('');
     setNewStock('');
-    setStorage('');
-    setRam('');
+    setDeviceCondition('جديد');
+    setDeviceStorage('');
+    setDeviceRam('');
     
     // hide success msg after 3 seconds
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
-  const currentCategory = showNewCategoryInput ? customCategory : newCategory;
-  const isDevice = currentCategory.includes('اجهزة') || currentCategory.includes('أجهزة');
-
   return (
-    <div className="p-6 max-w-4xl mx-auto w-full" dir="rtl">
+    <div className="p-6 max-w-4xl mx-auto w-full">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <PackagePlus className="h-6 w-6 text-blue-600" />
-          إضافة أصناف
+          اضافة اصناف
         </h1>
-        <p className="text-gray-500 mt-1">إضافة أصناف جديدة للمخزن</p>
+        <p className="text-gray-500 mt-1">اضافة اصناف جديدة للمخزن</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-6">
@@ -89,58 +86,48 @@ export function InventoryAdd() {
         )}
         <form onSubmit={handleAddProduct} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {/* المجموعة - أولا */}
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-2">المجموعة (القسم)</label>
-               {!showNewCategoryInput ? (
-                 <div className="flex gap-2">
-                   <select 
-                     required
-                     value={newCategory}
-                     onChange={e => {
-                       if (e.target.value === 'ADD_NEW') {
-                         setShowNewCategoryInput(true);
-                         setNewCategory('');
-                       } else {
-                         setNewCategory(e.target.value);
-                       }
-                     }}
-                     className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-bold"
-                   >
-                     <option value="">اختر المجموعة...</option>
-                     {categories.map((cat, i) => (
-                       <option key={i} value={cat}>{cat}</option>
-                     ))}
-                     <option value="ADD_NEW" className="text-blue-600 font-bold border-t">+ إضافة مجموعة جديدة</option>
-                   </select>
-                 </div>
-               ) : (
-                 <div className="flex gap-2">
-                   <input 
-                     required
-                     type="text" 
-                     value={customCategory}
-                     onChange={e => setCustomCategory(e.target.value)}
-                     className="flex-1 border border-blue-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50"
-                     placeholder="اكتب اسم المجموعة الجديدة..."
-                     autoFocus
-                   />
-                   <button 
-                     type="button"
-                     onClick={() => {
-                       setShowNewCategoryInput(false);
-                       setCustomCategory('');
-                     }}
-                     className="text-gray-400 hover:text-red-500 px-2"
-                     title="إلغاء"
-                   >
-                     ×
-                   </button>
-                 </div>
+             
+             {/* Category Field - Moved to the first block */}
+             <div className="flex flex-col gap-2">
+               <label className="block text-sm font-medium text-gray-700">المجموعة (القسم)</label>
+               <select 
+                 required
+                 value={newCategory}
+                 onChange={e => setNewCategory(e.target.value)}
+                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+               >
+                 <option value="" disabled>-- إختر المجموعة --</option>
+                 {categories.map((cat, i) => (
+                   <option key={i} value={cat}>{cat}</option>
+                 ))}
+                 <option value="NEW" className="font-bold text-blue-600">+ إضافة مجموعة جديدة</option>
+               </select>
+
+               {newCategory === 'NEW' && (
+                 <input 
+                   required
+                   type="text" 
+                   value={customCategory}
+                   onChange={e => setCustomCategory(e.target.value)}
+                   className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none mt-2"
+                   placeholder="اسم المجموعة الجديدة..."
+                   autoFocus
+                 />
                )}
              </div>
 
-             {/* كود الصنف - ثانيا */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">اسم الصنف</label>
+               <input 
+                 required
+                 type="text" 
+                 value={newName}
+                 onChange={e => setNewName(e.target.value)}
+                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                 placeholder="اسم الصنف كـ شاشة سامسونج"
+               />
+             </div>
+
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-2">كود الصنف</label>
                <div className="relative">
@@ -152,26 +139,51 @@ export function InventoryAdd() {
                    type="text" 
                    value={newCode}
                    onChange={e => setNewCode(e.target.value)}
-                   className="w-full border border-gray-300 rounded-lg p-2.5 pr-10 focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
+                   className="w-full border border-gray-300 rounded-lg p-2.5 pr-10 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                    placeholder="الباركود او كود الصنف"
                  />
                </div>
              </div>
 
-             {/* اسم الصنف */}
-             <div>
-               <label className="block text-sm font-medium text-gray-700 mb-2">اسم الصنف</label>
-               <input 
-                 required
-                 type="text" 
-                 value={newName}
-                 onChange={e => setNewName(e.target.value)}
-                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                 placeholder="اسم الصنف كـ شاشة سامسونج"
-               />
-             </div>
+             {/* Dynamic Device Fields */}
+             {(newCategory === 'اجهزة' || (newCategory === 'NEW' && customCategory === 'اجهزة')) && (
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                  <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">حالة الجهاز</label>
+                     <select 
+                       value={deviceCondition} 
+                       onChange={e => setDeviceCondition(e.target.value)}
+                       className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                     >
+                        <option value="جديد">جديد</option>
+                        <option value="مستعمل">مستعمل</option>
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">المساحة</label>
+                     <input 
+                       type="text"
+                       value={deviceStorage} 
+                       onChange={e => setDeviceStorage(e.target.value)}
+                       className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-mono text-left"
+                       placeholder="مثال: 128GB"
+                       dir="ltr"
+                     />
+                  </div>
+                  <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">الرام</label>
+                     <input 
+                       type="text"
+                       value={deviceRam} 
+                       onChange={e => setDeviceRam(e.target.value)}
+                       className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-mono text-left"
+                       placeholder="مثال: 8GB"
+                       dir="ltr"
+                     />
+                  </div>
+                </div>
+             )}
 
-             {/* سعر التكلفة */}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-2">سعر التكلفة (ج.م)</label>
                <input 
@@ -181,12 +193,10 @@ export function InventoryAdd() {
                  step="0.01"
                  value={newCostPrice}
                  onChange={e => setNewCostPrice(e.target.value)}
-                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
+                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
                  placeholder="0.00"
                />
              </div>
-
-             {/* سعر البيع */}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-2">سعر البيع (ج.م)</label>
                <input 
@@ -196,12 +206,10 @@ export function InventoryAdd() {
                  step="0.01"
                  value={newPrice}
                  onChange={e => setNewPrice(e.target.value)}
-                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
+                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
                  placeholder="0.00"
                />
              </div>
-
-             {/* الكمية */}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-2">الكمية الابتدائية (اختياري)</label>
                <input 
@@ -209,49 +217,10 @@ export function InventoryAdd() {
                  min="0"
                  value={newStock}
                  onChange={e => setNewStock(e.target.value)}
-                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
+                 className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
                  placeholder="0"
                />
              </div>
-
-             {/* حقول الأجهزة - تظهر فقط إذا كان القسم أجهزة */}
-             {isDevice && (
-               <>
-                 <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-300">
-                    <div>
-                      <label className="block text-sm font-bold text-blue-800 mb-2">حالة الجهاز</label>
-                      <select 
-                        value={deviceStatus}
-                        onChange={e => setDeviceStatus(e.target.value)}
-                        className="w-full border border-blue-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-bold"
-                      >
-                        <option value="جديد">جديد</option>
-                        <option value="مستعمل">مستعمل</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-blue-800 mb-2">المساحة</label>
-                      <input 
-                        type="text" 
-                        value={storage}
-                        onChange={e => setStorage(e.target.value)}
-                        className="w-full border border-blue-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                        placeholder="مثال: 128GB, 256GB..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-blue-800 mb-2">الرام</label>
-                      <input 
-                        type="text" 
-                        value={ram}
-                        onChange={e => setRam(e.target.value)}
-                        className="w-full border border-blue-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                        placeholder="مثال: 8GB, 12GB..."
-                      />
-                    </div>
-                 </div>
-               </>
-             )}
           </div>
           <div className="pt-4 border-t border-gray-100 flex justify-end">
             <button 

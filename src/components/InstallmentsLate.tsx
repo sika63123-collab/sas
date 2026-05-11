@@ -23,6 +23,13 @@ export function InstallmentsLate() {
     const results: any[] = [];
 
     installmentContracts.forEach(contract => {
+      // Check if fully paid overall (in case they paid more on earlier installments to cover later ones)
+      const totalRequired = contract.totalAmount; // totalAmount is the financed amount
+      const totalPaid = contract.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
+      const isFullyPaid = totalPaid >= totalRequired || contract.payments.every(p => p.isPaid);
+
+      if (isFullyPaid) return; // Skip if fully paid
+
       const latePayments = contract.payments.filter(p => {
         if (p.isPaid) return false;
         const dueDate = new Date(p.dueDate);
@@ -101,7 +108,7 @@ export function InstallmentsLate() {
                     <td className="py-3 px-2 border-l border-gray-300">{contract.pageNumber || '-'}</td>
                     <td className="py-3 px-2 border-l border-gray-300 text-[#543b3b]">{contract.customerName}</td>
                     <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{contract.customerPhone}</td>
-                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{contract.payments.length > 0 ? new Date(contract.payments[0].dueDate).toLocaleDateString('en-GB') : '-'}</td>
+                    <td className="py-3 px-2 border-l border-gray-300" dir="ltr">{new Date(contract.startDate).toLocaleDateString('en-GB')}</td>
                     <td className="py-3 px-2 border-l border-gray-300 text-gray-700">{contract.latePayments.length}</td>
                     <td className="py-3 px-2 text-gray-700">{contract.latePayments.reduce((sum: number, p: any) => sum + p.amount, 0).toFixed(2)}</td>
                   </tr>

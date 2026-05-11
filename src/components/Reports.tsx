@@ -1,33 +1,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FileText, CreditCard, Box, Calendar, Wallet, TrendingUp, Filter } from 'lucide-react';
+import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
+import ProfitMarginReport from './ProfitMarginReport';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
-  const { transactions, products } = useAppStore();
+  const { transactions } = useAppStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedProductId, setSelectedProductId] = useState<string>('all');
-
-  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
   // Filter transactions by selected date
   const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
-
-  // Filter by category/product for item-card view
-  const filteredItemTransactions = view === 'item-card' ? dailyTransactions.filter(t => {
-    if (selectedCategory === 'all' && selectedProductId === 'all') return true;
-    return t.items.some(item => {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) return false;
-      if (selectedProductId !== 'all') return product.id === selectedProductId;
-      if (selectedCategory !== 'all') return product.category === selectedCategory;
-      return true;
-    });
-  }) : dailyTransactions;
-
-  const filteredProducts = view === 'item-card' && selectedCategory !== 'all'
-    ? products.filter(p => p.category === selectedCategory)
-    : products;
 
   // Helper to calculate actual paid/returned amount
   const getAmount = (t: any) => t.type.includes('deposit') ? (t.depositAmount || 0) : t.totalAmount;
@@ -42,41 +23,6 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment').reduce((sum, t) => sum + getAmount(t), 0);
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
-
-  // --- Profit Logic ---
-  const calculateItemCost = (productId: string) => {
-    const p = products.find(prod => prod.id === productId);
-    return p ? (p.costPrice || 0) : 0;
-  };
-
-  const getProfit = () => {
-    let totalSalesRevenue = 0;
-    let totalSalesCost = 0;
-    let totalReturnsRevenue = 0;
-    let totalReturnsCost = 0;
-
-    dailyTransactions.forEach(t => {
-      if (t.type === 'sale' || t.type === 'deposit_sale') {
-        t.items.forEach(item => {
-          totalSalesRevenue += (item.price * item.quantity);
-          totalSalesCost += (calculateItemCost(item.productId) * item.quantity);
-        });
-      } else if (t.type === 'return' || t.type === 'deposit_return') {
-        t.items.forEach(item => {
-          totalReturnsRevenue += (item.price * item.quantity);
-          totalReturnsCost += (calculateItemCost(item.productId) * item.quantity);
-        });
-      }
-    });
-
-    const netRevenue = totalSalesRevenue - totalReturnsRevenue;
-    const netCost = totalSalesCost - totalReturnsCost;
-    const netProfit = netRevenue - netCost;
-
-    return { netRevenue, netCost, netProfit };
-  };
-
-  const profitData = view === 'profit-margin' ? getProfit() : { netRevenue: 0, netCost: 0, netProfit: 0 };
 
   const getMethodName = (method: string) => {
     switch(method) {
@@ -103,7 +49,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       case 'cash': return 'كشف حساب نقدي';
       case 'visa': return 'كشف حساب الفيزا والإلكتروني';
       case 'shift': return 'تقفيل وردية';
-      case 'item-card': return 'كرت الصنف';
+      case 'item-card': return 'كارت الصنف';
       case 'profit-margin': return 'تقرير هامش الربح';
     }
   };
@@ -254,46 +200,16 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
 
       {view === 'item-card' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-             <div className="flex items-center gap-2 flex-wrap">
+          <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+             <div className="flex items-center gap-2">
                <Box className="h-5 w-5 text-gray-700" />
                <h3 className="font-bold text-gray-800">حركة الأصناف</h3>
              </div>
-             <div className="flex items-center gap-2 flex-wrap">
-               {categories.length > 0 && (
-                 <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
-                   <Filter className="h-3.5 w-3.5 text-gray-500" />
-                   <select
-                     value={selectedCategory}
-                     onChange={e => { setSelectedCategory(e.target.value); setSelectedProductId('all'); }}
-                     className="bg-transparent border-none text-xs font-medium text-gray-700 outline-none cursor-pointer"
-                   >
-                     <option value="all">كل المجموعات</option>
-                     {categories.map((cat, i) => (
-                       <option key={i} value={cat as string}>{cat as string}</option>
-                     ))}
-                   </select>
-                 </div>
-               )}
-               {selectedCategory !== 'all' && (
-                 <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm">
-                   <select
-                     value={selectedProductId}
-                     onChange={e => setSelectedProductId(e.target.value)}
-                     className="bg-transparent border-none text-xs font-medium text-gray-700 outline-none cursor-pointer"
-                   >
-                     <option value="all">كل الأصناف</option>
-                     {filteredProducts.map(p => (
-                       <option key={p.id} value={p.id}>{p.name}</option>
-                     ))}
-                   </select>
-                 </div>
-               )}
-             </div>
+             <span className="text-xs text-gray-500">يرحل كل الأصناف التي يتم بيعها أو استرجاعها</span>
           </div>
           
           <div className="p-0 overflow-x-auto">
-            {filteredItemTransactions.length === 0 ? (
+            {dailyTransactions.length === 0 ? (
                <div className="p-8 text-center text-gray-500">لا توجد حركات في هذا اليوم</div>
             ) : (
               <table className="w-full text-right text-sm min-w-[500px]">
@@ -306,7 +222,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100">
-                   {filteredItemTransactions.map(t => (
+                   {dailyTransactions.map(t => (
                      <tr key={t.id} className="hover:bg-gray-50">
                        <td className="px-6 py-4 text-gray-500 whitespace-nowrap" dir="ltr">{new Date(t.timestamp).toLocaleTimeString('ar-EG')}</td>
                        <td className="px-6 py-4">
@@ -359,34 +275,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       )}
 
       {view === 'profit-margin' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto">
-          <div className="bg-indigo-50 border-b border-indigo-100 p-4">
-            <h2 className="text-lg font-bold text-indigo-800 flex items-center gap-2">
-              <span className="bg-indigo-200 p-1 rounded-md"><TrendingUp className="h-5 w-5 text-indigo-700" /></span>
-              تقرير هامش الربح
-            </h2>
-            <p className="text-sm text-indigo-600/80 mt-1">يعرض صافي المبيعات وتكلفتها والربح المحقق لليوم المحدد</p>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-              <span className="text-gray-600 text-lg">إجمالي قيمة المبيعات (الصافي):</span>
-              <span className="font-bold text-2xl text-gray-900">{profitData.netRevenue} ج.م</span>
-            </div>
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-              <span className="text-gray-600 text-lg">إجمالي تكلفة المبيعات:</span>
-              <span className="font-bold text-xl text-orange-600">- {profitData.netCost} ج.م</span>
-            </div>
-            <div className="flex justify-between items-center pt-2">
-              <span className="text-xl font-bold text-gray-800">صافي الأرباح:</span>
-              <span className="text-3xl font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-inner">{profitData.netProfit} ج.م</span>
-            </div>
-          </div>
-          <div className="bg-gray-50 p-4 border-t border-gray-200 text-sm text-gray-500">
-            * ملحوظة: يتم حساب التكلفة بناءً على سعر التكلفة الحالي للأصناف المسجلة في المخزن. قد يكون الربح غير دقيق إذا لم تقم بإدخال أسعار التكلفة لجميع الأصناف.
-          </div>
-        </div>
+        <ProfitMarginReport selectedDate={selectedDate} />
       )}
-
     </div>
   );
 }

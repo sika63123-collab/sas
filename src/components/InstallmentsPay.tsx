@@ -219,7 +219,7 @@ export function InstallmentsPay() {
                               المبلغ المتبقي للعميل:
                            </td>
                            <td className="border-b border-l border-gray-300 py-2 font-bold text-red-600 text-lg">
-                              {selectedContract?.payments.filter(p => !p.isPaid).reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+                              {selectedContract ? Math.max(0, selectedContract.totalAmount - selectedContract.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0)).toFixed(2) : '0.00'}
                            </td>
                            <td colSpan={2} className="border-b border-gray-300 py-2"></td>
                        </tr>

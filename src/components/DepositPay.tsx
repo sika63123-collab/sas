@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Transaction, PaymentMethod } from '../types';
 
@@ -31,39 +31,58 @@ export function DepositPay() {
     }
   };
 
+  const [payAmount, setPayAmount] = useState<number | ''>('');
+  const [isFullPayment, setIsFullPayment] = useState(true);
+
+  // ... 
+
   const handleCompletePayment = (method: PaymentMethod) => {
     if (!selectedTransaction) return;
 
     const remaining = selectedTransaction.totalAmount - (selectedTransaction.depositAmount || 0);
+    const amountToPay = isFullPayment ? remaining : (typeof payAmount === 'number' ? payAmount : 0);
 
-    if (window.confirm(`تأكيد استلام باقي المبلغ (${remaining} ج.م) وتسليم البضاعة؟`)) {
+    if (amountToPay <= 0 || amountToPay > remaining) {
+       alert('الرجاء كتابة مبلغ صحيح لا يتجاوز المبلغ المتبقي');
+       return;
+    }
+
+    const isFullyPaidNow = amountToPay === remaining;
+
+    if (window.confirm(`تأكيد استلام مبلغ (${amountToPay} ج.م)${isFullyPaidNow ? ' وتسليم البضاعة؟' : '؟'}`)) {
       
       // Update Original Transaction
       updateTransaction(selectedTransaction.id, {
-        isDelivered: true,
+        depositAmount: (selectedTransaction.depositAmount || 0) + amountToPay,
+        isDelivered: isFullyPaidNow,
       });
 
       // Create new completion transaction for reports
-      if (remaining > 0) {
-        addTransaction({
-          type: 'deposit_payment',
-          totalAmount: remaining,
-          paymentMethod: method,
-          items: [], // We don't replicate items to avoid double inventory counting
-          customerName: selectedTransaction.customerName,
-          customerPhone: selectedTransaction.customerPhone,
-          depositAmount: 0,
-        });
-      }
+      addTransaction({
+        type: 'deposit_payment',
+        totalAmount: amountToPay,
+        paymentMethod: method,
+        items: [], // We don't replicate items to avoid double inventory counting
+        customerName: selectedTransaction.customerName,
+        customerPhone: selectedTransaction.customerPhone,
+        depositAmount: amountToPay,
+      });
 
-      alert('تم سداد القسط/المتبقي بنجاح وتسليم البضاعة');
+      alert(`تم سداد مبلغ ${amountToPay} بنجاح${isFullyPaidNow ? ' وتسليم البضاعة' : ''}`);
       setSelectedTransaction(null);
       setSearchTerm('');
+      setPayAmount('');
     }
   };
 
   const currentDepositAmount = selectedTransaction?.depositAmount || 0;
   const remainingTotal = selectedTransaction ? selectedTransaction.totalAmount - currentDepositAmount : 0;
+
+  useEffect(() => {
+    if (isFullPayment) {
+      setPayAmount(remainingTotal);
+    }
+  }, [isFullPayment, remainingTotal]);
 
   return (
     <div className="flex flex-col items-center min-h-full bg-white font-sans p-6" dir="rtl">
@@ -150,12 +169,39 @@ export function DepositPay() {
                       </div>
                  </div>
 
-                 <div className="mt-8 flex justify-center gap-4 border-t pt-8">
-                     <p className="w-full text-center text-gray-500 mb-2 font-bold">إختر طريقة استلام المتبقي:</p>
-                 </div>
-                 <div className="flex justify-center gap-6">
-                     <button onClick={() => handleCompletePayment('cash')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow text-xl">استلام نقدي ({remainingTotal} ج)</button>
-                     <button onClick={() => handleCompletePayment('visa')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow text-xl">استلام فيزا ({remainingTotal} ج)</button>
+                 <div className="mt-8 pt-6 border-t border-gray-200">
+                     <div className="flex flex-col items-center gap-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                         <div className="flex gap-6 mb-2">
+                             <label className="flex items-center gap-2 cursor-pointer font-bold text-lg text-gray-700">
+                                 <input type="radio" checked={isFullPayment} onChange={() => setIsFullPayment(true)} className="w-5 h-5 text-blue-600" />
+                                 سداد كلي وتسليم
+                             </label>
+                             <label className="flex items-center gap-2 cursor-pointer font-bold text-lg text-gray-700">
+                                 <input type="radio" checked={!isFullPayment} onChange={() => setIsFullPayment(false)} className="w-5 h-5 text-blue-600" />
+                                 سداد جزء من المتبقي
+                             </label>
+                         </div>
+                         
+                         {!isFullPayment && (
+                             <div className="flex items-center gap-3">
+                                 <label className="text-lg font-bold">المبلغ المراد سداده الآن:</label>
+                                 <input 
+                                     type="number" 
+                                     className="w-48 h-12 text-center text-xl font-bold border-2 border-blue-300 rounded shadow-inner outline-none focus:border-blue-500" 
+                                     value={payAmount}
+                                     onChange={e => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                 />
+                                 <span className="text-lg text-gray-500 font-bold">ج.م</span>
+                             </div>
+                         )}
+                     </div>
+
+                     <p className="w-full text-center text-gray-500 mt-6 mb-4 font-bold">إختر طريقة استلام المبلغ ({isFullPayment ? remainingTotal : payAmount} ج.م):</p>
+                     
+                     <div className="flex justify-center gap-6">
+                         <button onClick={() => handleCompletePayment('cash')} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-md text-xl transition-transform active:scale-95">استلام نقدي</button>
+                         <button onClick={() => handleCompletePayment('visa')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md text-xl transition-transform active:scale-95">استلام فيزا</button>
+                     </div>
                  </div>
                </div>
             )}
