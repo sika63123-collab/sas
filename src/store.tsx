@@ -159,10 +159,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addInstallmentContract = (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => {
+    // Check if the customer already exists by name or phone
+    const existing = installmentContracts.find(c => 
+      c.customerName.trim() === contract.customerName.trim() || 
+      (c.customerPhone && contract.customerPhone && c.customerPhone.trim() === contract.customerPhone.trim())
+    );
+
+    const cNum = existing 
+                 ? existing.customerNumber 
+                 : (installmentContracts.length > 0 ? Math.max(...installmentContracts.map(c => c.customerNumber || 0)) + 1 : 1);
+
     const newContract: InstallmentContract = {
       ...contract,
       id: Date.now().toString(),
-      customerNumber: installmentContracts.length + 1,
+      customerNumber: cNum,
       createdAt: new Date().toISOString()
     };
     setInstallmentContracts(prev => [...prev, newContract]);
