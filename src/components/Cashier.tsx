@@ -22,6 +22,11 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const [returnInvoiceNo, setReturnInvoiceNo] = useState('');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
+  // General Navigation & Search States
+  const [viewingIndex, setViewingIndex] = useState<number>(-1);
+  const [searchInvoiceText, setSearchInvoiceText] = useState('');
+  const [searchProductText, setSearchProductText] = useState('');
+
   useEffect(() => {
     setTransactionType(initialType);
     setShowCustomerData(initialType === 'deposit_sale' || initialType === 'deposit_return');
@@ -44,8 +49,9 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
   const isReturn = transactionType.includes('return');
   const actualPaymentMethod = isReturn ? 'cash' : paymentMethod;
-  const invoiceNumber = transactions.length + 1;
+  const invoiceNumber = viewingIndex === -1 ? transactions.length + 1 : viewingIndex + 1;
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
+  const isNew = viewingIndex === -1;
 
   // Auto-fill deposit amount if full payment is checked
   useEffect(() => {
@@ -196,6 +202,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   };
 
   function handleNewInvoice() {
+    setViewingIndex(-1);
     setCart([]);
     setItemCode('');
     setItemName('');
@@ -217,47 +224,105 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     document.getElementById('itemCodeInput')?.focus();
   };
 
-  const handleSearchInvoice = () => {
-    if (!isReturn || !returnInvoiceNo.trim()) return;
-    let originalTx = transactions.find(t => String(t.id) === returnInvoiceNo);
-    if (!originalTx) {
-      const index = parseInt(returnInvoiceNo) - 1;
-      if (index >= 0 && index < transactions.length) {
-        originalTx = transactions[index];
-      }
+  const loadTransaction = (index: number) => {
+    if (index < 0 || index >= transactions.length) return;
+    const tx = transactions[index];
+    setViewingIndex(index);
+    setCart(tx.items.map(i => ({ 
+      id: i.productId, 
+      name: i.name, 
+      cartQuantity: i.quantity, 
+      price: i.price, 
+      stock: 0, 
+      product: {id: i.productId, name: i.name, price: i.price, stock: 0, categoryId: ''} 
+    })));
+    setTransactionType(tx.type);
+    if (tx.type.includes('deposit')) {
+        setShowCustomerData(true);
+        setCustomerName(tx.customerName || '');
+        setCustomerPhone(tx.customerPhone || '');
+        setCustomerAddress(tx.customerAddress || '');
+        setPageNumber(tx.pageNumber || '');
+        setDepositAmount(tx.depositAmount || 0);
+        setIsDelivered(tx.isDelivered || false);
+        setPaymentDate(tx.paymentDate || new Date().toISOString().split('T')[0]);
+        setIsFullPayment(tx.depositAmount === tx.totalAmount);
+    } else {
+        setShowCustomerData(false);
     }
-
-    if (!originalTx) {
-      alert('لم يتم العثور على الفاتورة');
-      return;
-    }
-    if (originalTx.type.includes('return')) {
-      alert('لا يمكن ارتجاع فاتورة مرتجع');
-      return;
-    }
-
-    const returnableItems: CartItem[] = originalTx.items.map(item => ({
-      product: { id: item.productId, name: item.name, price: item.price, stock: 0 },
-      id: item.productId,
-      name: item.name,
-      price: item.price,
-      stock: 0,
-      cartQuantity: item.quantity,
-    }));
-    setCart(returnableItems);
-
-    if (originalTx.type === 'deposit_sale') {
-      setShowCustomerData(true);
-      setDepositAmount(originalTx.depositAmount || 0);
-      setIsFullPayment((originalTx.depositAmount || 0) === originalTx.totalAmount);
-      setCustomerName(originalTx.customerName || '');
-      setCustomerPhone(originalTx.customerPhone || '');
-      setCustomerAddress(originalTx.customerAddress || '');
-      setPageNumber(originalTx.pageNumber || '');
-      setIsDelivered(originalTx.isDelivered || false);
-    }
-    alert('تم تحميل أصناف الفاتورة، يمكنك حذف الأصناف من المرتجع (بالضغط على الصنف ثم زر Delete)');
+    setPaymentMethod(tx.paymentMethod as PaymentMethod);
+    setReturnInvoiceNo(tx.returnInvoiceNumber || '');
   };
+
+  const handlePrev = () => {
+    if (viewingIndex === -1 && transactions.length > 0) {
+      loadTransaction(transactions.length - 1);
+    } else if (viewingIndex > 0) {
+      loadTransaction(viewingIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (viewingIndex !== -1 && viewingIndex < transactions.length - 1) {
+      loadTransaction(viewingIndex + 1);
+    } else if (viewingIndex === transactions.length - 1) {
+      handleNewInvoice();
+    }
+  };
+
+  const executeSearchGlobalInvoice = () => {
+    const text = searchInvoiceText.trim();
+    if (!text) return;
+    // Find by ID directly
+    let idx = transactions.findIndex(t => String(t.id) === text);
+    if (idx === -1) {
+        // also try finding by invoice number (sequence)
+        const num = parseInt(text) - 1;
+        if (num >= 0 && num < transactions.length) {
+            idx = num;
+        }
+    }
+    if (idx !== -1) {
+      if (isReturn) {
+         // Load for return
+         const originalTx = transactions[idx];
+         if (originalTx.type.includes('return')) {
+            alert('لا يمكن ارتجاع فاتورة مرتجع');
+            return;
+         }
+         
+         const returnableItems: CartItem[] = originalTx.items.map(item => ({
+             product: { id: item.productId, name: item.name, price: item.price, stock: 0, categoryId: '' },
+             id: item.productId,
+             name: item.name,
+             price: item.price,
+             stock: 0,
+             cartQuantity: item.quantity,
+         }));
+         setCart(returnableItems);
+         setReturnInvoiceNo(originalTx.id);
+         setViewingIndex(-1); // Keep it as a new transaction for return
+
+         if (originalTx.type === 'deposit_sale') {
+           setShowCustomerData(true);
+           setDepositAmount(originalTx.depositAmount || 0);
+           setIsFullPayment((originalTx.depositAmount || 0) === originalTx.totalAmount);
+           setCustomerName(originalTx.customerName || '');
+           setCustomerPhone(originalTx.customerPhone || '');
+           setCustomerAddress(originalTx.customerAddress || '');
+           setPageNumber(originalTx.pageNumber || '');
+           setIsDelivered(originalTx.isDelivered || false);
+         }
+         alert('تم تحميل أصناف الفاتورة للمرتجع. احذف الأصناف غير المرتجعة ثم اضغط حفظ الفاتورة.');
+      } else {
+         loadTransaction(idx);
+      }
+    } else {
+      alert('لم يتم العثور على الفاتورة');
+    }
+  };
+
+
 
   const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
 
@@ -270,24 +335,83 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
       {/* Maximum compact layout, avoiding stretching */}
       <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
         
+        {/* Top Header / Action Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 w-full flex flex-col gap-4">
+          
+          <div className="flex justify-between items-center bg-gray-50 p-2 rounded-xl border border-gray-200">
+             {/* Title and Invoice No */}
+             <div className="flex items-center gap-4 px-2">
+               <h2 className={`text-xl font-bold ${isReturn ? 'text-red-500' : 'text-gray-800'}`}>
+                 {isReturn ? 'مرتجع المبيعات' : 'شاشة الكاشير'}
+               </h2>
+               <div className="flex items-center gap-2">
+                 <span className="text-gray-500 font-medium text-sm">رقم الفاتورة:</span>
+                 <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
+               </div>
+             </div>
+
+             {/* Navigation and Actions */}
+             <div className="flex items-center gap-2">
+                <button onClick={handlePrev} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                  السابق
+                </button>
+                <button onClick={handleNext} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                  التالي
+                </button>
+                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                <button onClick={handleNewInvoice} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 px-5 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                  جديد
+                </button>
+                <button onClick={handleSaveInvoice} disabled={!isNew} className="bg-gray-900 border border-transparent text-white disabled:opacity-50 hover:bg-gray-800 px-6 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                  حفظ الفاتورة
+                </button>
+             </div>
+          </div>
+
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-4">
+             {/* Search Invoice */}
+             <div className="flex items-center gap-2">
+                <span className="text-gray-600 font-bold text-sm shrink-0">بحث برقم الفاتورة:</span>
+                <input 
+                  className={`w-28 ${inputTheme} text-center`} 
+                  placeholder="رقم..."
+                  value={searchInvoiceText}
+                  onChange={e => setSearchInvoiceText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && executeSearchGlobalInvoice()}
+                />
+             </div>
+             
+             {/* Global Search Product Box */}
+             <div className="flex items-center gap-2 flex-1">
+                <span className="text-gray-600 font-bold text-sm shrink-0">بحث باسم الصنف:</span>
+                <input 
+                  className={`flex-1 ${inputTheme}`} 
+                  placeholder="ابحث باسم الصنف واضغط Enter..."
+                  value={searchProductText}
+                  onChange={e => setSearchProductText(e.target.value)}
+                  list="globalProductNames"
+                  onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                          const match = products.find(p => p.name === searchProductText);
+                          if (match) {
+                             setItemName(match.name);
+                             setItemCode(match.id);
+                             setItemPrice(match.price);
+                             setSelectedProduct(match);
+                             setSearchProductText('');
+                             document.getElementById('itemQtyInput')?.focus();
+                          } else {
+                             alert('صنف غير موجود');
+                          }
+                      }
+                  }}
+                />
+             </div>
+          </div>
+        </div>
+
         {/* Main Cashier Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 w-full flex flex-col gap-3">
-          
-          {/* Header Row */}
-          <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-            <h2 className={`text-xl font-bold ${isReturn ? 'text-red-500' : 'text-gray-800'}`}>
-              {isReturn ? 'مرتجع المبيعات' : 'شاشة الكاشير'}
-            </h2>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 font-medium text-sm pr-2">رقم الفاتورة:</span>
-              <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
-              {isReturn && (
-                <button onClick={handleSearchInvoice} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 h-8 rounded-lg font-bold text-xs transition-colors">
-                  بحث
-                </button>
-              )}
-            </div>
-          </div>
 
           {/* Barcode/Item Entry Row */}
           <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
@@ -361,10 +485,13 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         </div>
 
         <datalist id="productNames">
-          {products.map(p => <option key={p.id} value={p.name} />)}
+          {itemName.trim().length > 0 && products.map(p => <option key={p.id} value={p.name} />)}
         </datalist>
         <datalist id="productCodes">
-          {products.map(p => <option key={`code-${p.id}`} value={p.id} />)}
+          {itemCode.trim().length > 0 && products.map(p => <option key={`code-${p.id}`} value={p.id} />)}
+        </datalist>
+        <datalist id="globalProductNames">
+          {searchProductText.trim().length > 0 && products.map(p => <option key={`g-${p.id}`} value={p.name} />)}
         </datalist>
 
         {/* Invoice Table Container (Matching width) */}
