@@ -1,262 +1,91 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
-import { InstallmentContract, InstallmentPayment } from '../types';
-import { CheckCircle } from 'lucide-react';
+import { Transaction } from '../types';
+import { Search } from 'lucide-react';
 
-export function InstallmentsPay() {
-  const { installmentContracts, payInstallment } = useAppStore();
-  
+export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId: string) => void }) {
+  const { transactions } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedContract, setSelectedContract] = useState<InstallmentContract | null>(null);
-  const [paymentInputs, setPaymentInputs] = useState<Record<string, string>>({});
 
-  // When selectedContract is null, select the first in the filtered list
-  const filteredContracts = useMemo(() => {
-    if (!searchTerm) return installmentContracts;
-    return installmentContracts.filter(c => 
-      String(c.customerNumber) === searchTerm || 
-      c.customerPhone === searchTerm || 
-      String(c.pageNumber) === searchTerm ||
-      c.customerName.includes(searchTerm) ||
-      c.deviceName.includes(searchTerm)
+  const depositInvoices = useMemo(() => {
+    const invoices = transactions.filter(t => t.type === 'deposit_sale' || t.type === 'deposit_return');
+    if (!searchTerm.trim()) return invoices;
+    const q = searchTerm.trim();
+    return invoices.filter(t =>
+      t.customerName?.includes(q) || t.customerPhone?.includes(q)
     );
-  }, [searchTerm, installmentContracts]);
+  }, [transactions, searchTerm]);
 
-  useEffect(() => {
-    if (filteredContracts.length > 0 && (!selectedContract || !filteredContracts.find(c => c.id === selectedContract.id))) {
-      setSelectedContract(filteredContracts[0]);
-    } else if (filteredContracts.length === 0) {
-      setSelectedContract(null);
-    }
-  }, [filteredContracts, selectedContract]);
+  const paidAmount = (t: Transaction) => t.depositAmount || 0;
+  const remainingAmount = (t: Transaction) => Math.max(0, t.totalAmount - paidAmount(t));
 
-  const handlePay = (paymentId: string) => {
-    if (!selectedContract) return;
-    
-    const originalPayment = selectedContract.payments.find(p => p.id === paymentId);
-    
-    const inputValue = paymentInputs[paymentId];
-    const paidVal = inputValue !== undefined ? Number(inputValue) : (originalPayment ? originalPayment.amount : 0);
-
-    if (!paidVal || paidVal <= 0) {
-      alert('الرجاء كتابة مبلغ الدفع');
-      return;
-    }
-
-    payInstallment(selectedContract.id, paymentId, paidVal);
-      
-    // Update local view
-    setSelectedContract(prev => {
-       if (!prev) return prev;
-       return {
-          ...prev,
-          payments: prev.payments.map(p => p.id === paymentId ? { ...p, isPaid: true, paidDate: new Date().toISOString(), paidAmount: paidVal } : p)
-       }
-    });
-
-    setPaymentInputs({...paymentInputs, [paymentId]: ''});
-  };
-
-  const getRemainingAmount = (c: InstallmentContract) => {
-    const paid = c.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
-    return Math.max(0, c.totalAmount - paid);
-  };
-
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const inputTheme = "h-9 border border-gray-200 rounded-lg shadow-sm outline-none px-3 bg-white font-medium text-sm focus:ring-2 focus:ring-blue-100 transition-shadow";
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#b0bec5] font-sans p-6" dir="rtl">
+    <div className="flex min-h-[calc(100vh-64px)] bg-[#f5f5f7] font-sans p-4 pb-0 gap-4" dir="rtl">
+      {/* ===== يمين: التقرير ===== */}
+      <div className="flex-1 flex flex-col items-center gap-4">
+        
         {/* Search Bar */}
-        <div className="flex justify-center items-center mb-6">
-            <input 
-                className="w-1/2 max-w-lg h-12 px-4 shadow-sm outline-none text-right placeholder-gray-400 text-lg font-bold rounded-r-sm"
-                placeholder="الاسم، الموبايل، رقم الصفحة..."
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full max-w-5xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-sm shrink-0">بحث:</div>
+            <div className="flex-1 relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                className={`w-full pr-10 ${inputTheme}`}
+                placeholder="ابحث باسم العميل أو رقم التليفون..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-            />
-            <div className="bg-black text-white px-6 py-[14px] font-bold text-lg text-center rounded-l-sm min-w-[200px]">
-                بحث سريع:
+              />
             </div>
+            <div className="text-sm font-bold text-gray-500 shrink-0">{depositInvoices.length} فاتورة</div>
+          </div>
         </div>
 
-        <div className="flex gap-4 w-full max-w-7xl mx-auto h-[75vh]">
-           {/* Sidebar: List of Contracts */}
-           <div className="w-[300px] flex flex-col shrink-0 gap-4">
-               {/* Total Box */}
-               <div className="bg-[#eaeff1] border border-gray-400 p-4 flex flex-col items-center justify-center shadow-sm">
-                   <div className="text-gray-600 font-bold text-sm mb-2">إجمالي المتبقي لجميع العملاء</div>
-                   <div className="text-gray-900 font-extrabold text-xl">{filteredContracts.reduce((sum, c) => sum + getRemainingAmount(c), 0).toLocaleString()} ج.م</div>
-               </div>
-               
-               <div className="w-full flex flex-col flex-1 bg-black shadow-md border-l border-gray-400 overflow-hidden">
-                   <div className="text-white py-2.5 text-center font-bold text-base shrink-0">العملاء ({filteredContracts.length})</div>
-                   <div className="flex-1 overflow-auto bg-[#eaeff1] w-full items-center flex flex-col pt-2 border-t border-gray-400">
-                       {filteredContracts.map((c, idx) => {
-                           const rem = getRemainingAmount(c);
-                           const isSelected = selectedContract?.id === c.id;
-                           
-                           return (
-                               <div 
-                                   key={c.id} 
-                                   onClick={() => setSelectedContract(c)}
-                                   className={`w-[96%] mb-2 p-3 cursor-pointer shadow-sm border ${isSelected ? 'bg-[#e3f2fd] border-blue-300' : 'bg-white border-white hover:border-gray-300'} transition-colors`}
-                               >
-                                   <div className="flex justify-between items-center">
-                                       <div className={`font-bold text-sm ${rem > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                           {rem > 0 ? `متبقي: ${rem}` : 'خالص'}
-                                       </div>
-                                       <div className="text-right">
-                                           <div className="font-bold text-gray-900">{c.customerName}</div>
-                                           <div className="text-xs text-gray-500 mt-1">{c.payments.filter(p => p.isPaid).length} من {c.payments.length} قسط</div>
-                                       </div>
-                                   </div>
-                               </div>
-                           )
-                       })}
-                   </div>
-               </div>
-           </div>
-
-           {/* Main Detail Area */}
-           <div className="flex-1 bg-[#eaeff1] shadow-md flex flex-col min-w-0">
-               {selectedContract ? (() => {
-                  const remaining = getRemainingAmount(selectedContract);
-                  const paidCount = selectedContract.payments.filter(p => p.isPaid).length;
-                  const totalCount = selectedContract.payments.length;
-                  const latePayments = selectedContract.payments.filter(p => !p.isPaid && new Date(p.dueDate) < today);
-                  const totalPaidAmount = selectedContract.downPayment + selectedContract.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount ?? p.amount) : 0), 0);
-                  const contractIndex = installmentContracts.findIndex(c => c.id === selectedContract.id) + 1;
-
-                  return (
-                     <>
-                        <div className="bg-[#1a365d] text-white px-4 py-2.5 flex justify-between items-center shrink-0">
-                           {latePayments.length > 0 ? (
-                              <div className="bg-red-100 text-red-600 px-3 py-1 font-bold text-sm">متأخر {latePayments.length} قسط</div>
-                           ) : <div/>}
-                           <div className="font-bold text-lg">عقد #{contractIndex} — {selectedContract.deviceName}</div>
-                        </div>
-
-                        <div className="p-6 pb-2 shrink-0">
-                            <div className="grid grid-cols-4 gap-4 text-center">
-                                {/* Row 1 */}
-                                <div className="flex flex-col gap-2">
-                                   <span className="text-gray-500 font-medium text-sm">رقم الصفحة</span>
-                                   <span className="font-bold text-gray-900">{selectedContract.pageNumber || '-'}</span>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                   <span className="text-gray-500 font-medium text-sm">التليفون</span>
-                                   <span className="font-bold text-gray-900" dir="ltr">{selectedContract.customerPhone}</span>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                   <span className="text-gray-500 font-medium text-sm">العنوان</span>
-                                   <span className="font-bold text-gray-900">{selectedContract.customerAddress || '-'}</span>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                   <span className="text-gray-500 font-medium text-sm">الضامن</span>
-                                   <span className="font-bold text-gray-900">{selectedContract.guarantorName || '-'}</span>
-                                </div>
-                                
-                                {/* Row 2 */}
-                                <div className="flex flex-col gap-2 mt-4 relative pb-5 border-b-2 border-blue-600">
-                                   <span className="text-gray-500 font-medium text-sm">سعر الجهاز</span>
-                                   <span className="font-bold text-gray-900">{selectedContract.purchasePrice} ج.م</span>
-                                   <span className="text-green-600 text-xs font-bold absolute bottom-0 left-0 right-0">مدفوع: {totalPaidAmount} ج.م</span>
-                                </div>
-                                <div className="flex flex-col gap-2 mt-4">
-                                   <span className="text-gray-500 font-medium text-sm">المقدم</span>
-                                   <span className="font-bold text-blue-600">{selectedContract.downPayment} ج.م</span>
-                                </div>
-                                <div className="flex flex-col gap-2 mt-4">
-                                   <span className="text-gray-500 font-medium text-sm">القسط الشهري</span>
-                                   <span className="font-bold text-gray-900">{selectedContract.monthlyPayment} ج.م</span>
-                                </div>
-                                <div className="flex flex-col gap-2 mt-4">
-                                   <span className="text-gray-500 font-medium text-sm">الأقساط</span>
-                                   <span className="font-bold text-gray-900">{paidCount}/{totalCount} دفع</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="px-6 py-2 pt-4 flex justify-start shrink-0">
-                           <span className="text-red-600 font-bold mt-2">متبقي: {remaining} ج.م</span>
-                        </div>
-
-                        {/* Table Area */}
-                        <div className="flex-1 overflow-auto mt-2 pb-6">
-                            <table className="w-full text-center">
-                                <thead className="bg-[#cbd5e1] text-gray-800 sticky top-0 z-10">
-                                    <tr>
-                                        <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-12">#</th>
-                                        <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/4">تاريخ الاستحقاق</th>
-                                        <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/5">المبلغ</th>
-                                        <th className="py-2.5 font-bold text-sm border-l border-gray-300 w-1/4">تاريخ الدفع</th>
-                                        <th className="py-2.5 font-bold text-sm w-24">الحالة</th>
-                                        <th className="py-2.5 font-bold text-sm w-32 border-r border-gray-300">إجراء</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white">
-                                    {selectedContract.payments.map((p, idx) => {
-                                        const dueDate = new Date(p.dueDate);
-                                        const isLate = !p.isPaid && dueDate < today;
-                                        const nextUnpaid = selectedContract.payments.find(up => !up.isPaid);
-                                        const isCurrent = nextUnpaid?.id === p.id;
-                                        
-                                        return (
-                                            <tr key={p.id} className={`${isLate ? 'bg-[#ffebee]' : 'even:bg-gray-50'} border-b border-gray-200`}>
-                                                <td className="py-2 text-sm font-bold border-l border-gray-200">{idx + 1}</td>
-                                                <td className="py-2 text-sm font-bold border-l border-gray-200" dir="ltr">{dueDate.toLocaleDateString('en-GB')}</td>
-                                                <td className="py-2 text-sm font-bold border-l border-gray-200 text-gray-900">
-                                                    {p.isPaid ? (
-                                                        <span>{p.paidAmount !== undefined ? p.paidAmount : p.amount}</span>
-                                                    ) : isCurrent ? (
-                                                        <input 
-                                                            type="number"
-                                                            className="w-24 h-7 border border-blue-400 text-center font-bold text-blue-700 outline-none bg-white focus:border-blue-600 rounded-sm"
-                                                            placeholder={p.amount.toString()}
-                                                            value={paymentInputs[p.id] !== undefined ? paymentInputs[p.id] : p.amount.toString()}
-                                                            onChange={(e) => setPaymentInputs(prev => ({...prev, [p.id]: e.target.value}))}
-                                                        />
-                                                    ) : p.amount}
-                                                </td>
-                                                <td className="py-2 text-sm font-bold border-l border-gray-200 text-gray-600">
-                                                    {p.isPaid ? new Date(p.paidDate!).toLocaleDateString('en-GB') : '—'}
-                                                </td>
-                                                <td className="py-2 text-sm font-bold">
-                                                    {p.isPaid ? (
-                                                        <span className="text-green-600">تم الدفع</span>
-                                                    ) : isLate ? (
-                                                        <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded">متأخر</span>
-                                                    ) : (
-                                                        <span className="text-gray-600">قادم</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-1 border-r border-gray-200">
-                                                   {!p.isPaid && isCurrent ? (
-                                                       <button onClick={() => handlePay(p.id)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-1 text-xs rounded transition-colors focus:ring-2 focus:ring-blue-300">
-                                                          تسديد
-                                                       </button>
-                                                   ) : p.isPaid ? (
-                                                       <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                                                   ) : null}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                     </>
-                  );
-               })() : (
-                  <div className="flex-1 flex justify-center items-center text-gray-500 font-bold text-lg">
-                      لا يوجد عقد محدد
-                  </div>
-               )}
-           </div>
-
+        {/* Report Table */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-5xl overflow-hidden">
+          <div className="bg-gray-900 text-white py-3 text-center font-bold text-base">فواتير العربون</div>
+          <div className="overflow-auto max-h-[calc(100vh-250px)]">
+            <table className="w-full text-center text-sm">
+              <thead className="bg-gray-50/80 border-b border-gray-100 sticky top-0 text-gray-500 font-medium z-10">
+                <tr>
+                  <th className="py-3 px-3 font-semibold">رقم الفاتورة</th>
+                  <th className="py-3 px-3 font-semibold">تاريخ الفاتورة</th>
+                  <th className="py-3 px-3 font-semibold text-right pr-6">اسم العميل</th>
+                  <th className="py-3 px-3 font-semibold">المدفوع</th>
+                  <th className="py-3 px-3 font-semibold">الباقي</th>
+                  <th className="py-3 px-3 font-semibold">تاريخ السداد</th>
+                  <th className="py-3 px-3 font-semibold">صافي الفاتورة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {depositInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-10 text-center text-gray-400 font-medium">لا توجد فواتير عربون</td>
+                  </tr>
+                ) : (
+                  depositInvoices.map(t => (
+                    <tr 
+                      key={t.id}
+                      onClick={() => onOpenInvoice?.(t.id)}
+                      className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                    >
+                      <td className="py-3 px-3 font-bold text-gray-700 font-mono text-xs">{t.id}</td>
+                      <td className="py-3 px-3 text-gray-600">{new Date(t.timestamp).toLocaleDateString('en-GB')}</td>
+                      <td className="py-3 px-3 font-bold text-gray-900 text-right pr-6">{t.customerName || '—'}</td>
+                      <td className="py-3 px-3 font-bold text-green-600">{paidAmount(t).toFixed(2)}</td>
+                      <td className="py-3 px-3 font-bold text-red-600">{remainingAmount(t).toFixed(2)}</td>
+                      <td className="py-3 px-3 text-gray-600">{t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('en-GB') : '—'}</td>
+                      <td className="py-3 px-3 font-bold text-gray-900">{t.totalAmount.toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
     </div>
   );
 }
-

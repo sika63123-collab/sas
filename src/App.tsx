@@ -36,6 +36,7 @@ function MainApp() {
   const { currentUser, logout } = useAppStore();
   const [activeView, setActiveView] = useState<ViewMode>('home');
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
+  const [loadInvoiceId, setLoadInvoiceId] = useState<string | null>(null);
   
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
@@ -46,6 +47,13 @@ function MainApp() {
   const selectView = (view: ViewMode, cMode?: TransactionType) => {
     setActiveView(view);
     if (cMode) setCashierMode(cMode);
+    setOpenMenu(null);
+  };
+
+  const openInvoiceInCashier = (invoiceId: string) => {
+    setLoadInvoiceId(invoiceId);
+    setCashierMode('deposit_sale');
+    setActiveView('cashier');
     setOpenMenu(null);
   };
 
@@ -86,13 +94,13 @@ function MainApp() {
                   الحركة
                 </button>
                 
-                {openMenu === 'transaction' && (
-                  <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
-                     {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
-                     {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
-                     {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مبيعات عربون</button>}
-                  </div>
-                )}
+                 {openMenu === 'transaction' && (
+                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
+                      {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
+                      {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
+                      {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
+                   </div>
+                 )}
               </div>
            )}
 
@@ -146,9 +154,8 @@ function MainApp() {
                 
                 {openMenu === 'installments' && (
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
-                     {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
-                     {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
-                     {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
+                      {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
+                      {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
                      {(isAdmin) && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">أرشيف العملاء</button>}
                   </div>
                 )}
@@ -203,16 +210,16 @@ function MainApp() {
              </motion.h1>
            </motion.div>
          )}
-         {activeView === 'cashier' && <Cashier initialType={cashierMode} />}
-         {activeView === 'inventory' && <Inventory />}
-         {activeView === 'inventory-add' && <InventoryAdd />}
-         {activeView.startsWith('reports-') && <Reports view={activeView.replace('reports-', '') as any} />}
-         {activeView === 'installments-add' && <InstallmentsAdd />}
-         {activeView === 'installments-pay' && <InstallmentsPay />}
-         {activeView === 'installments-late' && <InstallmentsLate />}
-         {activeView === 'installments-archive' && <InstallmentsArchive />}
-         {activeView === 'deposit-pay' && <DepositPay />}
-         {activeView === 'settings' && <Settings />}
+          {activeView === 'cashier' && <Cashier initialType={cashierMode} initialInvoiceId={loadInvoiceId} onInvoiceLoaded={() => setLoadInvoiceId(null)} />}
+          {activeView === 'inventory' && <Inventory />}
+          {activeView === 'inventory-add' && <InventoryAdd />}
+          {activeView.startsWith('reports-') && <Reports view={activeView.replace('reports-', '') as any} />}
+          {activeView === 'installments-add' && <InstallmentsAdd />}
+          {activeView === 'installments-pay' && <InstallmentsPay onOpenInvoice={openInvoiceInCashier} />}
+          {activeView === 'installments-late' && <InstallmentsLate />}
+          {activeView === 'installments-archive' && <InstallmentsArchive />}
+          {activeView === 'deposit-pay' && <DepositPay />}
+          {activeView === 'settings' && <Settings />}
       </div>
     </div>
   );

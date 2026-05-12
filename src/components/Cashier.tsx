@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
-import { CheckCircle, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { CheckCircle, Search, X } from 'lucide-react';
 
-export default function Cashier({ initialType = 'sale' }: { initialType?: TransactionType }) {
+export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvoiceLoaded }: { initialType?: TransactionType; initialInvoiceId?: string | null; onInvoiceLoaded?: () => void }) {
   const { products, addTransaction, transactions, updateTransaction } = useAppStore();
   const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -36,6 +36,18 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     setShowCustomerData(initialType === 'deposit_sale' || initialType === 'deposit_return');
     handleNewInvoice();
   }, [initialType]);
+
+  useEffect(() => {
+    if (initialInvoiceId) {
+      const idx = cashierTransactions.findIndex(t => t.id === initialInvoiceId);
+      if (idx !== -1) {
+        loadTransaction(idx);
+        setTransactionType(cashierTransactions[idx].type);
+        setShowCustomerData(cashierTransactions[idx].type.includes('deposit'));
+      }
+      onInvoiceLoaded?.();
+    }
+  }, [initialInvoiceId]);
 
   // Deposit States
   const [showCustomerData, setShowCustomerData] = useState(false);
@@ -72,6 +84,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
         setItemName(match.name);
         setItemPrice(match.price);
         setSelectedProduct(match);
+        document.getElementById('itemQtyInput')?.focus();
       } else if (!itemName) {
         setSelectedProduct(null);
         setItemPrice('');
@@ -141,7 +154,12 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleAddItem(e);
+      const target = e.target as HTMLElement;
+      if (target.id === 'itemQtyInput') {
+        handleAddItem(e);
+      } else if (target.id === 'itemCodeInput') {
+        document.getElementById('itemQtyInput')?.focus();
+      }
     }
   };
 
@@ -374,9 +392,10 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const labelTheme = "text-sm font-semibold text-gray-600 w-24 shrink-0";
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#f5f5f7] font-sans p-4 pb-0" dir="rtl">
-      {/* Maximum compact layout, avoiding stretching */}
-      <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
+    <div className="flex min-h-[calc(100vh-64px)] bg-[#f5f5f7] font-sans p-4 pb-0 gap-4" dir="rtl">
+      {/* ===== يمين: الكاشير ===== */}
+      <div className="max-w-4xl w-auto flex flex-col items-center">
+
         
         {/* Top Header / Action Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 w-full flex flex-col gap-4">
@@ -464,6 +483,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
             <div className="flex items-center gap-2">
               <label className={labelTheme}>الكمية:</label>
               <input
+                id="itemQtyInput"
                 type="number"
                 min="1"
                 className={`w-20 text-center ${inputTheme}`}
@@ -494,12 +514,32 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                 <option value="vodafone_cash">فودافون كاش</option>
               </select>
             </div>
-            <button
-              onClick={handleAddItem}
-              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold h-9 px-6 rounded-lg text-sm flex items-center justify-center transition-all mr-auto shadow-sm"
-            >
-              + إضافة
-            </button>
+            {isEWallet && (
+              <>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-600 shrink-0">المرسل:</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={senderWallet}
+                    onChange={e => setSenderWallet(e.target.value.replace(/\D/g, ''))}
+                    className={`w-20 text-center tracking-[0.3em] text-base font-mono ${inputTheme}`}
+                    placeholder="اخر 4"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-600 shrink-0">المستلم:</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={receiverWallet}
+                    onChange={e => setReceiverWallet(e.target.value.replace(/\D/g, ''))}
+                    className={`w-20 text-center tracking-[0.3em] text-base font-mono ${inputTheme}`}
+                    placeholder="اخر 4"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -566,112 +606,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
            </div>
         </div>
 
-        {/* Accordion / Customer Data Toggle */}
-        <button 
-           onClick={() => setShowCustomerData(!showCustomerData)}
-           className="bg-white rounded-full px-4 py-1.5 shadow-sm border border-gray-200 text-gray-500 font-medium text-xs flex items-center gap-1 hover:bg-gray-50 transition-colors mb-4 focus:outline-none"
-        >
-           بيانات العميل أو العربون {showCustomerData ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
 
-        {/* Customer & Deposit Data (Parallel Width) */}
-        {showCustomerData && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 w-full flex flex-col md:flex-row gap-6 mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
-            {/* Right Side: Customer Info (Vertical) */}
-            <div className="flex-1 flex flex-col gap-3">
-              <h3 className="text-gray-800 font-bold mb-1 border-b border-gray-100 pb-2">بيانات العميل</h3>
-              
-              <div className="flex items-center gap-3">
-                <label className={labelTheme}>تاريخ السداد:</label>
-                <input type="date" className={`flex-1 ${inputTheme}`} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className={labelTheme}>اسم العميل:</label>
-                <input className={`flex-1 ${inputTheme}`} value={customerName} onChange={e => setCustomerName(e.target.value)} />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className={labelTheme}>التليفون:</label>
-                <input className={`flex-1 text-left ${inputTheme}`} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} dir="ltr" />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className={labelTheme}>العنوان:</label>
-                <input className={`flex-1 ${inputTheme}`} value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className={labelTheme}>حالة التسليم:</label>
-                <select className={`flex-1 ${inputTheme}`} value={isDelivered ? 'yes' : 'no'} onChange={(e) => setIsDelivered(e.target.value === 'yes')}>
-                  <option value="no">لم يتم التسليم</option>
-                  <option value="yes">تم التسليم</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Left Side: Financials/Deposit */}
-            <div className="flex-[0.8] flex flex-col gap-3 md:border-r border-gray-100 md:pr-6">
-              <h3 className="text-gray-800 font-bold mb-1 border-b border-gray-100 pb-2">تفاصيل السداد</h3>
-              
-              <div className="flex flex-col gap-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); isNew ? setDepositAmount(totalAmount) : setNewPaymentAmount(totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
-                  سداد كلي (غلق المديونية)
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={!isFullPayment} onChange={() => { setIsFullPayment(false); isNew ? setDepositAmount(0) : setNewPaymentAmount(0); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
-                  سداد جزئي (عربون)
-                </label>
-              </div>
-
-              <div className="flex items-center gap-3 mt-1">
-                 <label className={labelTheme}>إجمالي الفاتورة:</label>
-                 <input 
-                   className={`flex-1 text-center bg-gray-50 font-bold text-gray-800 ${inputTheme}`} 
-                   value={totalAmount.toFixed(2)} 
-                   readOnly 
-                 />
-              </div>
-
-              {!isNew && (
-                <div className="flex items-center gap-3">
-                   <label className={labelTheme}>المدفوع مسبقاً:</label>
-                   <input 
-                     className={`flex-1 text-center bg-gray-50 font-bold text-gray-500 ${inputTheme}`} 
-                     value={typeof depositAmount === 'number' ? depositAmount.toFixed(2) : '0.00'} 
-                     readOnly 
-                   />
-                </div>
-              )}
-
-              {!isFullPayment && (
-                <div className="flex items-center gap-3">
-                   <label className={labelTheme}>{isNew ? 'العربون:' : 'الدفعة الجديدة (عربون):'}</label>
-                   <input 
-                     type="number" 
-                     className={`flex-1 text-center font-bold text-blue-800 ${inputTheme}`} 
-                     value={isNew ? depositAmount : newPaymentAmount} 
-                     onChange={e => {
-                       const val = e.target.value === '' ? '' : Number(e.target.value);
-                       if (isNew) setDepositAmount(val);
-                       else setNewPaymentAmount(val);
-                     }} 
-                   />
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                 <label className={labelTheme}>المتبقي:</label>
-                 <input 
-                   className={`flex-1 text-center bg-gray-50 text-red-600 font-bold ${inputTheme}`} 
-                   value={isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0) - (!isNew ? (typeof newPaymentAmount === 'number' ? newPaymentAmount : 0) : 0)).toFixed(2) : '0.00')} 
-                   readOnly 
-                 />
-              </div>
-            </div>
-          </div>
-        )}
 
 
 
@@ -732,6 +667,102 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===== شمال: العربون ===== */}
+      <div className="w-80 shrink-0 flex flex-col gap-3">
+        {/* Deposit Toggle Button */}
+        <button
+          onClick={() => setShowCustomerData(!showCustomerData)}
+          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full flex items-center justify-between gap-2 transition-all hover:bg-gray-50 ${showCustomerData ? 'ring-2 ring-blue-200' : ''}`}
+        >
+          <span className="text-lg font-bold text-gray-800">
+            {showCustomerData ? 'إخفاء' : 'فتح'} العربون
+          </span>
+          <span className={`text-xl transition-transform ${showCustomerData ? 'rotate-180' : ''}`}>
+            ◀
+          </span>
+        </button>
+
+        {/* Deposit Content */}
+        {showCustomerData && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-200px)]">
+            <h3 className="text-gray-800 font-bold border-b border-gray-100 pb-2 text-sm">بيانات العميل</h3>
+            
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">تاريخ السداد:</label>
+                <input type="date" className={`${inputTheme} w-full`} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">اسم العميل:</label>
+                <input className={`${inputTheme} w-full`} value={customerName} onChange={e => setCustomerName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">التليفون:</label>
+                <input className={`${inputTheme} w-full text-left`} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} dir="ltr" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">العنوان:</label>
+                <input className={`${inputTheme} w-full`} value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">رقم الصفحة:</label>
+                <input className={`${inputTheme} w-full`} value={pageNumber} onChange={e => setPageNumber(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">حالة التسليم:</label>
+                <select className={`${inputTheme} w-full`} value={isDelivered ? 'yes' : 'no'} onChange={(e) => setIsDelivered(e.target.value === 'yes')}>
+                  <option value="no">لم يتم التسليم</option>
+                  <option value="yes">تم التسليم</option>
+                </select>
+              </div>
+            </div>
+
+            <h3 className="text-gray-800 font-bold border-b border-gray-100 pb-2 text-sm mt-1">تفاصيل السداد</h3>
+            
+            <div className="flex flex-col gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
+                <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); isNew ? setDepositAmount(totalAmount) : setNewPaymentAmount(totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                سداد كلي (غلق المديونية)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
+                <input type="radio" checked={!isFullPayment} onChange={() => { setIsFullPayment(false); isNew ? setDepositAmount(0) : setNewPaymentAmount(0); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                سداد جزئي (عربون)
+              </label>
+            </div>
+
+            <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
+              <span className="text-sm font-semibold text-gray-500">إجمالي الفاتورة:</span>
+              <span className="font-bold text-gray-800">{totalAmount.toFixed(2)} <span className="text-xs">ج.م</span></span>
+            </div>
+
+            {!isNew && (
+              <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
+                <span className="text-sm font-semibold text-gray-500">المدفوع مسبقاً:</span>
+                <span className="font-bold text-gray-500">{typeof depositAmount === 'number' ? depositAmount.toFixed(2) : '0.00'} <span className="text-xs">ج.م</span></span>
+              </div>
+            )}
+
+            {!isFullPayment && (
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">{isNew ? 'العربون:' : 'الدفعة الجديدة (عربون):'}</label>
+                <input type="number" className={`${inputTheme} w-full text-center font-bold text-blue-800`} value={isNew ? depositAmount : newPaymentAmount} onChange={e => {
+                  const val = e.target.value === '' ? '' : Number(e.target.value);
+                  if (isNew) setDepositAmount(val);
+                  else setNewPaymentAmount(val);
+                }} />
+              </div>
+            )}
+
+            <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
+              <span className="text-sm font-semibold text-gray-500">المتبقي:</span>
+              <span className="font-bold text-red-600">
+                {isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0) - (!isNew ? (typeof newPaymentAmount === 'number' ? newPaymentAmount : 0) : 0)).toFixed(2) : '0.00')} <span className="text-xs">ج.م</span>
+              </span>
             </div>
           </div>
         )}
