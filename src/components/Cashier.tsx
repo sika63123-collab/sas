@@ -28,6 +28,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const [searchProductText, setSearchProductText] = useState('');
   const [showInvoiceSearchModal, setShowInvoiceSearchModal] = useState(false);
   const [showProductSearchModal, setShowProductSearchModal] = useState(false);
+  const [newPaymentAmount, setNewPaymentAmount] = useState<number | ''>('');
 
   useEffect(() => {
     setTransactionType(initialType);
@@ -158,6 +159,44 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
       }
     }
 
+    if (!isNew) {
+      // Updating an existing deposit invoice or adding a payment
+      const existingTx = transactions[viewingIndex];
+      const paymentVal = typeof newPaymentAmount === 'number' ? newPaymentAmount : 0;
+      
+      // Update the original invoice with the new total deposit
+      const currentDeposit = typeof existingTx.depositAmount === 'number' ? existingTx.depositAmount : 0;
+      updateTransaction(existingTx.id, {
+        depositAmount: currentDeposit + paymentVal,
+        isDelivered: isDelivered
+      });
+
+      // Add a new transaction record for the payment itself ONLY if payment > 0
+      if (paymentVal > 0) {
+        addTransaction({
+          type: 'deposit_payment',
+          items: [{
+            productId: 'payment',
+            name: `دفعة لفاتورة رقم ${viewingIndex + 1} - ${existingTx.customerName || ''}`,
+            quantity: 1,
+            price: paymentVal
+          }],
+          totalAmount: paymentVal,
+          paymentMethod: actualPaymentMethod,
+          ...(isEWallet && { senderWalletLast4: senderWallet, receiverWalletLast4: receiverWallet }),
+          customerName: existingTx.customerName,
+          paymentDate: paymentDate
+        });
+        alert('تم تسجيل الدفعة بنجاح وتحديث الفاتورة');
+      } else {
+        alert('تم تحديث الفاتورة بنجاح');
+      }
+
+      handleNewInvoice();
+      setShowCheckoutModal(false);
+      return;
+    }
+
     const finalType = isReturn 
       ? (showCustomerData ? 'deposit_return' : 'return') 
       : (showCustomerData ? 'deposit_sale' : 'sale');
@@ -221,6 +260,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     setPageNumber('');
     setIsFullPayment(true);
     setDepositAmount('');
+    setNewPaymentAmount('');
     setIsDelivered(false);
     setSelectedRowId(null);
     document.getElementById('itemCodeInput')?.focus();
@@ -372,8 +412,8 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                 <button onClick={handleNewInvoice} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 px-5 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
                   جديد
                 </button>
-                <button onClick={handleSaveInvoice} disabled={!isNew} className="bg-gray-900 border border-transparent text-white disabled:opacity-50 hover:bg-gray-800 px-6 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
-                  حفظ الفاتورة
+                <button onClick={handleSaveInvoice} disabled={!isNew && !showCustomerData} className="bg-gray-900 border border-transparent text-white disabled:opacity-50 hover:bg-gray-800 px-6 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                  {isNew ? 'حفظ الفاتورة' : 'تحديث وتأكيد'}
                 </button>
              </div>
           </div>
@@ -575,11 +615,11 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               
               <div className="flex flex-col gap-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); setDepositAmount(totalAmount); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                  <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); isNew ? setDepositAmount(totalAmount) : setNewPaymentAmount(totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
                   سداد كلي (غلق المديونية)
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={!isFullPayment} onChange={() => { setIsFullPayment(false); setDepositAmount(0); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                  <input type="radio" checked={!isFullPayment} onChange={() => { setIsFullPayment(false); isNew ? setDepositAmount(0) : setNewPaymentAmount(0); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
                   سداد جزئي (عربون)
                 </label>
               </div>
@@ -593,14 +633,29 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                  />
               </div>
 
+              {!isNew && (
+                <div className="flex items-center gap-3">
+                   <label className={labelTheme}>المدفوع مسبقاً:</label>
+                   <input 
+                     className={`flex-1 text-center bg-gray-50 font-bold text-gray-500 ${inputTheme}`} 
+                     value={typeof depositAmount === 'number' ? depositAmount.toFixed(2) : '0.00'} 
+                     readOnly 
+                   />
+                </div>
+              )}
+
               {!isFullPayment && (
                 <div className="flex items-center gap-3">
-                   <label className={labelTheme}>مبلغ السداد:</label>
+                   <label className={labelTheme}>{isNew ? 'مبلغ السداد:' : 'الدفعة الجديدة:'}</label>
                    <input 
                      type="number" 
                      className={`flex-1 text-center font-bold text-blue-800 ${inputTheme}`} 
-                     value={depositAmount} 
-                     onChange={e => setDepositAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                     value={isNew ? depositAmount : newPaymentAmount} 
+                     onChange={e => {
+                       const val = e.target.value === '' ? '' : Number(e.target.value);
+                       if (isNew) setDepositAmount(val);
+                       else setNewPaymentAmount(val);
+                     }} 
                    />
                 </div>
               )}
@@ -609,7 +664,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                  <label className={labelTheme}>المتبقي:</label>
                  <input 
                    className={`flex-1 text-center bg-gray-50 text-red-600 font-bold ${inputTheme}`} 
-                   value={isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)).toFixed(2) : '0.00')} 
+                   value={isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0) - (!isNew ? (typeof newPaymentAmount === 'number' ? newPaymentAmount : 0) : 0)).toFixed(2) : '0.00')} 
                    readOnly 
                  />
               </div>
