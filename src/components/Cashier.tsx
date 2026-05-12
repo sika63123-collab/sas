@@ -5,6 +5,7 @@ import { CheckCircle, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale' }: { initialType?: TransactionType }) {
   const { products, addTransaction, transactions, updateTransaction } = useAppStore();
+  const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>(initialType);
 
@@ -52,7 +53,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
   const isReturn = transactionType.includes('return');
   const actualPaymentMethod = isReturn ? 'cash' : paymentMethod;
-  const invoiceNumber = viewingIndex === -1 ? transactions.length + 1 : viewingIndex + 1;
+  const invoiceNumber = viewingIndex === -1 ? cashierTransactions.length + 1 : viewingIndex + 1;
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
   const isNew = viewingIndex === -1;
 
@@ -161,7 +162,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
     if (!isNew) {
       // Updating an existing deposit invoice or adding a payment
-      const existingTx = transactions[viewingIndex];
+      const existingTx = cashierTransactions[viewingIndex];
       const paymentVal = typeof newPaymentAmount === 'number' ? newPaymentAmount : 0;
       
       // Update the original invoice with the new total deposit
@@ -267,8 +268,8 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   };
 
   const loadTransaction = (index: number) => {
-    if (index < 0 || index >= transactions.length) return;
-    const tx = transactions[index];
+    if (index < 0 || index >= cashierTransactions.length) return;
+    const tx = cashierTransactions[index];
     setViewingIndex(index);
     setCart(tx.items.map(i => ({ 
       id: i.productId, 
@@ -297,17 +298,17 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   };
 
   const handlePrev = () => {
-    if (viewingIndex === -1 && transactions.length > 0) {
-      loadTransaction(transactions.length - 1);
+    if (viewingIndex === -1 && cashierTransactions.length > 0) {
+      loadTransaction(cashierTransactions.length - 1);
     } else if (viewingIndex > 0) {
       loadTransaction(viewingIndex - 1);
     }
   };
 
   const handleNext = () => {
-    if (viewingIndex !== -1 && viewingIndex < transactions.length - 1) {
+    if (viewingIndex !== -1 && viewingIndex < cashierTransactions.length - 1) {
       loadTransaction(viewingIndex + 1);
-    } else if (viewingIndex === transactions.length - 1) {
+    } else if (viewingIndex === cashierTransactions.length - 1) {
       handleNewInvoice();
     }
   };
@@ -316,7 +317,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     const text = searchInvoiceText.trim();
     if (!text) return;
     // Find by ID directly
-    let idx = transactions.findIndex(t => String(t.id) === text);
+    let idx = cashierTransactions.findIndex(t => String(t.id) === text);
     if (idx === -1) {
         // also try finding by invoice number (sequence)
         const num = parseInt(text) - 1;
@@ -327,7 +328,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
     if (idx !== -1) {
       if (isReturn) {
          // Load for return
-         const originalTx = transactions[idx];
+         const originalTx = cashierTransactions[idx];
          if (originalTx.type.includes('return')) {
             alert('لا يمكن ارتجاع فاتورة مرتجع');
             return;
