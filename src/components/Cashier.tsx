@@ -182,9 +182,14 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       // Updating an existing deposit invoice or adding a payment
       const existingTx = cashierTransactions[viewingIndex];
       const paymentVal = typeof newPaymentAmount === 'number' ? newPaymentAmount : 0;
+      const currentDeposit = typeof existingTx.depositAmount === 'number' ? existingTx.depositAmount : 0;
+
+      if (showCustomerData && currentDeposit + paymentVal > existingTx.totalAmount) {
+        alert('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الفاتورة');
+        return;
+      }
       
       // Update the original invoice with the new total deposit
-      const currentDeposit = typeof existingTx.depositAmount === 'number' ? existingTx.depositAmount : 0;
       updateTransaction(existingTx.id, {
         depositAmount: currentDeposit + paymentVal,
         isDelivered: isDelivered
@@ -219,6 +224,11 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     const finalType = isReturn 
       ? (showCustomerData ? 'deposit_return' : 'return') 
       : (showCustomerData ? 'deposit_sale' : 'sale');
+
+    if (showCustomerData && typeof depositAmount === 'number' && depositAmount > totalAmount) {
+      alert('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الفاتورة');
+      return;
+    }
 
     addTransaction({
       type: finalType,
@@ -394,7 +404,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   return (
     <div className="flex min-h-[calc(100vh-64px)] bg-[#f5f5f7] font-sans p-4 pb-0 gap-4" dir="rtl">
       {/* ===== يمين: الكاشير ===== */}
-      <div className="max-w-4xl w-auto flex flex-col items-center">
+      <div className="max-w-5xl w-auto min-w-0 overflow-hidden flex flex-col items-center">
 
         
         {/* Top Header / Action Bar */}
