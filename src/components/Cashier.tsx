@@ -646,7 +646,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
 
               {!isFullPayment && (
                 <div className="flex items-center gap-3">
-                   <label className={labelTheme}>{isNew ? 'مبلغ السداد:' : 'الدفعة الجديدة:'}</label>
+                   <label className={labelTheme}>{isNew ? 'العربون:' : 'الدفعة الجديدة (عربون):'}</label>
                    <input 
                      type="number" 
                      className={`flex-1 text-center font-bold text-blue-800 ${inputTheme}`} 
