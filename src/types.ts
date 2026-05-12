@@ -60,6 +60,7 @@ export interface Transaction {
   pageNumber?: string;
   depositAmount?: number;
   isDelivered?: boolean;
+  paymentDate?: string;
 }
 
 export interface InstallmentPayment {

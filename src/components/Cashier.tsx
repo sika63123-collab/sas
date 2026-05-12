@@ -4,7 +4,7 @@ import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
 import { CheckCircle, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale' }: { initialType?: TransactionType }) {
-  const { products, addTransaction, transactions } = useAppStore();
+  const { products, addTransaction, transactions, updateTransaction } = useAppStore();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>(initialType);
 
