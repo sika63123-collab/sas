@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
-import { CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale' }: { initialType?: TransactionType }) {
   const { products, addTransaction, transactions } = useAppStore();
@@ -26,6 +26,8 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
   const [viewingIndex, setViewingIndex] = useState<number>(-1);
   const [searchInvoiceText, setSearchInvoiceText] = useState('');
   const [searchProductText, setSearchProductText] = useState('');
+  const [showInvoiceSearchModal, setShowInvoiceSearchModal] = useState(false);
+  const [showProductSearchModal, setShowProductSearchModal] = useState(false);
 
   useEffect(() => {
     setTransactionType(initialType);
@@ -347,6 +349,14 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
                <div className="flex items-center gap-2">
                  <span className="text-gray-500 font-medium text-sm">رقم الفاتورة:</span>
                  <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
+                 <button
+                    onClick={() => setShowInvoiceSearchModal(true)}
+                    className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    title="بحث برقم الفاتورة"
+                 >
+                    <Search className="w-3.5 h-3.5" />
+                    بحث
+                 </button>
                </div>
              </div>
 
@@ -368,46 +378,6 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
              </div>
           </div>
 
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-4">
-             {/* Search Invoice */}
-             <div className="flex items-center gap-2">
-                <span className="text-gray-600 font-bold text-sm shrink-0">بحث برقم الفاتورة:</span>
-                <input 
-                  className={`w-28 ${inputTheme} text-center`} 
-                  placeholder="رقم..."
-                  value={searchInvoiceText}
-                  onChange={e => setSearchInvoiceText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && executeSearchGlobalInvoice()}
-                />
-             </div>
-             
-             {/* Global Search Product Box */}
-             <div className="flex items-center gap-2 flex-1">
-                <span className="text-gray-600 font-bold text-sm shrink-0">بحث باسم الصنف:</span>
-                <input 
-                  className={`flex-1 ${inputTheme}`} 
-                  placeholder="ابحث باسم الصنف واضغط Enter..."
-                  value={searchProductText}
-                  onChange={e => setSearchProductText(e.target.value)}
-                  list="globalProductNames"
-                  onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                          const match = products.find(p => p.name === searchProductText);
-                          if (match) {
-                             setItemName(match.name);
-                             setItemCode(match.id);
-                             setItemPrice(match.price);
-                             setSelectedProduct(match);
-                             setSearchProductText('');
-                             document.getElementById('itemQtyInput')?.focus();
-                          } else {
-                             alert('صنف غير موجود');
-                          }
-                      }
-                  }}
-                />
-             </div>
-          </div>
         </div>
 
         {/* Main Cashier Card */}
@@ -428,15 +398,23 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               />
             </div>
             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <label className={labelTheme}>اسم الصنف:</label>
+              <label className="text-sm font-semibold text-gray-600 shrink-0">اسم الصنف:</label>
               <input
                 className={`flex-1 min-w-0 ${inputTheme}`}
-                placeholder="بحث..."
+                placeholder="اكتب اسم الصنف..."
                 value={itemName}
                 onChange={e => setItemName(e.target.value)}
                 list="productNames"
                 onKeyDown={handleKeyDown}
               />
+              <button
+                 onClick={() => setShowProductSearchModal(true)}
+                 className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-9 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors shrink-0"
+                 title="بحث باسم الصنف"
+              >
+                 <Search className="w-4 h-4" />
+                 بحث
+              </button>
             </div>
           </div>
 
@@ -568,11 +546,6 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               </div>
 
               <div className="flex items-center gap-3">
-                <label className={labelTheme}>رقم البطاقة:</label>
-                <input className={`flex-1 text-left ${inputTheme}`} value={pageNumber} onChange={e => setPageNumber(e.target.value)} dir="ltr" />
-              </div>
-
-              <div className="flex items-center gap-3">
                 <label className={labelTheme}>اسم العميل:</label>
                 <input className={`flex-1 ${inputTheme}`} value={customerName} onChange={e => setCustomerName(e.target.value)} />
               </div>
@@ -602,31 +575,41 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
               
               <div className="flex flex-col gap-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={isFullPayment} onChange={() => setIsFullPayment(true)} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                  <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); setDepositAmount(totalAmount); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
                   سداد كلي (غلق المديونية)
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                  <input type="radio" checked={!isFullPayment} onChange={() => setIsFullPayment(false)} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                  <input type="radio" checked={!isFullPayment} onChange={() => { setIsFullPayment(false); setDepositAmount(0); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
                   سداد جزئي (عربون)
                 </label>
               </div>
 
               <div className="flex items-center gap-3 mt-1">
-                 <label className={labelTheme}>مبلغ السداد:</label>
+                 <label className={labelTheme}>إجمالي الفاتورة:</label>
                  <input 
-                   type="number" 
-                   className={`flex-1 text-center font-bold text-blue-800 ${inputTheme}`} 
-                   value={depositAmount} 
-                   onChange={e => setDepositAmount(e.target.value === '' ? '' : Number(e.target.value))} 
-                   disabled={isFullPayment}
+                   className={`flex-1 text-center bg-gray-50 font-bold text-gray-800 ${inputTheme}`} 
+                   value={totalAmount.toFixed(2)} 
+                   readOnly 
                  />
               </div>
+
+              {!isFullPayment && (
+                <div className="flex items-center gap-3">
+                   <label className={labelTheme}>مبلغ السداد:</label>
+                   <input 
+                     type="number" 
+                     className={`flex-1 text-center font-bold text-blue-800 ${inputTheme}`} 
+                     value={depositAmount} 
+                     onChange={e => setDepositAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                   />
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                  <label className={labelTheme}>المتبقي:</label>
                  <input 
                    className={`flex-1 text-center bg-gray-50 text-red-600 font-bold ${inputTheme}`} 
-                   value={totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)).toFixed(2) : '0'} 
+                   value={isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)).toFixed(2) : '0.00')} 
                    readOnly 
                  />
               </div>
@@ -634,21 +617,7 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
           </div>
         )}
 
-        {/* Global Save/Reset Buttons */}
-        <div className="flex gap-3 w-full justify-end mt-4 mb-10">
-          <button 
-             onClick={handleNewInvoice} 
-             className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold px-8 py-2.5 rounded-xl shadow-sm text-sm transition-colors"
-          >
-            جديد
-          </button>
-          <button 
-             onClick={handleSaveInvoice} 
-             className="bg-gray-900 border border-transparent text-white hover:bg-gray-800 focus:ring-4 focus:ring-gray-200 font-semibold px-10 py-2.5 rounded-xl shadow-sm text-sm transition-all"
-          >
-            حفظ الفاتورة
-          </button>
-        </div>
+
 
         {/* Checkout Modal */}
         {showCheckoutModal && (
@@ -711,6 +680,103 @@ export default function Cashier({ initialType = 'sale' }: { initialType?: Transa
           </div>
         )}
       </div>
+
+      {/* Invoice Search Modal */}
+      {showInvoiceSearchModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">بحث برقم الفاتورة</h3>
+              <button onClick={() => setShowInvoiceSearchModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <input 
+                className={`w-full ${inputTheme} text-center text-lg h-12`} 
+                placeholder="أدخل رقم الفاتورة..."
+                value={searchInvoiceText}
+                onChange={e => setSearchInvoiceText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    executeSearchGlobalInvoice();
+                    setShowInvoiceSearchModal(false);
+                  }
+                }}
+                autoFocus
+              />
+              <button 
+                onClick={() => {
+                  executeSearchGlobalInvoice();
+                  setShowInvoiceSearchModal(false);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-lg shadow-sm"
+              >
+                بحث
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Search Modal */}
+      {showProductSearchModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">بحث متقدم باسم الصنف</h3>
+              <button onClick={() => setShowProductSearchModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border-b border-gray-100">
+              <input 
+                className={`w-full ${inputTheme}`} 
+                placeholder="ابحث باسم الصنف..."
+                value={searchProductText}
+                onChange={e => setSearchProductText(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="overflow-auto flex-1 p-2 space-y-1">
+              {searchProductText.trim().length === 0 ? (
+                <div className="p-8 text-center text-gray-400 font-medium">
+                  اكتب اسم الصنف أو الكود للبحث...
+                </div>
+              ) : (
+                <>
+                  {products.filter(p => p.name.includes(searchProductText) || p.id.includes(searchProductText)).map(p => (
+                    <div 
+                      key={p.id} 
+                      onClick={() => { 
+                        setItemCode(p.id); 
+                        setItemName(p.name); 
+                        setItemPrice(p.price); 
+                        setSelectedProduct(p); 
+                        setShowProductSearchModal(false);
+                        setSearchProductText('');
+                        document.getElementById('itemQtyInput')?.focus();
+                      }} 
+                      className="p-3 rounded-lg hover:bg-blue-50 cursor-pointer flex justify-between items-center border border-transparent hover:border-blue-100 transition-colors"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-bold text-gray-800">{p.name}</span>
+                        <span className="text-xs text-gray-400 font-mono mt-1">{p.id}</span>
+                      </div>
+                      <span className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded">{p.price} ج.م</span>
+                    </div>
+                  ))}
+                  {products.filter(p => p.name.includes(searchProductText) || p.id.includes(searchProductText)).length === 0 && (
+                    <div className="p-8 text-center text-gray-400">
+                      لا توجد نتائج مطابقة لبحثك
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
