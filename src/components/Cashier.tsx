@@ -30,6 +30,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const [showInvoiceSearchModal, setShowInvoiceSearchModal] = useState(false);
   const [showProductSearchModal, setShowProductSearchModal] = useState(false);
   const [newPaymentAmount, setNewPaymentAmount] = useState<number | ''>('');
+  const [returnSaleInvoiceSearch, setReturnSaleInvoiceSearch] = useState('');
+  const [linkedSaleTransaction, setLinkedSaleTransaction] = useState<{ id: string; items: { productId: string; name: string; quantity: number; price: number }[] } | null>(null);
 
   useEffect(() => {
     setTransactionType(initialType);
@@ -68,6 +70,53 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const invoiceNumber = viewingIndex === -1 ? cashierTransactions.length + 1 : viewingIndex + 1;
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
   const isNew = viewingIndex === -1;
+
+  // Return invoice number: count only return transactions
+  const returnTransactions = transactions.filter(t => t.type === 'return' || t.type === 'deposit_return');
+  const returnInvoiceNumber = isReturn ? returnTransactions.length + 1 : 0;
+
+  // Search for a sale invoice to return from
+  const handleReturnSaleSearch = () => {
+    const text = returnSaleInvoiceSearch.trim();
+    if (!text) return;
+    let idx = cashierTransactions.findIndex(t => String(t.id) === text);
+    if (idx === -1) {
+      const num = parseInt(text) - 1;
+      if (num >= 0 && num < cashierTransactions.length) idx = num;
+    }
+    if (idx !== -1) {
+      const originalTx = cashierTransactions[idx];
+      if (originalTx.type.includes('return')) {
+        alert('لا يمكن ارتجاع فاتورة مرتجع');
+        return;
+      }
+      const returnableItems: CartItem[] = originalTx.items.map(item => ({
+        product: { id: item.productId, name: item.name, price: item.price, stock: 0, categoryId: '' },
+        id: item.productId,
+        name: item.name,
+        price: item.price,
+        stock: 0,
+        cartQuantity: item.quantity,
+      }));
+      setCart(returnableItems);
+      setReturnInvoiceNo(originalTx.id);
+      setLinkedSaleTransaction({ id: originalTx.id, items: originalTx.items });
+      setViewingIndex(-1);
+
+      if (originalTx.type === 'deposit_sale') {
+        setShowCustomerData(true);
+        setDepositAmount(originalTx.depositAmount || 0);
+        setIsFullPayment((originalTx.depositAmount || 0) === originalTx.totalAmount);
+        setCustomerName(originalTx.customerName || '');
+        setCustomerPhone(originalTx.customerPhone || '');
+        setCustomerAddress(originalTx.customerAddress || '');
+        setIsDelivered(originalTx.isDelivered || false);
+      }
+      alert('تم تحميل أصناف الفاتورة للمرتجع. احذف الأصناف غير المرتجعة ثم اضغط حفظ الفاتورة.');
+    } else {
+      alert('لم يتم العثور على الفاتورة');
+    }
+  };
 
   // Auto-fill deposit amount if full payment is checked
   useEffect(() => {
@@ -123,6 +172,15 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const handleAddItem = (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) e.preventDefault();
     if (!selectedProduct || !itemQty || itemQty <= 0) return;
+
+    // In return mode, only allow items from the linked sale invoice
+    if (isReturn && linkedSaleTransaction) {
+      const allowed = linkedSaleTransaction.items.find(i => i.productId === selectedProduct.id);
+      if (!allowed) {
+        alert('هذا الصنف غير موجود في فاتورة المبيعات المرتبطة');
+        return;
+      }
+    }
 
     if (transactionType === 'sale' && selectedProduct.stock <= 0) {
       alert('هذا الصنف غير متوفر في المخزن');
@@ -283,6 +341,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     setSenderWallet('');
     setReceiverWallet('');
     setReturnInvoiceNo('');
+    setReturnSaleInvoiceSearch('');
+    setLinkedSaleTransaction(null);
     setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
@@ -416,29 +476,63 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                <h2 className={`text-xl font-bold ${isReturn ? 'text-red-500' : 'text-gray-800'}`}>
                  {isReturn ? 'مرتجع المبيعات' : 'شاشة الكاشير'}
                </h2>
-               <div className="flex items-center gap-2">
-                 <span className="text-gray-500 font-medium text-sm">رقم الفاتورة:</span>
-                 <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
-                 <button
-                    onClick={() => setShowInvoiceSearchModal(true)}
-                    className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
-                    title="بحث برقم الفاتورة"
-                 >
-                    <Search className="w-3.5 h-3.5" />
-                    بحث
-                 </button>
-               </div>
+
+               {isReturn ? (
+                 /* Return Mode: show return number (read-only) + sale invoice search */
+                 <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-1.5">
+                     <span className="text-gray-500 font-medium text-sm">رقم المرتجع:</span>
+                     <input className="w-16 h-8 text-center rounded-lg bg-gray-100 border border-gray-300 font-bold focus:outline-none text-red-600" value={returnInvoiceNumber} readOnly />
+                   </div>
+                   <div className="flex items-center gap-1.5">
+                     <span className="text-gray-500 font-medium text-sm">رقم فاتورة المبيعات:</span>
+                     <input 
+                       className="w-20 h-8 text-center rounded-lg bg-white border border-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-blue-100" 
+                       value={returnSaleInvoiceSearch} 
+                       onChange={e => setReturnSaleInvoiceSearch(e.target.value)}
+                       onKeyDown={e => e.key === 'Enter' && handleReturnSaleSearch()}
+                       placeholder="رقم"
+                     />
+                     <button
+                       onClick={handleReturnSaleSearch}
+                       className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                       title="بحث عن فاتورة المبيعات"
+                     >
+                       <Search className="w-3.5 h-3.5" />
+                       بحث
+                     </button>
+                   </div>
+                 </div>
+               ) : (
+                 /* Normal Mode: invoice number + search */
+                 <div className="flex items-center gap-2">
+                   <span className="text-gray-500 font-medium text-sm">رقم الفاتورة:</span>
+                   <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
+                   <button
+                      onClick={() => setShowInvoiceSearchModal(true)}
+                      className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                      title="بحث برقم الفاتورة"
+                   >
+                      <Search className="w-3.5 h-3.5" />
+                      بحث
+                   </button>
+                 </div>
+               )}
              </div>
 
              {/* Navigation and Actions */}
              <div className="flex items-center gap-2">
-                <button onClick={handlePrev} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
-                  السابق
-                </button>
-                <button onClick={handleNext} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
-                  التالي
-                </button>
-                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                {!isReturn && (
+                  <>
+                    <button onClick={handlePrev} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                      السابق
+                    </button>
+                    <button onClick={handleNext} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                      التالي
+                    </button>
+                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                  </>
+                )}
                 <button onClick={handleNewInvoice} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 px-5 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
                   جديد
                 </button>
@@ -684,7 +778,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
 
       {/* ===== شمال: العربون ===== */}
       <div className="w-80 shrink-0 flex flex-col gap-3">
-        {/* Deposit Toggle Button */}
+        {/* Deposit Toggle Button - hidden in return mode */}
+        {!isReturn && (
         <button
           onClick={() => setShowCustomerData(!showCustomerData)}
           className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full flex items-center justify-between gap-2 transition-all hover:bg-gray-50 ${showCustomerData ? 'ring-2 ring-blue-200' : ''}`}
@@ -696,6 +791,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
             ◀
           </span>
         </button>
+        )}
 
         {/* Deposit Content */}
         {showCustomerData && (
