@@ -71,10 +71,10 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
 
   // Auto-fill deposit amount if full payment is checked
   useEffect(() => {
-    if (isFullPayment) {
+    if (isFullPayment && isNew) {
       setDepositAmount(totalAmount);
     }
-  }, [totalAmount, isFullPayment]);
+  }, [totalAmount, isFullPayment, isNew]);
 
   // Handle item search by ID/Code or Name
   useEffect(() => {
@@ -181,8 +181,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     if (!isNew) {
       // Updating an existing deposit invoice or adding a payment
       const existingTx = cashierTransactions[viewingIndex];
-      const paymentVal = typeof newPaymentAmount === 'number' ? newPaymentAmount : 0;
-      const currentDeposit = typeof existingTx.depositAmount === 'number' ? existingTx.depositAmount : 0;
+      const paymentVal = Number(newPaymentAmount) || 0;
+      const currentDeposit = Number(existingTx.depositAmount) || 0;
 
       if (showCustomerData && currentDeposit + paymentVal > existingTx.totalAmount) {
         alert('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الفاتورة');
@@ -225,7 +225,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       ? (showCustomerData ? 'deposit_return' : 'return') 
       : (showCustomerData ? 'deposit_sale' : 'sale');
 
-    if (showCustomerData && typeof depositAmount === 'number' && depositAmount > totalAmount) {
+    if (showCustomerData && Number(depositAmount) > totalAmount) {
       alert('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الفاتورة');
       return;
     }
@@ -247,7 +247,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
         customerPhone,
         customerAddress,
         pageNumber,
-        depositAmount: typeof depositAmount === 'number' ? depositAmount : 0,
+        depositAmount: Number(depositAmount) || 0,
         isDelivered,
         paymentDate
       })
@@ -720,10 +720,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                 <input className={`${inputTheme} w-full`} value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
               </div>
               <div className="flex flex-col gap-0.5">
-                <label className="text-xs font-semibold text-gray-500">رقم الصفحة:</label>
-                <input className={`${inputTheme} w-full`} value={pageNumber} onChange={e => setPageNumber(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-0.5">
                 <label className="text-xs font-semibold text-gray-500">حالة التسليم:</label>
                 <select className={`${inputTheme} w-full`} value={isDelivered ? 'yes' : 'no'} onChange={(e) => setIsDelivered(e.target.value === 'yes')}>
                   <option value="no">لم يتم التسليم</option>
@@ -736,7 +732,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
             
             <div className="flex flex-col gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
               <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
-                <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); isNew ? setDepositAmount(totalAmount) : setNewPaymentAmount(totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0)); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
+                <input type="radio" checked={isFullPayment} onChange={() => { setIsFullPayment(true); isNew ? setDepositAmount(totalAmount) : setNewPaymentAmount(Math.max(0, totalAmount - (Number(depositAmount) || 0))); }} className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300" />
                 سداد كلي (غلق المديونية)
               </label>
               <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-gray-700">
@@ -753,7 +749,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
             {!isNew && (
               <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
                 <span className="text-sm font-semibold text-gray-500">المدفوع مسبقاً:</span>
-                <span className="font-bold text-gray-500">{typeof depositAmount === 'number' ? depositAmount.toFixed(2) : '0.00'} <span className="text-xs">ج.م</span></span>
+                <span className="font-bold text-gray-500">{Number(depositAmount) > 0 ? Number(depositAmount).toFixed(2) : '0.00'} <span className="text-xs">ج.م</span></span>
               </div>
             )}
 
@@ -771,7 +767,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
             <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
               <span className="text-sm font-semibold text-gray-500">المتبقي:</span>
               <span className="font-bold text-red-600">
-                {isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (typeof depositAmount === 'number' ? depositAmount : 0) - (!isNew ? (typeof newPaymentAmount === 'number' ? newPaymentAmount : 0) : 0)).toFixed(2) : '0.00')} <span className="text-xs">ج.م</span>
+                {isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (Number(depositAmount) || 0) - (!isNew ? (Number(newPaymentAmount) || 0) : 0)).toFixed(2) : '0.00')} <span className="text-xs">ج.م</span>
               </span>
             </div>
           </div>

@@ -16,7 +16,11 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
     );
   }, [transactions, searchTerm]);
 
-  const paidAmount = (t: Transaction) => t.depositAmount || 0;
+  const cashierTransactions = useMemo(() => {
+    return transactions.filter(t => t.type !== 'deposit_payment');
+  }, [transactions]);
+
+  const paidAmount = (t: Transaction) => Number(t.depositAmount) || 0;
   const remainingAmount = (t: Transaction) => Math.max(0, t.totalAmount - paidAmount(t));
 
   const inputTheme = "h-9 border border-gray-200 rounded-lg shadow-sm outline-none px-3 bg-white font-medium text-sm focus:ring-2 focus:ring-blue-100 transition-shadow";
@@ -71,7 +75,7 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
                       onClick={() => onOpenInvoice?.(t.id)}
                       className="hover:bg-blue-50/50 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-3 font-bold text-gray-700 font-mono text-xs">{t.id}</td>
+                      <td className="py-3 px-3 font-bold text-gray-700 font-mono text-xs">{cashierTransactions.findIndex(tx => tx.id === t.id) + 1}</td>
                       <td className="py-3 px-3 text-gray-600">{new Date(t.timestamp).toLocaleDateString('en-GB')}</td>
                       <td className="py-3 px-3 font-bold text-gray-900 text-right pr-6">{t.customerName || '—'}</td>
                       <td className="py-3 px-3 font-bold text-green-600">{paidAmount(t).toFixed(2)}</td>

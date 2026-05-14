@@ -11,6 +11,7 @@ import { InstallmentsAdd } from './components/InstallmentsAdd';
 import { InstallmentsPay } from './components/InstallmentsPay';
 import { InstallmentsLate } from './components/InstallmentsLate';
 import InstallmentsArchive from './components/InstallmentsArchive';
+import { InstallmentsPayCustomer } from './components/InstallmentsPayCustomer';
 import { DepositPay } from './components/DepositPay';
 import { Login } from './components/Login';
 import { Settings } from './components/Settings';
@@ -29,6 +30,7 @@ type ViewMode =
   | 'installments-pay'
   | 'installments-late'
   | 'installments-archive'
+  | 'installments-pay-customer'
   | 'deposit-pay'
   | 'settings';
 
@@ -155,6 +157,7 @@ function MainApp() {
                 {openMenu === 'installments' && (
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                       {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
+                      {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay-customer')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
                       {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
                      {(isAdmin) && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">أرشيف العملاء</button>}
                   </div>
@@ -218,6 +221,7 @@ function MainApp() {
           {activeView === 'installments-pay' && <InstallmentsPay onOpenInvoice={openInvoiceInCashier} />}
           {activeView === 'installments-late' && <InstallmentsLate />}
           {activeView === 'installments-archive' && <InstallmentsArchive />}
+          {activeView === 'installments-pay-customer' && <InstallmentsPayCustomer />}
           {activeView === 'deposit-pay' && <DepositPay />}
           {activeView === 'settings' && <Settings />}
       </div>
