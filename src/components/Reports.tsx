@@ -4,7 +4,7 @@ import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
-  const { transactions } = useAppStore();
+  const { transactions, expenses } = useAppStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Filter transactions by selected date
@@ -17,6 +17,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment')).reduce((sum, t) => sum + getAmount(t), 0);
   const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const netCash = cashSales - cashReturns;
+
+  // --- Expenses Logic ---
+  const dailyExpenses = expenses.filter(e => e.timestamp.startsWith(selectedDate));
+  const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const netCashAfterExpenses = netCash - totalExpenses;
 
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
@@ -79,6 +84,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       </div>
 
       {view === 'cash' && (
+      <>
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto">
           <div className="bg-emerald-50 border-b border-emerald-100 p-4">
             <h2 className="text-lg font-bold text-emerald-800 flex items-center gap-2">
@@ -96,12 +102,59 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
               <span className="text-gray-600 text-lg">إجمالي المرتجعات النقدية:</span>
               <span className="font-bold text-xl text-red-600">- {cashReturns} ج.م</span>
             </div>
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+              <span className="text-gray-600 text-lg">إجمالي المصروفات:</span>
+              <span className="font-bold text-xl text-orange-600">- {totalExpenses} ج.م</span>
+            </div>
             <div className="flex justify-between items-center pt-2">
-              <span className="text-xl font-bold text-gray-800">صافي المبيعات النقدية:</span>
-              <span className="text-3xl font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 shadow-inner">{netCash} ج.م</span>
+              <span className="text-xl font-bold text-gray-800">صافي النقدي بعد المصروفات:</span>
+              <span className="text-3xl font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 shadow-inner">{netCashAfterExpenses} ج.م</span>
             </div>
           </div>
         </div>
+
+        {/* Daily Expenses Table */}
+        {dailyExpenses.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto mt-6">
+            <div className="bg-orange-50 border-b border-orange-100 p-4">
+              <h2 className="text-lg font-bold text-orange-800">تفاصيل المصروفات</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold border-b">رقم</th>
+                    <th className="px-4 py-3 font-semibold border-b">الوقت</th>
+                    <th className="px-4 py-3 font-semibold border-b">النوع</th>
+                    <th className="px-4 py-3 font-semibold border-b">المبلغ</th>
+                    <th className="px-4 py-3 font-semibold border-b">ملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {dailyExpenses.map(e => (
+                    <tr key={e.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono text-gray-500">{e.expenseNumber}</td>
+                      <td className="px-4 py-3 text-gray-500" dir="ltr">{new Date(e.timestamp).toLocaleTimeString('ar-EG')}</td>
+                      <td className="px-4 py-3 font-medium text-orange-700">
+                        <span className="bg-orange-50 px-2 py-0.5 rounded">{e.expenseType}</span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-900">{e.amount} ج.م</td>
+                      <td className="px-4 py-3 text-gray-500">{e.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-orange-50 font-bold">
+                    <td colSpan={3} className="px-4 py-3 text-orange-800">إجمالي المصروفات</td>
+                    <td className="px-4 py-3 text-orange-800">{totalExpenses} ج.م</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+      </>
       )}
 
       {view === 'visa' && (
@@ -178,18 +231,26 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
            
            <div className="grid grid-cols-2 gap-4 text-right">
               <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                  <div className="text-sm text-emerald-600 font-bold mb-2">صافي النقدية بالدرج</div>
+                  <div className="text-sm text-emerald-600 font-bold mb-2">صافي النقدية</div>
                   <div className="text-3xl font-black text-emerald-700">{netCash} ج.م</div>
               </div>
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                   <div className="text-sm text-blue-600 font-bold mb-2">صافي المدفوعات الإلكترونية</div>
                   <div className="text-3xl font-black text-blue-700">{netElec} ج.م</div>
               </div>
+              <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                  <div className="text-sm text-orange-600 font-bold mb-2">إجمالي المصروفات</div>
+                  <div className="text-3xl font-black text-orange-700">- {totalExpenses} ج.م</div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div className="text-sm text-gray-600 font-bold mb-2">صافي النقدية بعد المصروفات</div>
+                  <div className="text-3xl font-black text-gray-800">{netCashAfterExpenses} ج.م</div>
+              </div>
            </div>
            
            <div className="bg-gray-100 p-6 rounded-xl border border-gray-200 mt-6 flex justify-between items-center">
                <span className="text-xl font-bold text-gray-700">إجمالي إيراد اليوم:</span>
-               <span className="text-4xl font-black text-gray-900">{netCash + netElec} ج.م</span>
+               <span className="text-4xl font-black text-gray-900">{netCashAfterExpenses + netElec} ج.م</span>
            </div>
 
            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg mt-4 w-full md:w-auto">
