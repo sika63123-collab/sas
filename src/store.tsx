@@ -11,6 +11,7 @@ interface AppContextType {
   currentUser: User | null;
   addProduct: (product: Product) => void;
   updateProductStock: (id: string, newStock: number) => void;
+  updateProductPrice: (id: string, newPrice: number) => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   addInstallmentContract: (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => void;
@@ -154,6 +155,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  const updateProductPrice = (id: string, newPrice: number) => {
+    setProducts(products.map(p => 
+      p.id === id ? { ...p, price: newPrice } : p
+    ));
+  };
+
   const addTransaction = (t: Omit<Transaction, 'id' | 'timestamp'>) => {
     const newTransaction: Transaction = {
       ...t,
@@ -251,6 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentUser,
       addProduct, 
       updateProductStock, 
+      updateProductPrice,
       addTransaction,
       updateTransaction,
       addInstallmentContract,

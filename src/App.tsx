@@ -3,8 +3,10 @@ import { Store, ChevronDown, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Cashier from './components/Cashier';
 import Inventory from './components/Inventory';
+import Pricing from './components/Pricing';
 import { InventoryAdd } from './components/InventoryAdd';
 import Reports from './components/Reports';
+import ItemCard from './components/ItemCard';
 import { AppProvider, useAppStore } from './store';
 import { TransactionType } from './types';
 import { InstallmentsAdd } from './components/InstallmentsAdd';
@@ -32,6 +34,7 @@ type ViewMode =
   | 'installments-archive'
   | 'installments-pay-customer'
   | 'deposit-pay'
+  | 'pricing'
   | 'settings';
 
 function MainApp() {
@@ -139,6 +142,7 @@ function MainApp() {
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                      {(isAdmin || p.addItem) && <button onClick={() => selectView('inventory-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة اصناف</button>}
                      {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كميات الاصناف</button>}
+                     {(isAdmin) && <button onClick={() => selectView('pricing')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">التسعير</button>}
                      {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كارت الصنف</button>}
                   </div>
                 )}
@@ -215,8 +219,10 @@ function MainApp() {
          )}
           {activeView === 'cashier' && <Cashier initialType={cashierMode} initialInvoiceId={loadInvoiceId} onInvoiceLoaded={() => setLoadInvoiceId(null)} />}
           {activeView === 'inventory' && <Inventory />}
+          {activeView === 'pricing' && <Pricing />}
           {activeView === 'inventory-add' && <InventoryAdd />}
-          {activeView.startsWith('reports-') && <Reports view={activeView.replace('reports-', '') as any} />}
+          {activeView.startsWith('reports-') && activeView !== 'reports-item-card' && <Reports view={activeView.replace('reports-', '') as any} />}
+          {activeView === 'reports-item-card' && <ItemCard />}
           {activeView === 'installments-add' && <InstallmentsAdd />}
           {activeView === 'installments-pay' && <InstallmentsPay onOpenInvoice={openInvoiceInCashier} />}
           {activeView === 'installments-late' && <InstallmentsLate />}

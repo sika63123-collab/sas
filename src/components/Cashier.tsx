@@ -403,18 +403,45 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   };
 
   const handlePrev = () => {
-    if (viewingIndex === -1 && cashierTransactions.length > 0) {
-      loadTransaction(cashierTransactions.length - 1);
-    } else if (viewingIndex > 0) {
-      loadTransaction(viewingIndex - 1);
+    if (isReturn) {
+      // Navigate only through return transactions
+      const returnTxIndices = cashierTransactions
+        .map((t, i) => t.type.includes('return') ? i : -1)
+        .filter(i => i !== -1);
+      if (returnTxIndices.length === 0) return;
+      if (viewingIndex === -1) {
+        loadTransaction(returnTxIndices[returnTxIndices.length - 1]);
+      } else {
+        const currentPos = returnTxIndices.indexOf(viewingIndex);
+        if (currentPos > 0) loadTransaction(returnTxIndices[currentPos - 1]);
+      }
+    } else {
+      if (viewingIndex === -1 && cashierTransactions.length > 0) {
+        loadTransaction(cashierTransactions.length - 1);
+      } else if (viewingIndex > 0) {
+        loadTransaction(viewingIndex - 1);
+      }
     }
   };
 
   const handleNext = () => {
-    if (viewingIndex !== -1 && viewingIndex < cashierTransactions.length - 1) {
-      loadTransaction(viewingIndex + 1);
-    } else if (viewingIndex === cashierTransactions.length - 1) {
-      handleNewInvoice();
+    if (isReturn) {
+      const returnTxIndices = cashierTransactions
+        .map((t, i) => t.type.includes('return') ? i : -1)
+        .filter(i => i !== -1);
+      if (returnTxIndices.length === 0) return;
+      const currentPos = returnTxIndices.indexOf(viewingIndex);
+      if (currentPos !== -1 && currentPos < returnTxIndices.length - 1) {
+        loadTransaction(returnTxIndices[currentPos + 1]);
+      } else if (currentPos === returnTxIndices.length - 1) {
+        handleNewInvoice();
+      }
+    } else {
+      if (viewingIndex !== -1 && viewingIndex < cashierTransactions.length - 1) {
+        loadTransaction(viewingIndex + 1);
+      } else if (viewingIndex === cashierTransactions.length - 1) {
+        handleNewInvoice();
+      }
     }
   };
 
@@ -487,8 +514,25 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
         {/* Top Header / Action Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 w-full flex flex-col gap-4">
           
+          {/* Navigation and Actions - Centered on top */}
+          <div className="flex items-center justify-center gap-2">
+                    <button onClick={handlePrev} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                      السابق
+                    </button>
+                    <button onClick={handleNext} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
+                      التالي
+                    </button>
+                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                <button onClick={handleNewInvoice} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 px-5 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                  جديد
+                </button>
+                <button onClick={handleSaveInvoice} disabled={!isNew && !showCustomerData} className="bg-gray-900 border border-transparent text-white disabled:opacity-50 hover:bg-gray-800 px-6 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                  {isNew ? 'حفظ الفاتورة' : 'تحديث وتأكيد'}
+                </button>
+          </div>
+
+          {/* Title and Invoice No */}
           <div className="flex justify-between items-center bg-gray-50 p-2 rounded-xl border border-gray-200">
-             {/* Title and Invoice No */}
              <div className="flex items-center gap-4 px-2">
                <h2 className={`text-xl font-bold ${isReturn ? 'text-red-500' : 'text-gray-800'}`}>
                  {isReturn ? 'مرتجع المبيعات' : 'شاشة الكاشير'}
@@ -535,27 +579,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                    </button>
                  </div>
                )}
-             </div>
-
-             {/* Navigation and Actions */}
-             <div className="flex items-center gap-2">
-                {!isReturn && (
-                  <>
-                    <button onClick={handlePrev} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
-                      السابق
-                    </button>
-                    <button onClick={handleNext} className="bg-white border border-gray-200 px-4 h-9 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm">
-                      التالي
-                    </button>
-                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  </>
-                )}
-                <button onClick={handleNewInvoice} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 px-5 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
-                  جديد
-                </button>
-                <button onClick={handleSaveInvoice} disabled={!isNew && !showCustomerData} className="bg-gray-900 border border-transparent text-white disabled:opacity-50 hover:bg-gray-800 px-6 h-9 rounded-lg text-sm font-bold shadow-sm transition-colors">
-                  {isNew ? 'حفظ الفاتورة' : 'تحديث وتأكيد'}
-                </button>
              </div>
           </div>
 
