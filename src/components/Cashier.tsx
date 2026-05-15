@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
-import { CheckCircle, Search, X } from 'lucide-react';
+import { CheckCircle, Search, X, Plus, Trash2 } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvoiceLoaded }: { initialType?: TransactionType; initialInvoiceId?: string | null; onInvoiceLoaded?: () => void }) {
-  const { products, addTransaction, transactions, updateTransaction } = useAppStore();
+  const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType } = useAppStore();
   const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>(initialType);
@@ -71,6 +71,14 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const [isDelivered, setIsDelivered] = useState(false);
   const [isFullPayment, setIsFullPayment] = useState(true);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Expense States
+  const [showExpenses, setShowExpenses] = useState(false);
+  const [expenseType, setExpenseType] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState<number | ''>('');
+  const [expenseNotes, setExpenseNotes] = useState('');
+  const [showAddExpenseType, setShowAddExpenseType] = useState(false);
+  const [newExpenseTypeName, setNewExpenseTypeName] = useState('');
 
   // Selected row for deletion
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -605,7 +613,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
               <button
                 onClick={() => handleAddItem()}
                 disabled={!selectedProduct || !itemQty || itemQty <= 0}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white h-9 px-4 rounded-lg text-sm font-bold shadow-sm transition-colors items-center gap-1.5 shrink-0 flex md:hidden"
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white h-9 px-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
                 title="إضافة الصنف"
               >
                 + إضافة
@@ -873,6 +881,151 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                 {isFullPayment ? '0.00' : (totalAmount > 0 ? Math.max(0, totalAmount - (Number(depositAmount) || 0) - (!isNew ? (Number(newPaymentAmount) || 0) : 0)).toFixed(2) : '0.00')} <span className="text-xs">ج.م</span>
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Expenses Toggle Button */}
+        {!isReturn && !showCustomerData && (
+        <button
+          onClick={() => setShowExpenses(!showExpenses)}
+          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 w-full flex items-center justify-between gap-2 transition-all hover:bg-gray-50 ${showExpenses ? 'ring-2 ring-orange-200' : ''}`}
+        >
+          <span className="text-lg font-bold text-gray-800">
+            {showExpenses ? 'إخفاء' : 'فتح'} المصروفات
+          </span>
+          <span className={`text-xl transition-transform ${showExpenses ? 'rotate-180' : ''}`}>
+            ◀
+          </span>
+        </button>
+        )}
+
+        {/* Expenses Content */}
+        {showExpenses && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-200px)]">
+            <h3 className="text-gray-800 font-bold border-b border-gray-100 pb-2 text-sm">تسجيل مصروف</h3>
+            
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                <span className="text-sm font-semibold text-gray-500">رقم المصروف:</span>
+                <span className="font-bold text-gray-800 font-mono">{expenses.length + 1}</span>
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">نوع المصروف:</label>
+                <div className="flex gap-1.5">
+                  <select
+                    className={`${inputTheme} flex-1`}
+                    value={expenseType}
+                    onChange={e => setExpenseType(e.target.value)}
+                  >
+                    <option value="">اختر نوع المصروف...</option>
+                    {expenseTypes.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setShowAddExpenseType(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white h-9 w-9 rounded-lg flex items-center justify-center shadow-sm transition-colors shrink-0"
+                    title="إضافة نوع جديد"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {showAddExpenseType && (
+                <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-blue-600">إضافة نوع مصروف جديد:</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      className={`${inputTheme} flex-1`}
+                      placeholder="اسم النوع..."
+                      value={newExpenseTypeName}
+                      onChange={e => setNewExpenseTypeName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newExpenseTypeName.trim()) {
+                          addExpenseType(newExpenseTypeName.trim());
+                          setExpenseType(newExpenseTypeName.trim());
+                          setNewExpenseTypeName('');
+                          setShowAddExpenseType(false);
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => {
+                        if (newExpenseTypeName.trim()) {
+                          addExpenseType(newExpenseTypeName.trim());
+                          setExpenseType(newExpenseTypeName.trim());
+                          setNewExpenseTypeName('');
+                          setShowAddExpenseType(false);
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-3 rounded-lg text-xs font-bold shadow-sm transition-colors shrink-0"
+                    >
+                      حفظ
+                    </button>
+                    <button
+                      onClick={() => { setShowAddExpenseType(false); setNewExpenseTypeName(''); }}
+                      className="bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 h-9 w-9 rounded-lg flex items-center justify-center shadow-sm transition-colors shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {/* List existing types for deletion */}
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {expenseTypes.map(t => (
+                      <span key={t} className="bg-white border border-gray-200 text-xs px-2 py-1 rounded-md flex items-center gap-1 text-gray-600">
+                        {t}
+                        <button onClick={() => deleteExpenseType(t)} className="text-red-400 hover:text-red-600 transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">المبلغ:</label>
+                <input
+                  type="number"
+                  className={`${inputTheme} w-full text-center font-bold text-orange-700`}
+                  placeholder="0.00"
+                  value={expenseAmount}
+                  onChange={e => setExpenseAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-semibold text-gray-500">الملاحظات:</label>
+                <input
+                  className={`${inputTheme} w-full`}
+                  placeholder="ملاحظات إضافية..."
+                  value={expenseNotes}
+                  onChange={e => setExpenseNotes(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (!expenseType) { alert('يجب اختيار نوع المصروف'); return; }
+                if (!expenseAmount || expenseAmount <= 0) { alert('يجب إدخال مبلغ صحيح'); return; }
+                addExpense({
+                  expenseType,
+                  amount: Number(expenseAmount),
+                  notes: expenseNotes,
+                });
+                alert('تم تسجيل المصروف بنجاح');
+                setExpenseType('');
+                setExpenseAmount('');
+                setExpenseNotes('');
+              }}
+              className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-2.5 rounded-xl shadow-sm transition-colors mt-1"
+            >
+              حفظ المصروف
+            </button>
           </div>
         )}
       </div>

@@ -92,3 +92,12 @@ export interface InstallmentContract {
   payments: InstallmentPayment[];
   createdAt: string;
 }
+
+export interface Expense {
+  id: string;
+  expenseNumber: number;
+  expenseType: string;
+  amount: number;
+  notes: string;
+  timestamp: string;
+}

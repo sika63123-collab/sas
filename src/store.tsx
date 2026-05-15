@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense } from './types';
 
 interface AppContextType {
   products: Product[];
   transactions: Transaction[];
   installmentContracts: InstallmentContract[];
+  expenses: Expense[];
+  expenseTypes: string[];
   users: User[];
   currentUser: User | null;
   addProduct: (product: Product) => void;
@@ -13,6 +15,9 @@ interface AppContextType {
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   addInstallmentContract: (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => void;
   payInstallment: (contractId: string, paymentId: string, paidAmount: number) => void;
+  addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => void;
+  addExpenseType: (typeName: string) => void;
+  deleteExpenseType: (typeName: string) => void;
   login: (code: string) => boolean;
   logout: () => void;
   addUser: (user: User) => void;
@@ -69,6 +74,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    const saved = localStorage.getItem('mobile_shop_expenses');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [expenseTypes, setExpenseTypes] = useState<string[]>(() => {
+    const saved = localStorage.getItem('mobile_shop_expense_types');
+    return saved ? JSON.parse(saved) : ['إيجار', 'كهرباء', 'مياه', 'إنترنت', 'مرتبات', 'مشتريات', 'أخرى'];
+  });
+
   useEffect(() => {
     localStorage.setItem('mobile_shop_products', JSON.stringify(products));
   }, [products]);
@@ -84,6 +99,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('mobile_shop_users', JSON.stringify(users));
   }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('mobile_shop_expenses', JSON.stringify(expenses));
+  }, [expenses]);
+
+  useEffect(() => {
+    localStorage.setItem('mobile_shop_expense_types', JSON.stringify(expenseTypes));
+  }, [expenseTypes]);
 
   useEffect(() => {
     if (currentUser) {
@@ -115,6 +138,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.transactions) setTransactions(data.transactions);
     if (data.installmentContracts) setInstallmentContracts(data.installmentContracts);
     if (data.users) setUsers(data.users);
+    if (data.expenses) setExpenses(data.expenses);
+    if (data.expenseTypes) setExpenseTypes(data.expenseTypes);
     alert('تم الرجوع للنسخة الاحتياطية بنجاح!');
     window.location.reload();
   };
@@ -195,11 +220,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const addExpense = (e: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => {
+    const newExpense: Expense = {
+      ...e,
+      id: Date.now().toString(),
+      expenseNumber: expenses.length + 1,
+      timestamp: new Date().toISOString(),
+    };
+    setExpenses(prev => [...prev, newExpense]);
+  };
+
+  const addExpenseType = (typeName: string) => {
+    if (!expenseTypes.includes(typeName.trim())) {
+      setExpenseTypes(prev => [...prev, typeName.trim()]);
+    }
+  };
+
+  const deleteExpenseType = (typeName: string) => {
+    setExpenseTypes(prev => prev.filter(t => t !== typeName));
+  };
+
   return (
     <AppContext.Provider value={{ 
       products, 
       transactions, 
       installmentContracts,
+      expenses,
+      expenseTypes,
       users,
       currentUser,
       addProduct, 
@@ -208,6 +255,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTransaction,
       addInstallmentContract,
       payInstallment,
+      addExpense,
+      addExpenseType,
+      deleteExpenseType,
       login,
       logout,
       addUser,
