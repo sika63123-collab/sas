@@ -36,18 +36,28 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   useEffect(() => {
     setTransactionType(initialType);
     setShowCustomerData(initialType === 'deposit_sale' || initialType === 'deposit_return');
-    handleNewInvoice();
+    // Don't reset if there's a pending invoice to load (coming from deposit invoices list)
+    if (!initialInvoiceId) {
+      handleNewInvoice();
+    }
   }, [initialType]);
 
   useEffect(() => {
     if (initialInvoiceId) {
+      // First reset to ensure clean state
+      handleNewInvoice();
       const idx = cashierTransactions.findIndex(t => t.id === initialInvoiceId);
       if (idx !== -1) {
-        loadTransaction(idx);
-        setTransactionType(cashierTransactions[idx].type);
-        setShowCustomerData(cashierTransactions[idx].type.includes('deposit'));
+        // Defer to next tick so handleNewInvoice state updates settle
+        setTimeout(() => {
+          loadTransaction(idx);
+          setTransactionType(cashierTransactions[idx].type);
+          setShowCustomerData(cashierTransactions[idx].type.includes('deposit'));
+          onInvoiceLoaded?.();
+        }, 0);
+      } else {
+        onInvoiceLoaded?.();
       }
-      onInvoiceLoaded?.();
     }
   }, [initialInvoiceId]);
 
@@ -133,7 +143,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
         setItemName(match.name);
         setItemPrice(match.price);
         setSelectedProduct(match);
-        document.getElementById('itemQtyInput')?.focus();
       } else if (!itemName) {
         setSelectedProduct(null);
         setItemPrice('');
@@ -557,7 +566,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                 value={itemCode}
                 onChange={e => setItemCode(e.target.value)}
                 onKeyDown={handleKeyDown}
-                list="productCodes"
                 autoFocus
               />
             </div>
@@ -568,7 +576,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                 placeholder="اكتب اسم الصنف..."
                 value={itemName}
                 onChange={e => setItemName(e.target.value)}
-                list="productNames"
                 onKeyDown={handleKeyDown}
               />
               <button
@@ -595,6 +602,14 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                 onChange={e => setItemQty(e.target.value === '' ? '' : Number(e.target.value))}
                 onKeyDown={handleKeyDown}
               />
+              <button
+                onClick={() => handleAddItem()}
+                disabled={!selectedProduct || !itemQty || itemQty <= 0}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white h-9 px-4 rounded-lg text-sm font-bold shadow-sm transition-colors items-center gap-1.5 shrink-0 flex md:hidden"
+                title="إضافة الصنف"
+              >
+                + إضافة
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <label className={labelTheme}>السعر:</label>
@@ -647,15 +662,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
           </div>
         </div>
 
-        <datalist id="productNames">
-          {itemName.trim().length > 0 && products.map(p => <option key={p.id} value={p.name} />)}
-        </datalist>
-        <datalist id="productCodes">
-          {itemCode.trim().length > 0 && products.map(p => <option key={`code-${p.id}`} value={p.id} />)}
-        </datalist>
-        <datalist id="globalProductNames">
-          {searchProductText.trim().length > 0 && products.map(p => <option key={`g-${p.id}`} value={p.name} />)}
-        </datalist>
+
 
         {/* Invoice Table Container (Matching width) */}
         <div className="bg-white rounded-t-2xl shadow-sm border border-gray-100 w-full overflow-hidden flex flex-col shrink-0 min-h-[200px]">
