@@ -17,7 +17,7 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
   }, [transactions, searchTerm]);
 
   const cashierTransactions = useMemo(() => {
-    return transactions.filter(t => t.type !== 'deposit_payment');
+    return transactions.filter(t => t.type !== 'deposit_payment' && t.type !== 'installment_payment');
   }, [transactions]);
 
   const paidAmount = (t: Transaction) => Number(t.depositAmount) || 0;

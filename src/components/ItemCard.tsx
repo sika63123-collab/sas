@@ -4,6 +4,7 @@ import { FileText, Search } from 'lucide-react';
 
 export default function ItemCard() {
   const { transactions, products } = useAppStore();
+  const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment' && t.type !== 'installment_payment');
   
   const today = new Date().toISOString().split('T')[0];
   const [dateFrom, setDateFrom] = useState(today);
@@ -51,7 +52,8 @@ export default function ItemCard() {
       if (!item) return;
 
       const isReturn = t.type === 'return' || t.type === 'deposit_return';
-      const isSale = t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment';
+      const isSale = t.type === 'sale' || t.type === 'deposit_sale';
+      const isPurchase = t.type === 'purchase';
 
       let description = '';
       let details = '';
@@ -60,7 +62,6 @@ export default function ItemCard() {
         switch(t.type) {
           case 'sale': description = 'فاتورة مبيعات'; break;
           case 'deposit_sale': description = 'مبيعات عربون'; break;
-          case 'deposit_payment': description = 'سداد عربون'; break;
         }
         details = `${item.quantity} قطعة × ${item.price} ج.م`;
         if (t.customerName) details += ` | العميل: ${t.customerName}`;
@@ -72,14 +73,18 @@ export default function ItemCard() {
         description = t.type === 'return' ? 'مرتجع مبيعات' : 'مرتجع عربون';
         details = `${item.quantity} قطعة × ${item.price} ج.م`;
         if (t.returnInvoiceNumber) details += ` | فاتورة رقم: ${t.returnInvoiceNumber}`;
+      } else if (isPurchase) {
+        description = 'فاتورة مشتريات';
+        details = `إضافة رصيد للمخزن | ${item.quantity} قطعة`;
       }
 
+      const invoiceNum = cashierTransactions.findIndex(tx => tx.id === t.id) + 1;
       rows.push({
-        invoiceId: t.id,
+        invoiceId: invoiceNum > 0 ? String(invoiceNum) : t.id,
         date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
         time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
         description,
-        incoming: isReturn ? item.quantity : 0,
+        incoming: isReturn || isPurchase ? item.quantity : 0,
         outgoing: isSale ? item.quantity : 0,
         details,
       });

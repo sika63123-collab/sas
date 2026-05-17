@@ -5,7 +5,7 @@ import { CheckCircle, Search, X, Plus, Trash2 } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvoiceLoaded }: { initialType?: TransactionType; initialInvoiceId?: string | null; onInvoiceLoaded?: () => void }) {
   const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType } = useAppStore();
-  const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment');
+  const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment' && t.type !== 'installment_payment');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [transactionType, setTransactionType] = useState<TransactionType>(initialType);
 
@@ -453,7 +453,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     if (idx === -1) {
         // also try finding by invoice number (sequence)
         const num = parseInt(text) - 1;
-        if (num >= 0 && num < transactions.length) {
+        if (num >= 0 && num < cashierTransactions.length) {
             idx = num;
         }
     }

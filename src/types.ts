@@ -23,7 +23,7 @@ export interface User {
 }
 
 export type PaymentMethod = 'cash' | 'visa' | 'instapay' | 'vodafone_cash';
-export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment';
+export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'purchase';
 
 export interface Product {
   id: string;

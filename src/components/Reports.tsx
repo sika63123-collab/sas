@@ -11,10 +11,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
 
   // Helper to calculate actual paid/returned amount
-  const getAmount = (t: any) => t.type.includes('deposit') ? (t.depositAmount || 0) : t.totalAmount;
+  const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return') ? (t.depositAmount || 0) : t.totalAmount;
 
   // --- Cash Account Logic ---
-  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment')).reduce((sum, t) => sum + getAmount(t), 0);
   const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const netCash = cashSales - cashReturns;
 
@@ -25,7 +25,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
 
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
-  const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment').reduce((sum, t) => sum + getAmount(t), 0);
+  const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment').reduce((sum, t) => sum + getAmount(t), 0);
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
 
@@ -45,6 +45,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       case 'deposit_sale': return { label: 'مبيعات عربون', color: 'text-orange-600 bg-orange-50' };
       case 'deposit_return': return { label: 'مرتجع عربون', color: 'text-purple-600 bg-purple-50' };
       case 'deposit_payment': return { label: 'سداد عربون', color: 'text-teal-600 bg-teal-50' };
+      case 'installment_payment': return { label: 'سداد قسط', color: 'text-blue-600 bg-blue-50' };
+      case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
       default: return { label: type, color: 'text-gray-600 bg-gray-50' };
     }
   };
@@ -317,7 +319,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                                </li>
                             ))}
                           </ul>
-                          {t.type.includes('deposit') && (
+                          {(t.type === 'deposit_sale' || t.type === 'deposit_return') && (
                             <div className="mt-2 text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded inline-block">
                               عربون: {t.depositAmount || 0} ج.م | 
                               متبقي: {t.totalAmount - (t.depositAmount || 0)} ج.م | 

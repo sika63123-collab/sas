@@ -52,7 +52,7 @@ export function InstallmentsPayCustomer() {
     return { totalPaidInstallments, remaining, paidCount, totalCount, nextPayment, globalIndex };
   }, [selectedContract, installmentContracts]);
 
-  const handlePay = () => {
+  const handlePay = (method: 'cash' | 'visa') => {
     if (!selectedContract || !contractCalcs?.nextPayment) return;
     const amount = typeof payAmount === 'number' ? payAmount : 0;
     if (amount <= 0) {
@@ -60,15 +60,12 @@ export function InstallmentsPayCustomer() {
       return;
     }
 
-    if (window.confirm(`تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1}؟`)) {
-      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount);
+    if (window.confirm(`تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${method === 'cash' ? 'نقدي' : 'فيزا'})؟`)) {
+      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, method);
       alert('تم تسجيل الدفع بنجاح');
       // Refresh selected contract from store
       const updated = installmentContracts.find(c => c.id === selectedContract.id);
       if (updated) {
-        // We need to re-read from store - but since payInstallment updates state,
-        // the component will re-render. We need to keep the selection.
-        // The useMemo will recalculate. Just update payAmount for next installment.
         const nextUnpaid = updated.payments.find(p => !p.isPaid && p.id !== contractCalcs.nextPayment!.id);
         setPayAmount(nextUnpaid ? nextUnpaid.amount : '');
       }
@@ -241,12 +238,20 @@ export function InstallmentsPayCustomer() {
                                                     {p.isPaid ? (
                                                         <span className="text-green-600 font-bold">✓ تم الدفع</span>
                                                     ) : isNextDue ? (
-                                                        <button 
-                                                          onClick={handlePay}
-                                                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1 px-3 shadow transition-colors"
-                                                        >
-                                                          تسجيل الدفع
-                                                        </button>
+                                                        <div className="flex flex-col gap-1">
+                                                          <button 
+                                                            onClick={() => handlePay('cash')}
+                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-3 shadow transition-colors"
+                                                          >
+                                                            نقدي
+                                                          </button>
+                                                          <button 
+                                                            onClick={() => handlePay('visa')}
+                                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1 px-3 shadow transition-colors"
+                                                          >
+                                                            فيزا
+                                                          </button>
+                                                        </div>
                                                     ) : isLate ? (
                                                         <span className="text-red-600 font-bold">متأخر</span>
                                                     ) : (

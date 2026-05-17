@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod } from './types';
+import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
 
 interface AppContextType {
   products: Product[];
@@ -15,7 +16,7 @@ interface AppContextType {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   addInstallmentContract: (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => void;
-  payInstallment: (contractId: string, paymentId: string, paidAmount: number) => void;
+  payInstallment: (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => void;
   addExpenseType: (typeName: string) => void;
   deleteExpenseType: (typeName: string) => void;
@@ -24,14 +25,14 @@ interface AppContextType {
   addUser: (user: User) => void;
   updateUser: (code: string, updates: Partial<User>) => void;
   deleteUser: (code: string) => void;
-  restoreData: (data: any) => void;
+  restoreData: (data: any) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_users');
+    const saved = getStorageItem('mobile_shop_users');
     if (saved) return JSON.parse(saved);
     // Default admin
     return [{
@@ -48,7 +49,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedCode = sessionStorage.getItem('mobile_shop_current_user');
+    const savedCode = getSessionItem('mobile_shop_current_user');
     if (savedCode) {
       const u = users.find(u => u.code === savedCode);
       if (u) return u;
@@ -57,7 +58,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_products');
+    const saved = getStorageItem('mobile_shop_products');
     return saved ? JSON.parse(saved) : [
       { id: '1', name: 'ايفون 13 برو', price: 35000, stock: 10 },
       { id: '2', name: 'سامسونج S23', price: 30000, stock: 15 },
@@ -66,54 +67,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_transactions');
+    const saved = getStorageItem('mobile_shop_transactions');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [installmentContracts, setInstallmentContracts] = useState<InstallmentContract[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_installments');
+    const saved = getStorageItem('mobile_shop_installments');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_expenses');
+    const saved = getStorageItem('mobile_shop_expenses');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [expenseTypes, setExpenseTypes] = useState<string[]>(() => {
-    const saved = localStorage.getItem('mobile_shop_expense_types');
+    const saved = getStorageItem('mobile_shop_expense_types');
     return saved ? JSON.parse(saved) : ['إيجار', 'كهرباء', 'مياه', 'إنترنت', 'مرتبات', 'مشتريات', 'أخرى'];
   });
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_products', JSON.stringify(products));
+    setStorageItem('mobile_shop_products', JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_transactions', JSON.stringify(transactions));
+    setStorageItem('mobile_shop_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_installments', JSON.stringify(installmentContracts));
+    setStorageItem('mobile_shop_installments', JSON.stringify(installmentContracts));
   }, [installmentContracts]);
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_users', JSON.stringify(users));
+    setStorageItem('mobile_shop_users', JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_expenses', JSON.stringify(expenses));
+    setStorageItem('mobile_shop_expenses', JSON.stringify(expenses));
   }, [expenses]);
 
   useEffect(() => {
-    localStorage.setItem('mobile_shop_expense_types', JSON.stringify(expenseTypes));
+    setStorageItem('mobile_shop_expense_types', JSON.stringify(expenseTypes));
   }, [expenseTypes]);
 
   useEffect(() => {
     if (currentUser) {
-      sessionStorage.setItem('mobile_shop_current_user', currentUser.code);
+      setSessionItem('mobile_shop_current_user', currentUser.code);
     } else {
-      sessionStorage.removeItem('mobile_shop_current_user');
+      removeSessionItem('mobile_shop_current_user');
     }
   }, [currentUser]);
 
@@ -134,19 +135,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteUser = (code: string) => 
     setUsers(prev => prev.filter(u => u.code !== code));
 
-  const restoreData = (data: any) => {
-    if (data.products) setProducts(data.products);
-    if (data.transactions) setTransactions(data.transactions);
-    if (data.installmentContracts) setInstallmentContracts(data.installmentContracts);
-    if (data.users) setUsers(data.users);
-    if (data.expenses) setExpenses(data.expenses);
-    if (data.expenseTypes) setExpenseTypes(data.expenseTypes);
+  const restoreData = async (data: any) => {
+    // Build the storage entries
+    const storageData: Record<string, string> = {};
+    if (data.products) {
+      setProducts(data.products);
+      storageData['mobile_shop_products'] = JSON.stringify(data.products);
+    }
+    if (data.transactions) {
+      setTransactions(data.transactions);
+      storageData['mobile_shop_transactions'] = JSON.stringify(data.transactions);
+    }
+    if (data.installmentContracts) {
+      setInstallmentContracts(data.installmentContracts);
+      storageData['mobile_shop_installments'] = JSON.stringify(data.installmentContracts);
+    }
+    if (data.users) {
+      setUsers(data.users);
+      storageData['mobile_shop_users'] = JSON.stringify(data.users);
+    }
+    if (data.expenses) {
+      setExpenses(data.expenses);
+      storageData['mobile_shop_expenses'] = JSON.stringify(data.expenses);
+    }
+    if (data.expenseTypes) {
+      setExpenseTypes(data.expenseTypes);
+      storageData['mobile_shop_expense_types'] = JSON.stringify(data.expenseTypes);
+    }
+
+    // Write all data to storage before reloading
+    await restoreAllStorage(storageData);
+
     alert('تم الرجوع للنسخة الاحتياطية بنجاح!');
     window.location.reload();
   };
 
   const addProduct = (product: Product) => {
     setProducts([...products, product]);
+    if (product.stock > 0) {
+      const newTransaction: Transaction = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        type: 'purchase',
+        items: [{
+          productId: product.id,
+          name: product.name,
+          quantity: product.stock,
+          price: product.costPrice || product.price
+        }],
+        totalAmount: (product.costPrice || product.price) * product.stock,
+        paymentMethod: 'cash'
+      };
+      setTransactions(prev => [...prev, newTransaction]);
+    }
   };
 
   const updateProductStock = (id: string, amountToChange: number) => {
@@ -170,20 +211,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setTransactions(prev => [...prev, newTransaction]);
 
-    // Update stock based on transaction type
-    const multiplier = (t.type === 'sale' || t.type === 'deposit_sale') ? -1 : 1;
+    // Update stock based on transaction type (skip for payment records)
+    if (t.type !== 'deposit_payment' && t.type !== 'installment_payment') {
+      const multiplier = (t.type === 'sale' || t.type === 'deposit_sale') ? -1 : 1;
     
-    let currentProducts = [...products];
-    t.items.forEach(item => {
-      const pIndex = currentProducts.findIndex(p => p.id === item.productId);
-      if (pIndex !== -1) {
-        currentProducts[pIndex] = {
-          ...currentProducts[pIndex],
-          stock: currentProducts[pIndex].stock + (item.quantity * multiplier)
-        };
-      }
-    });
-    setProducts(currentProducts);
+      let currentProducts = [...products];
+      t.items.forEach(item => {
+        const pIndex = currentProducts.findIndex(p => p.id === item.productId);
+        if (pIndex !== -1) {
+          currentProducts[pIndex] = {
+            ...currentProducts[pIndex],
+            stock: currentProducts[pIndex].stock + (item.quantity * multiplier)
+          };
+        }
+      });
+      setProducts(currentProducts);
+    }
   };
 
   const updateTransaction = (id: string, updates: Partial<Transaction>) => {
@@ -210,9 +253,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInstallmentContracts(prev => [...prev, newContract]);
   };
 
-  const payInstallment = (contractId: string, paymentId: string, paidAmount: number) => {
+  const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod) => {
+    let customerName = '';
+    let customerPhone = '';
+    
     setInstallmentContracts(prev => prev.map(contract => {
       if (contract.id === contractId) {
+        customerName = contract.customerName;
+        customerPhone = contract.customerPhone;
         return {
           ...contract,
           payments: contract.payments.map(payment => {
@@ -225,6 +273,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return contract;
     }));
+
+    // Add transaction for shift reporting
+    if (customerName) {
+      addTransaction({
+        type: 'installment_payment',
+        totalAmount: paidAmount,
+        paymentMethod: paymentMethod,
+        items: [],
+        customerName: customerName,
+        customerPhone: customerPhone,
+      });
+    }
   };
 
   const addExpense = (e: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => {
