@@ -20,15 +20,23 @@ export default function Inventory() {
       // Ignore payment transactions
       if (t.type === 'deposit_payment' || t.type === 'installment_payment') return;
 
-      const isIncoming = t.type === 'purchase' || t.type === 'return' || t.type === 'deposit_return';
-      const isOutgoing = t.type === 'sale' || t.type === 'deposit_sale';
+      const isPurchase = t.type === 'purchase';
+      const isReturn = t.type === 'return' || t.type === 'deposit_return';
+      const isSale = t.type === 'sale' || t.type === 'deposit_sale';
 
       t.items.forEach(item => {
         if (!stats[item.productId]) {
           stats[item.productId] = { incoming: 0, sold: 0 };
         }
-        if (isIncoming) stats[item.productId].incoming += item.quantity;
-        if (isOutgoing) stats[item.productId].sold += item.quantity;
+        if (isPurchase) {
+          stats[item.productId].incoming += item.quantity;
+        }
+        if (isSale) {
+          stats[item.productId].sold += item.quantity;
+        }
+        if (isReturn) {
+          stats[item.productId].sold -= item.quantity;
+        }
       });
     });
     return stats;

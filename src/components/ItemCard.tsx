@@ -97,8 +97,8 @@ export default function ItemCard() {
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
-          incoming: isReturn || isPurchase ? item.quantity : 0,
-          outgoing: isSale ? item.quantity : 0,
+          incoming: isPurchase ? item.quantity : 0,
+          outgoing: isSale ? item.quantity : (isReturn ? -item.quantity : 0),
           details,
         });
       });
@@ -301,6 +301,8 @@ export default function ItemCard() {
                     <td className="px-4 py-3 text-center">
                       {m.outgoing > 0 ? (
                         <span className="font-bold text-red-700">{m.outgoing}</span>
+                      ) : m.outgoing < 0 ? (
+                        <span className="font-bold text-green-700" dir="ltr">-{Math.abs(m.outgoing)}</span>
                       ) : (
                         <span className="text-gray-300">-</span>
                       )}
