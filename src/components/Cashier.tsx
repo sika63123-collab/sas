@@ -390,6 +390,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   };
 
   function handleNewInvoice() {
+    setTransactionType(initialType);
+    setShowCustomerData(initialType === 'deposit_sale' || initialType === 'deposit_return');
     setViewingIndex(-1);
     setCart([]);
     setItemCode('');
@@ -446,7 +448,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   };
 
   const handlePrev = () => {
-    if (isReturn) {
+    if (initialType.includes('return')) {
       // Navigate only through return transactions
       const returnTxIndices = cashierTransactions
         .map((t, i) => t.type.includes('return') ? i : -1)
@@ -468,7 +470,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   };
 
   const handleNext = () => {
-    if (isReturn) {
+    if (initialType.includes('return')) {
       const returnTxIndices = cashierTransactions
         .map((t, i) => t.type.includes('return') ? i : -1)
         .filter(i => i !== -1);
@@ -586,26 +588,35 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                  <div className="flex items-center gap-3">
                    <div className="flex items-center gap-1.5">
                      <span className="text-gray-500 font-medium text-sm">رقم المرتجع:</span>
-                     <input className="w-16 h-8 text-center rounded-lg bg-gray-100 border border-gray-300 font-bold focus:outline-none text-red-600" value={returnInvoiceNumber} readOnly />
+                     <input className="w-16 h-8 text-center rounded-lg bg-gray-100 border border-gray-300 font-bold focus:outline-none text-red-600" value={isNew ? returnInvoiceNumber : invoiceNumber} readOnly />
                    </div>
-                   <div className="flex items-center gap-1.5">
-                     <span className="text-gray-500 font-medium text-sm">رقم فاتورة المبيعات:</span>
-                     <input 
-                       className="w-20 h-8 text-center rounded-lg bg-white border border-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-blue-100" 
-                       value={returnSaleInvoiceSearch} 
-                       onChange={e => setReturnSaleInvoiceSearch(e.target.value)}
-                       onKeyDown={e => e.key === 'Enter' && handleReturnSaleSearch()}
-                       placeholder="رقم"
-                     />
-                     <button
-                       onClick={handleReturnSaleSearch}
-                       className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
-                       title="بحث عن فاتورة المبيعات"
-                     >
-                       <Search className="w-3.5 h-3.5" />
-                       بحث
-                     </button>
-                   </div>
+                   {isNew ? (
+                     <div className="flex items-center gap-1.5">
+                       <span className="text-gray-500 font-medium text-sm">رقم فاتورة المبيعات:</span>
+                       <input 
+                         className="w-20 h-8 text-center rounded-lg bg-white border border-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-blue-100" 
+                         value={returnSaleInvoiceSearch} 
+                         onChange={e => setReturnSaleInvoiceSearch(e.target.value)}
+                         onKeyDown={e => e.key === 'Enter' && handleReturnSaleSearch()}
+                         placeholder="رقم"
+                       />
+                       <button
+                         onClick={handleReturnSaleSearch}
+                         className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                         title="بحث عن فاتورة المبيعات"
+                       >
+                         <Search className="w-3.5 h-3.5" />
+                         بحث
+                       </button>
+                     </div>
+                   ) : (
+                     returnInvoiceNo && (
+                       <div className="flex items-center gap-1.5 mr-2">
+                         <span className="text-gray-500 font-medium text-sm">من فاتورة مبيعات رقم:</span>
+                         <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">{returnInvoiceNo}</span>
+                       </div>
+                     )
+                   )}
                  </div>
                ) : (
                  /* Normal Mode: invoice number + search */

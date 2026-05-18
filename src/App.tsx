@@ -42,6 +42,7 @@ function MainApp() {
   const [activeView, setActiveView] = useState<ViewMode>('home');
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
   const [loadInvoiceId, setLoadInvoiceId] = useState<string | null>(null);
+  const [cashierKey, setCashierKey] = useState<number>(0);
   
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
@@ -51,7 +52,10 @@ function MainApp() {
 
   const selectView = (view: ViewMode, cMode?: TransactionType) => {
     setActiveView(view);
-    if (cMode) setCashierMode(cMode);
+    if (cMode) {
+      setCashierMode(cMode);
+      setCashierKey(prev => prev + 1);
+    }
     setOpenMenu(null);
   };
 
@@ -217,7 +221,7 @@ function MainApp() {
              </motion.h1>
            </motion.div>
          )}
-          {activeView === 'cashier' && <Cashier initialType={cashierMode} initialInvoiceId={loadInvoiceId} onInvoiceLoaded={() => setLoadInvoiceId(null)} />}
+          {activeView === 'cashier' && <Cashier key={cashierKey} initialType={cashierMode} initialInvoiceId={loadInvoiceId} onInvoiceLoaded={() => setLoadInvoiceId(null)} />}
           {activeView === 'inventory' && <Inventory />}
           {activeView === 'pricing' && <Pricing />}
           {activeView === 'inventory-add' && <InventoryAdd />}
