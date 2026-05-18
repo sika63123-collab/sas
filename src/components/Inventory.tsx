@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { Package, Plus, Minus, Filter, Printer } from 'lucide-react';
 
 export default function Inventory() {
-  const { products, updateProductStock, currentUser } = useAppStore();
+  const { products, transactions, updateProductStock, currentUser } = useAppStore();
   
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
@@ -11,6 +11,28 @@ export default function Inventory() {
   const filteredProducts = selectedCategory === 'all' 
     ? products 
     : products.filter(p => p.category === selectedCategory);
+
+  const productStats = useMemo(() => {
+    const stats: Record<string, { incoming: number, sold: number }> = {};
+    products.forEach(p => stats[p.id] = { incoming: 0, sold: 0 });
+
+    transactions.forEach(t => {
+      // Ignore payment transactions
+      if (t.type === 'deposit_payment' || t.type === 'installment_payment') return;
+
+      const isIncoming = t.type === 'purchase' || t.type === 'return' || t.type === 'deposit_return';
+      const isOutgoing = t.type === 'sale' || t.type === 'deposit_sale';
+
+      t.items.forEach(item => {
+        if (!stats[item.productId]) {
+          stats[item.productId] = { incoming: 0, sold: 0 };
+        }
+        if (isIncoming) stats[item.productId].incoming += item.quantity;
+        if (isOutgoing) stats[item.productId].sold += item.quantity;
+      });
+    });
+    return stats;
+  }, [transactions, products]);
 
   const totalItemsAvailable = filteredProducts.reduce((sum, p) => sum + p.stock, 0);
   const totalCostValue = filteredProducts.reduce((sum, p) => sum + ((p.costPrice || 0) * p.stock), 0);
@@ -53,8 +75,6 @@ export default function Inventory() {
         </div>
       </div>
 
-
-
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col">
         <div className="bg-gray-50 p-3 text-center border-b border-gray-200 hidden print:block">
            <h2 className="text-xl font-bold">جرد أصناف {selectedCategory === 'all' ? 'المحل (كل المجموعات)' : `المجموعة: ${selectedCategory}`}</h2>
@@ -67,11 +87,15 @@ export default function Inventory() {
               <th className="px-6 py-4 font-semibold text-sm">المجموعة</th>
               <th className="px-6 py-4 font-semibold text-sm">اسم الصنف</th>
               <th className="px-6 py-4 font-semibold text-sm">سعر البيع</th>
+              <th className="px-6 py-4 font-semibold text-sm text-green-700">رصيد افتتاحي</th>
+              <th className="px-6 py-4 font-semibold text-sm text-red-700">كميات مباعة</th>
               <th className="px-6 py-4 font-semibold text-sm">الرصيد المتاح</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredProducts.map(product => (
+            {filteredProducts.map(product => {
+              const stats = productStats[product.id] || { incoming: 0, sold: 0 };
+              return (
               <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-6 py-4 font-medium font-mono text-blue-600">{product.id}</td>
                 <td className="px-6 py-4 text-gray-500 text-sm">
@@ -88,16 +112,22 @@ export default function Inventory() {
                 <td className="px-6 py-4 text-gray-700 font-bold">
                   {product.price}
                 </td>
+                <td className="px-6 py-4 text-green-700 font-bold">
+                  {stats.incoming}
+                </td>
+                <td className="px-6 py-4 text-red-700 font-bold">
+                  {stats.sold}
+                </td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-1 rounded-full text-sm font-semibold ${product.stock > 5 ? 'bg-green-100 text-green-800' : product.stock > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
                     {product.stock}
                   </span>
                 </td>
               </tr>
-            ))}
+            )})}
             {filteredProducts.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                   لا يوجد أصناف مطابقة
                 </td>
               </tr>

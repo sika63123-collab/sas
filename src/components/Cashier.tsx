@@ -86,7 +86,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const isReturn = transactionType.includes('return');
   const actualPaymentMethod = isReturn ? 'cash' : paymentMethod;
   const invoiceNumber = viewingIndex === -1 ? cashierTransactions.length + 1 : viewingIndex + 1;
-  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
+  const totalAmount = cart.reduce((sum, item) => sum + (item.price * (item.cartQuantity || 0)), 0);
   const isNew = viewingIndex === -1;
 
   // Return invoice number: count only return transactions
@@ -197,6 +197,10 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
         alert('هذا الصنف غير موجود في فاتورة المبيعات المرتبطة');
         return;
       }
+      if (Number(itemQty) > allowed.quantity) {
+        alert('الكمية المرتجعة لا يمكن أن تتجاوز الكمية المباعة (' + allowed.quantity + ')');
+        return;
+      }
     }
 
     if (transactionType === 'sale' && selectedProduct.stock <= 0) {
@@ -207,6 +211,13 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     setCart(prev => {
       const existing = prev.find(item => item.id === selectedProduct.id);
       if (existing) {
+        if (isReturn && linkedSaleTransaction) {
+          const allowed = linkedSaleTransaction.items.find(i => i.productId === selectedProduct.id);
+          if (allowed && existing.cartQuantity + Number(itemQty) > allowed.quantity) {
+            alert('الكمية المرتجعة لا يمكن أن تتجاوز الكمية المباعة (' + allowed.quantity + ')');
+            return prev;
+          }
+        }
         if (transactionType === 'sale' && existing.cartQuantity + Number(itemQty) > selectedProduct.stock) {
           alert('لا يوجد كمية كافية في المخزن');
           return prev;
@@ -243,7 +254,39 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
     if (selectedRowId === id) setSelectedRowId(null);
   };
 
+  const updateCartQty = (id: string, val: string) => {
+    if (val === '') {
+      setCart(prev => prev.map(item => item.id === id ? { ...item, cartQuantity: '' as any } : item));
+      return;
+    }
+    const newQty = parseInt(val);
+    if (isNaN(newQty) || newQty < 0) return;
+    
+    if (isReturn && linkedSaleTransaction) {
+      const originalItem = linkedSaleTransaction.items.find(i => i.productId === id);
+      if (originalItem && newQty > originalItem.quantity) {
+         alert('الكمية المرتجعة لا يمكن أن تتجاوز الكمية المباعة (' + originalItem.quantity + ')');
+         return;
+      }
+    }
+    
+    if (transactionType.includes('sale')) {
+      const product = products.find(p => p.id === id);
+      if (product && newQty > product.stock) {
+        alert('لا يوجد كمية كافية في المخزن');
+        return;
+      }
+    }
+
+    setCart(prev => prev.map(item => item.id === id ? { ...item, cartQuantity: newQty } : item));
+  };
+
   const submitTransaction = () => {
+    if (cart.some(item => !item.cartQuantity || item.cartQuantity <= 0)) {
+      alert('يجب تحديد كمية صحيحة لجميع الأصناف');
+      return;
+    }
+
     const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
 
     if (isEWallet) {
@@ -724,8 +767,18 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                         <span className="text-xs text-gray-400 font-mono mt-0.5">{item.id}</span>
                       </td>
                       <td className="py-3 px-4 font-medium text-gray-600">{item.price}</td>
-                      <td className="py-3 px-4 font-medium text-gray-800">{item.cartQuantity}</td>
-                      <td className="py-3 px-4 font-bold text-gray-900">{item.price * item.cartQuantity}</td>
+                      <td className="py-3 px-4 font-medium text-gray-800">
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-16 text-center border border-gray-200 rounded-md py-1 bg-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 transition-shadow"
+                          value={item.cartQuantity}
+                          onChange={(e) => updateCartQty(item.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={!isNew}
+                        />
+                      </td>
+                      <td className="py-3 px-4 font-bold text-gray-900">{item.price * (item.cartQuantity || 0)}</td>
                     </tr>
                   ))
                 )}
