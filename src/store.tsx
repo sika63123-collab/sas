@@ -26,6 +26,7 @@ interface AppContextType {
   updateUser: (code: string, updates: Partial<User>) => void;
   deleteUser: (code: string) => void;
   restoreData: (data: any) => Promise<void>;
+  clearData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -167,6 +168,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await restoreAllStorage(storageData);
 
     alert('تم الرجوع للنسخة الاحتياطية بنجاح!');
+    window.location.reload();
+  };
+
+  const clearData = async () => {
+    setTransactions([]);
+    setInstallmentContracts([]);
+    setExpenses([]);
+    
+    const storageData: Record<string, string> = {
+      'mobile_shop_transactions': JSON.stringify([]),
+      'mobile_shop_installments': JSON.stringify([]),
+      'mobile_shop_expenses': JSON.stringify([]),
+      'mobile_shop_products': JSON.stringify(products),
+      'mobile_shop_users': JSON.stringify(users),
+      'mobile_shop_expense_types': JSON.stringify(expenseTypes)
+    };
+    
+    await restoreAllStorage(storageData);
+    alert('تم تصفير البيانات بنجاح! تم مسح الحركات والاقساط والمصروفات، مع الاحتفاظ بالأصناف.');
     window.location.reload();
   };
 
@@ -331,7 +351,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUser,
       updateUser,
       deleteUser,
-      restoreData
+      restoreData,
+      clearData
     }}>
       {children}
     </AppContext.Provider>

@@ -83,27 +83,37 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   // Selected row for deletion
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
+  const isAppInReturnMode = initialType.includes('return');
   const isReturn = transactionType.includes('return');
   const actualPaymentMethod = isReturn ? 'cash' : paymentMethod;
-  const invoiceNumber = viewingIndex === -1 ? cashierTransactions.length + 1 : viewingIndex + 1;
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * (item.cartQuantity || 0)), 0);
   const isNew = viewingIndex === -1;
 
-  // Return invoice number: count only return transactions
-  const returnTransactions = transactions.filter(t => t.type === 'return' || t.type === 'deposit_return');
-  const returnInvoiceNumber = isReturn ? returnTransactions.length + 1 : 0;
+  const saleTransactions = cashierTransactions.filter(t => !t.type.includes('return'));
+  const returnTransactions = cashierTransactions.filter(t => t.type.includes('return'));
 
-  // Search for a sale invoice to return from
+  let displayInvoiceNumber = 0;
+  if (viewingIndex === -1) {
+    displayInvoiceNumber = isAppInReturnMode ? returnTransactions.length + 1 : saleTransactions.length + 1;
+  } else {
+    const currentTx = cashierTransactions[viewingIndex];
+    if (currentTx.type.includes('return')) {
+       displayInvoiceNumber = returnTransactions.findIndex(t => t.id === currentTx.id) + 1;
+    } else {
+       displayInvoiceNumber = saleTransactions.findIndex(t => t.id === currentTx.id) + 1;
+    }
+  }
+
   const handleReturnSaleSearch = () => {
     const text = returnSaleInvoiceSearch.trim();
     if (!text) return;
-    let idx = cashierTransactions.findIndex(t => String(t.id) === text);
-    if (idx === -1) {
+    let foundTx = saleTransactions.find(t => String(t.id) === text);
+    if (!foundTx) {
       const num = parseInt(text) - 1;
-      if (num >= 0 && num < cashierTransactions.length) idx = num;
+      if (num >= 0 && num < saleTransactions.length) foundTx = saleTransactions[num];
     }
-    if (idx !== -1) {
-      const originalTx = cashierTransactions[idx];
+    if (foundTx) {
+      const originalTx = foundTx;
       if (originalTx.type.includes('return')) {
         alert('لا يمكن ارتجاع فاتورة مرتجع');
         return;
@@ -121,15 +131,6 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       setLinkedSaleTransaction({ id: originalTx.id, items: originalTx.items });
       setViewingIndex(-1);
 
-      if (originalTx.type === 'deposit_sale') {
-        setShowCustomerData(true);
-        setDepositAmount(originalTx.depositAmount || 0);
-        setIsFullPayment((originalTx.depositAmount || 0) === originalTx.totalAmount);
-        setCustomerName(originalTx.customerName || '');
-        setCustomerPhone(originalTx.customerPhone || '');
-        setCustomerAddress(originalTx.customerAddress || '');
-        setIsDelivered(originalTx.isDelivered || false);
-      }
       alert('تم تحميل أصناف الفاتورة للمرتجع. احذف الأصناف غير المرتجعة ثم اضغط حفظ الفاتورة.');
     } else {
       alert('لم يتم العثور على الفاتورة');
@@ -391,7 +392,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
 
   function handleNewInvoice() {
     setTransactionType(initialType);
-    setShowCustomerData(initialType === 'deposit_sale' || initialType === 'deposit_return');
+    setShowCustomerData(initialType === 'deposit_sale');
     setViewingIndex(-1);
     setCart([]);
     setItemCode('');
@@ -430,7 +431,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       product: {id: i.productId, name: i.name, price: i.price, stock: 0, categoryId: ''} 
     })));
     setTransactionType(tx.type);
-    if (tx.type.includes('deposit')) {
+    if (tx.type === 'deposit_sale') {
         setShowCustomerData(true);
         setCustomerName(tx.customerName || '');
         setCustomerPhone(tx.customerPhone || '');
@@ -448,43 +449,33 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   };
 
   const handlePrev = () => {
-    if (initialType.includes('return')) {
-      // Navigate only through return transactions
-      const returnTxIndices = cashierTransactions
-        .map((t, i) => t.type.includes('return') ? i : -1)
-        .filter(i => i !== -1);
-      if (returnTxIndices.length === 0) return;
-      if (viewingIndex === -1) {
-        loadTransaction(returnTxIndices[returnTxIndices.length - 1]);
-      } else {
-        const currentPos = returnTxIndices.indexOf(viewingIndex);
-        if (currentPos > 0) loadTransaction(returnTxIndices[currentPos - 1]);
-      }
+    const relevantTransactions = isAppInReturnMode ? returnTransactions : saleTransactions;
+    if (relevantTransactions.length === 0) return;
+    
+    if (viewingIndex === -1) {
+      const lastTx = relevantTransactions[relevantTransactions.length - 1];
+      loadTransaction(cashierTransactions.findIndex(t => t.id === lastTx.id));
     } else {
-      if (viewingIndex === -1 && cashierTransactions.length > 0) {
-        loadTransaction(cashierTransactions.length - 1);
-      } else if (viewingIndex > 0) {
-        loadTransaction(viewingIndex - 1);
+      const currentTx = cashierTransactions[viewingIndex];
+      const currentPos = relevantTransactions.findIndex(t => t.id === currentTx.id);
+      if (currentPos > 0) {
+        const prevTx = relevantTransactions[currentPos - 1];
+        loadTransaction(cashierTransactions.findIndex(t => t.id === prevTx.id));
       }
     }
   };
 
   const handleNext = () => {
-    if (initialType.includes('return')) {
-      const returnTxIndices = cashierTransactions
-        .map((t, i) => t.type.includes('return') ? i : -1)
-        .filter(i => i !== -1);
-      if (returnTxIndices.length === 0) return;
-      const currentPos = returnTxIndices.indexOf(viewingIndex);
-      if (currentPos !== -1 && currentPos < returnTxIndices.length - 1) {
-        loadTransaction(returnTxIndices[currentPos + 1]);
-      } else if (currentPos === returnTxIndices.length - 1) {
-        handleNewInvoice();
-      }
-    } else {
-      if (viewingIndex !== -1 && viewingIndex < cashierTransactions.length - 1) {
-        loadTransaction(viewingIndex + 1);
-      } else if (viewingIndex === cashierTransactions.length - 1) {
+    const relevantTransactions = isAppInReturnMode ? returnTransactions : saleTransactions;
+    if (relevantTransactions.length === 0) return;
+    
+    if (viewingIndex !== -1) {
+      const currentTx = cashierTransactions[viewingIndex];
+      const currentPos = relevantTransactions.findIndex(t => t.id === currentTx.id);
+      if (currentPos !== -1 && currentPos < relevantTransactions.length - 1) {
+        const nextTx = relevantTransactions[currentPos + 1];
+        loadTransaction(cashierTransactions.findIndex(t => t.id === nextTx.id));
+      } else if (currentPos === relevantTransactions.length - 1) {
         handleNewInvoice();
       }
     }
@@ -493,52 +484,21 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
   const executeSearchGlobalInvoice = () => {
     const text = searchInvoiceText.trim();
     if (!text) return;
-    // Find by ID directly
-    let idx = cashierTransactions.findIndex(t => String(t.id) === text);
-    if (idx === -1) {
-        // also try finding by invoice number (sequence)
+    
+    let foundTx = saleTransactions.find(t => String(t.id) === text);
+    if (!foundTx) {
         const num = parseInt(text) - 1;
-        if (num >= 0 && num < cashierTransactions.length) {
-            idx = num;
+        if (num >= 0 && num < saleTransactions.length) {
+            foundTx = saleTransactions[num];
         }
     }
-    if (idx !== -1) {
-      if (isReturn) {
-         // Load for return
-         const originalTx = cashierTransactions[idx];
-         if (originalTx.type.includes('return')) {
-            alert('لا يمكن ارتجاع فاتورة مرتجع');
-            return;
-         }
-         
-         const returnableItems: CartItem[] = originalTx.items.map(item => ({
-             product: { id: item.productId, name: item.name, price: item.price, stock: 0, categoryId: '' },
-             id: item.productId,
-             name: item.name,
-             price: item.price,
-             stock: 0,
-             cartQuantity: item.quantity,
-         }));
-         setCart(returnableItems);
-         setReturnInvoiceNo(originalTx.id);
-         setViewingIndex(-1); // Keep it as a new transaction for return
-
-         if (originalTx.type === 'deposit_sale') {
-           setShowCustomerData(true);
-           setDepositAmount(originalTx.depositAmount || 0);
-           setIsFullPayment((originalTx.depositAmount || 0) === originalTx.totalAmount);
-           setCustomerName(originalTx.customerName || '');
-           setCustomerPhone(originalTx.customerPhone || '');
-           setCustomerAddress(originalTx.customerAddress || '');
-           setPageNumber(originalTx.pageNumber || '');
-           setIsDelivered(originalTx.isDelivered || false);
-         }
-         alert('تم تحميل أصناف الفاتورة للمرتجع. احذف الأصناف غير المرتجعة ثم اضغط حفظ الفاتورة.');
-      } else {
-         loadTransaction(idx);
-      }
+    
+    if (foundTx) {
+       const globalIdx = cashierTransactions.findIndex(t => t.id === foundTx.id);
+       loadTransaction(globalIdx);
+       setShowInvoiceSearchModal(false);
     } else {
-      alert('لم يتم العثور على الفاتورة');
+       alert('لم يتم العثور على الفاتورة');
     }
   };
 
@@ -583,12 +543,12 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                  {isReturn ? 'مرتجع المبيعات' : 'شاشة الكاشير'}
                </h2>
 
-               {isReturn ? (
-                 /* Return Mode: show return number (read-only) + sale invoice search */
+               {isAppInReturnMode ? (
+                 /* Return Mode UI */
                  <div className="flex items-center gap-3">
                    <div className="flex items-center gap-1.5">
                      <span className="text-gray-500 font-medium text-sm">رقم المرتجع:</span>
-                     <input className="w-16 h-8 text-center rounded-lg bg-gray-100 border border-gray-300 font-bold focus:outline-none text-red-600" value={isNew ? returnInvoiceNumber : invoiceNumber} readOnly />
+                     <input className="w-16 h-8 text-center rounded-lg bg-gray-100 border border-gray-300 font-bold focus:outline-none text-red-600" value={displayInvoiceNumber} readOnly />
                    </div>
                    {isNew ? (
                      <div className="flex items-center gap-1.5">
@@ -613,16 +573,18 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
                      returnInvoiceNo && (
                        <div className="flex items-center gap-1.5 mr-2">
                          <span className="text-gray-500 font-medium text-sm">من فاتورة مبيعات رقم:</span>
-                         <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">{returnInvoiceNo}</span>
+                         <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
+                           {saleTransactions.findIndex(t => t.id === returnInvoiceNo) + 1 || returnInvoiceNo}
+                         </span>
                        </div>
                      )
                    )}
                  </div>
                ) : (
-                 /* Normal Mode: invoice number + search */
+                 /* Normal Mode UI */
                  <div className="flex items-center gap-2">
                    <span className="text-gray-500 font-medium text-sm">رقم الفاتورة:</span>
-                   <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={invoiceNumber} readOnly />
+                   <input className={`w-16 h-8 text-center rounded-lg bg-gray-50 border border-gray-200 font-bold focus:outline-none`} value={displayInvoiceNumber} readOnly />
                    <button
                       onClick={() => setShowInvoiceSearchModal(true)}
                       className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 h-8 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-sm transition-colors"

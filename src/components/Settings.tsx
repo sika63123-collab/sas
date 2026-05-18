@@ -10,7 +10,7 @@ const defaultPermissions: UserPermissions = {
 };
 
 export function Settings() {
-  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData } = useAppStore();
+  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData, clearData } = useAppStore();
   
   const [editingCode, setEditingCode] = useState<string | null>(null);
   
@@ -300,6 +300,24 @@ export function Settings() {
                       />
                       <button onClick={() => fileInputRef.current?.click()} className="mt-2 bg-[#d87c12] hover:bg-[#c26d0e] text-white font-bold px-6 py-2.5 shadow-md transition-colors text-sm w-48 rounded-sm">
                          رفع ملف النسخة الاحتياطية
+                      </button>
+                   </div>
+                </div>
+
+                {/* Clear Data Section */}
+                <div className="mt-6 border-t pt-6">
+                   <div className="bg-red-50/30 border border-red-200 p-8 flex flex-col items-center justify-center text-center gap-3 w-full md:w-1/2 mx-auto">
+                      <h4 className="text-red-900 font-bold text-lg">تصفير النظام (مسح البيانات)</h4>
+                      <p className="text-sm text-red-700 font-medium">هذا الإجراء سيقوم بمسح جميع الفواتير والمصروفات والأقساط، ولكنه سيحتفظ بأسماء وأرصدة الأصناف المسجلة فقط.</p>
+                      <button 
+                        onClick={() => {
+                          if (window.confirm('تحذير: هل أنت متأكد من مسح جميع الحركات والفواتير؟ (لا يمكن التراجع عن هذه الخطوة)')) {
+                            clearData();
+                          }
+                        }} 
+                        className="mt-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 shadow-md transition-colors text-sm w-48 rounded-sm"
+                      >
+                         مسح البيانات الآن
                       </button>
                    </div>
                 </div>
