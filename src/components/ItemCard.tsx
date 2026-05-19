@@ -85,15 +85,26 @@ export default function ItemCard() {
         } else if (isReturn) {
           description = t.type === 'return' ? 'مرتجع مبيعات' : 'مرتجع عربون';
           details = `${item.name} | ${item.quantity} قطعة × ${item.price} ج.م`;
-          if (t.returnInvoiceNumber) details += ` | فاتورة رقم: ${t.returnInvoiceNumber}`;
+          if (t.returnInvoiceNumber) {
+            const origIdx = cashierTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+            const origInvoiceDisplay = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+            details += ` | فاتورة رقم: ${origInvoiceDisplay}`;
+          }
         } else if (isPurchase) {
           description = 'فاتورة مشتريات';
           details = `${item.name} | إضافة رصيد للمخزن | ${item.quantity} قطعة`;
         }
 
         const invoiceNum = cashierTransactions.findIndex(tx => tx.id === t.id) + 1;
+        let displayInvoiceId = invoiceNum > 0 ? String(invoiceNum) : t.id;
+        
+        if (isReturn && t.returnInvoiceNumber) {
+          const origIdx = cashierTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+          displayInvoiceId = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+        }
+
         rows.push({
-          invoiceId: (isReturn && t.returnInvoiceNumber) ? t.returnInvoiceNumber : (invoiceNum > 0 ? String(invoiceNum) : t.id),
+          invoiceId: displayInvoiceId,
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
