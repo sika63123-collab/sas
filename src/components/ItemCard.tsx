@@ -93,12 +93,12 @@ export default function ItemCard() {
 
         const invoiceNum = cashierTransactions.findIndex(tx => tx.id === t.id) + 1;
         rows.push({
-          invoiceId: invoiceNum > 0 ? String(invoiceNum) : t.id,
+          invoiceId: (isReturn && t.returnInvoiceNumber) ? t.returnInvoiceNumber : (invoiceNum > 0 ? String(invoiceNum) : t.id),
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
-          incoming: isPurchase ? item.quantity : (isReturn ? item.quantity : 0),
-          outgoing: isSale ? item.quantity : 0,
+          incoming: isPurchase ? item.quantity : 0,
+          outgoing: isSale ? item.quantity : (isReturn ? -item.quantity : 0),
           details,
         });
       });
@@ -109,6 +109,7 @@ export default function ItemCard() {
 
   const totalIncoming = movements.reduce((sum, m) => sum + m.incoming, 0);
   const totalOutgoing = movements.reduce((sum, m) => sum + m.outgoing, 0);
+  const currentBalance = totalIncoming - totalOutgoing;
 
   const handleSearch = () => {
     if (matchedProduct) {
@@ -261,6 +262,10 @@ export default function ItemCard() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">إجمالي الصادر:</span>
                 <span className="font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{totalOutgoing}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">الرصيد المتاح:</span>
+                <span className="font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">{currentBalance}</span>
               </div>
             </div>
           </div>
