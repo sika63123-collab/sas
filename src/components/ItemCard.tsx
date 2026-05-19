@@ -124,9 +124,8 @@ export default function ItemCard() {
   }, [activeProducts, transactions, dateFrom, dateTo, saleTransactions, returnTransactions]);
 
   const totalIncoming = movements.reduce((sum, m) => sum + m.incoming, 0);
-  const totalOutgoing = movements.reduce((sum, m) => sum + m.outgoing, 0);
-  const totalReturns = movements.reduce((sum, m) => sum + m.returnQty, 0);
-  const currentBalance = totalIncoming - totalOutgoing + totalReturns;
+  const totalOutgoing = movements.reduce((sum, m) => sum + m.outgoing, 0) - movements.reduce((sum, m) => sum + m.returnQty, 0);
+  const currentBalance = totalIncoming - totalOutgoing;
 
   const handleSearch = () => {
     if (matchedProduct) {
@@ -279,10 +278,6 @@ export default function ItemCard() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">إجمالي الصادر:</span>
                 <span className="font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{totalOutgoing}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">مرتجع المبيعات:</span>
-                <span className="font-bold text-orange-700 bg-orange-50 px-3 py-1 rounded-lg border border-orange-100">{totalReturns}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">الرصيد المتاح:</span>
