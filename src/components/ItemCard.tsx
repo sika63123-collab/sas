@@ -97,8 +97,8 @@ export default function ItemCard() {
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
-          incoming: isPurchase ? item.quantity : 0,
-          outgoing: isSale ? item.quantity : (isReturn ? -item.quantity : 0),
+          incoming: isPurchase ? item.quantity : (isReturn ? item.quantity : 0),
+          outgoing: isSale ? item.quantity : 0,
           details,
         });
       });
