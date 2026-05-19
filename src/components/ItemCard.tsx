@@ -49,8 +49,9 @@ export default function ItemCard() {
       date: string;
       time: string;
       description: string;
-      incoming: number; // وارد
-      outgoing: number; // صادر
+      incoming: number; // وارد (مشتريات فقط)
+      outgoing: number; // صادر (مبيعات فقط)
+      returnQty: number; // مرتجع
       details: string;
     }[] = [];
 
@@ -111,8 +112,9 @@ export default function ItemCard() {
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
-          incoming: isPurchase || isReturn ? item.quantity : 0,
+          incoming: isPurchase ? item.quantity : 0,
           outgoing: isSale ? item.quantity : 0,
+          returnQty: isReturn ? item.quantity : 0,
           details,
         });
       });
@@ -123,7 +125,8 @@ export default function ItemCard() {
 
   const totalIncoming = movements.reduce((sum, m) => sum + m.incoming, 0);
   const totalOutgoing = movements.reduce((sum, m) => sum + m.outgoing, 0);
-  const currentBalance = totalIncoming - totalOutgoing;
+  const totalReturns = movements.reduce((sum, m) => sum + m.returnQty, 0);
+  const currentBalance = totalIncoming - totalOutgoing + totalReturns;
 
   const handleSearch = () => {
     if (matchedProduct) {
@@ -268,7 +271,7 @@ export default function ItemCard() {
           {/* Summary */}
           <div className="bg-gray-50 border-b border-gray-200 p-4 flex flex-wrap items-center justify-between gap-4">
             <h3 className="font-bold text-gray-800">{selectedCategory ? 'حركة المجموعة' : 'حركة الصنف'}</h3>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">إجمالي الوارد:</span>
                 <span className="font-bold text-green-700 bg-green-50 px-3 py-1 rounded-lg border border-green-100">{totalIncoming}</span>
@@ -276,6 +279,10 @@ export default function ItemCard() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">إجمالي الصادر:</span>
                 <span className="font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{totalOutgoing}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">مرتجع المبيعات:</span>
+                <span className="font-bold text-orange-700 bg-orange-50 px-3 py-1 rounded-lg border border-orange-100">{totalReturns}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">الرصيد المتاح:</span>
@@ -305,7 +312,9 @@ export default function ItemCard() {
                       <span className={`font-medium px-2 py-0.5 rounded text-xs ${
                         m.incoming > 0 
                           ? 'text-green-700 bg-green-50' 
-                          : 'text-orange-700 bg-orange-50'
+                          : m.returnQty > 0
+                            ? 'text-orange-700 bg-orange-50'
+                            : 'text-red-700 bg-red-50'
                       }`}>
                         {m.description}
                       </span>
@@ -313,6 +322,8 @@ export default function ItemCard() {
                     <td className="px-4 py-3 text-center">
                       {m.incoming > 0 ? (
                         <span className="font-bold text-green-700">{m.incoming}</span>
+                      ) : m.returnQty > 0 ? (
+                        <span className="font-bold text-orange-600">{m.returnQty}</span>
                       ) : (
                         <span className="text-gray-300">-</span>
                       )}
@@ -320,8 +331,6 @@ export default function ItemCard() {
                     <td className="px-4 py-3 text-center">
                       {m.outgoing > 0 ? (
                         <span className="font-bold text-red-700">{m.outgoing}</span>
-                      ) : m.outgoing < 0 ? (
-                        <span className="font-bold text-green-700" dir="ltr">-{Math.abs(m.outgoing)}</span>
                       ) : (
                         <span className="text-gray-300">-</span>
                       )}
