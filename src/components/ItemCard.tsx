@@ -5,6 +5,8 @@ import { FileText, Search, LayoutGrid } from 'lucide-react';
 export default function ItemCard() {
   const { transactions, products } = useAppStore();
   const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment' && t.type !== 'installment_payment');
+  const saleTransactions = cashierTransactions.filter(t => !t.type.includes('return'));
+  const returnTransactions = cashierTransactions.filter(t => t.type.includes('return'));
   
   const categories = useMemo(() => {
     return Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
@@ -86,21 +88,22 @@ export default function ItemCard() {
           description = t.type === 'return' ? 'مرتجع مبيعات' : 'مرتجع عربون';
           details = `${item.name} | ${item.quantity} قطعة × ${item.price} ج.م`;
           if (t.returnInvoiceNumber) {
-            const origIdx = cashierTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+            const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
             const origInvoiceDisplay = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
-            details += ` | فاتورة رقم: ${origInvoiceDisplay}`;
+            details += ` | فاتورة مبيعات رقم: ${origInvoiceDisplay}`;
           }
         } else if (isPurchase) {
           description = 'فاتورة مشتريات';
           details = `${item.name} | إضافة رصيد للمخزن | ${item.quantity} قطعة`;
         }
 
-        const invoiceNum = cashierTransactions.findIndex(tx => tx.id === t.id) + 1;
-        let displayInvoiceId = invoiceNum > 0 ? String(invoiceNum) : t.id;
-        
-        if (isReturn && t.returnInvoiceNumber) {
-          const origIdx = cashierTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
-          displayInvoiceId = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+        let displayInvoiceId = t.id;
+        if (isReturn) {
+          const returnNum = returnTransactions.findIndex(tx => tx.id === t.id) + 1;
+          displayInvoiceId = returnNum > 0 ? String(returnNum) : t.id;
+        } else {
+          const saleNum = saleTransactions.findIndex(tx => tx.id === t.id) + 1;
+          displayInvoiceId = saleNum > 0 ? String(saleNum) : t.id;
         }
 
         rows.push({
@@ -108,15 +111,15 @@ export default function ItemCard() {
           date: new Date(t.timestamp).toLocaleDateString('ar-EG'),
           time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           description,
-          incoming: isPurchase ? item.quantity : 0,
-          outgoing: isSale ? item.quantity : (isReturn ? -item.quantity : 0),
+          incoming: isPurchase || isReturn ? item.quantity : 0,
+          outgoing: isSale ? item.quantity : 0,
           details,
         });
       });
     });
 
     return rows;
-  }, [activeProducts, transactions, dateFrom, dateTo, cashierTransactions]);
+  }, [activeProducts, transactions, dateFrom, dateTo, saleTransactions, returnTransactions]);
 
   const totalIncoming = movements.reduce((sum, m) => sum + m.incoming, 0);
   const totalOutgoing = movements.reduce((sum, m) => sum + m.outgoing, 0);
