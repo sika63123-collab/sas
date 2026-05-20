@@ -5,6 +5,7 @@ import ProfitMarginReport from './ProfitMarginReport';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
   const { transactions, expenses } = useAppStore();
+  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Filter transactions by selected date
@@ -293,11 +294,15 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                            <span className={`font-medium px-2 py-0.5 rounded ${getTypeName(t.type).color}`}>
                              {getTypeName(t.type).label}
                            </span>
-                           {t.returnInvoiceNumber && (
-                             <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1 rounded">
-                               فاتورة رقم: {t.returnInvoiceNumber}
-                             </span>
-                           )}
+                           {t.returnInvoiceNumber && (() => {
+                             const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+                             const origInvoiceDisplay = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+                             return (
+                               <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1 rounded">
+                                 فاتورة رقم: {origInvoiceDisplay}
+                               </span>
+                             );
+                           })()}
                          </div>
                        </td>
                        <td className="px-6 py-4">

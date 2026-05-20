@@ -191,22 +191,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addProduct = (product: Product) => {
-    setProducts([...products, product]);
-    if (product.stock > 0) {
-      const newTransaction: Transaction = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        type: 'purchase',
-        items: [{
-          productId: product.id,
-          name: product.name,
-          quantity: product.stock,
-          price: product.costPrice || product.price
-        }],
-        totalAmount: (product.costPrice || product.price) * product.stock,
-        paymentMethod: 'cash'
-      };
-      setTransactions(prev => [...prev, newTransaction]);
+    const existing = products.find(p => p.id === product.id);
+    if (existing) {
+      // تحديث الصنف الحالي
+      setProducts(prev => prev.map(p => 
+        p.id === product.id 
+          ? { 
+              ...p, 
+              name: product.name || p.name,
+              category: product.category || p.category,
+              stock: p.stock + product.stock, 
+              costPrice: product.costPrice !== undefined ? product.costPrice : p.costPrice,
+              price: product.price !== undefined ? product.price : p.price
+            } 
+          : p
+      ));
+      
+      // تسجيل حركة الشراء وتغذية المخزن
+      if (product.stock > 0) {
+        const newTransaction: Transaction = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          type: 'purchase',
+          items: [{
+            productId: product.id,
+            name: product.name,
+            quantity: product.stock,
+            price: product.costPrice || product.price
+          }],
+          totalAmount: (product.costPrice || product.price) * product.stock,
+          paymentMethod: 'cash'
+        };
+        setTransactions(prev => [...prev, newTransaction]);
+      }
+    } else {
+      // إضافة صنف جديد لأول مرة
+      setProducts([...products, product]);
+      if (product.stock > 0) {
+        const newTransaction: Transaction = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          type: 'purchase',
+          items: [{
+            productId: product.id,
+            name: product.name,
+            quantity: product.stock,
+            price: product.costPrice || product.price
+          }],
+          totalAmount: (product.costPrice || product.price) * product.stock,
+          paymentMethod: 'cash'
+        };
+        setTransactions(prev => [...prev, newTransaction]);
+      }
     }
   };
 

@@ -4,9 +4,9 @@ import { FileText, Search, LayoutGrid } from 'lucide-react';
 
 export default function ItemCard() {
   const { transactions, products } = useAppStore();
-  const cashierTransactions = transactions.filter(t => t.type !== 'deposit_payment' && t.type !== 'installment_payment');
-  const saleTransactions = cashierTransactions.filter(t => !t.type.includes('return'));
-  const returnTransactions = cashierTransactions.filter(t => t.type.includes('return'));
+  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
+  const returnTransactions = transactions.filter(t => t.type === 'return' || t.type === 'deposit_return');
+  const purchaseTransactions = transactions.filter(t => t.type === 'purchase');
   
   const categories = useMemo(() => {
     return Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
@@ -102,9 +102,12 @@ export default function ItemCard() {
         if (isReturn) {
           const returnNum = returnTransactions.findIndex(tx => tx.id === t.id) + 1;
           displayInvoiceId = returnNum > 0 ? String(returnNum) : t.id;
-        } else {
+        } else if (isSale) {
           const saleNum = saleTransactions.findIndex(tx => tx.id === t.id) + 1;
           displayInvoiceId = saleNum > 0 ? String(saleNum) : t.id;
+        } else if (isPurchase) {
+          const purchaseNum = purchaseTransactions.findIndex(tx => tx.id === t.id) + 1;
+          displayInvoiceId = purchaseNum > 0 ? String(purchaseNum) : t.id;
         }
 
         rows.push({
