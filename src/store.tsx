@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
 
 interface AppContextType {
@@ -10,6 +10,7 @@ interface AppContextType {
   expenseTypes: string[];
   users: User[];
   currentUser: User | null;
+  paymentTransactions: PaymentTransaction[];
   addProduct: (product: Product) => void;
   updateProductStock: (id: string, newStock: number) => void;
   updateProductPrice: (id: string, newPrice: number) => void;
@@ -27,6 +28,7 @@ interface AppContextType {
   deleteUser: (code: string) => void;
   restoreData: (data: any) => Promise<void>;
   clearData: () => Promise<void>;
+  addPaymentTransaction: (pt: Omit<PaymentTransaction, 'id'>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -87,6 +89,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return saved ? JSON.parse(saved) : ['إيجار', 'كهرباء', 'مياه', 'إنترنت', 'مرتبات', 'مشتريات', 'أخرى'];
   });
 
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>(() => {
+    const saved = getStorageItem('mobile_shop_payment_transactions');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   useEffect(() => {
     setStorageItem('mobile_shop_products', JSON.stringify(products));
   }, [products]);
@@ -110,6 +117,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setStorageItem('mobile_shop_expense_types', JSON.stringify(expenseTypes));
   }, [expenseTypes]);
+
+  useEffect(() => {
+    setStorageItem('mobile_shop_payment_transactions', JSON.stringify(paymentTransactions));
+  }, [paymentTransactions]);
 
   useEffect(() => {
     if (currentUser) {
@@ -171,15 +182,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.location.reload();
   };
 
+  const addPaymentTransaction = (pt: Omit<PaymentTransaction, 'id'>) => {
+    const newPt: PaymentTransaction = {
+      ...pt,
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+    };
+    setPaymentTransactions(prev => [...prev, newPt]);
+  };
+
   const clearData = async () => {
     setTransactions([]);
     setInstallmentContracts([]);
     setExpenses([]);
+    setPaymentTransactions([]);
     
     const storageData: Record<string, string> = {
       'mobile_shop_transactions': JSON.stringify([]),
       'mobile_shop_installments': JSON.stringify([]),
       'mobile_shop_expenses': JSON.stringify([]),
+      'mobile_shop_payment_transactions': JSON.stringify([]),
       'mobile_shop_products': JSON.stringify(products),
       'mobile_shop_users': JSON.stringify(users),
       'mobile_shop_expense_types': JSON.stringify(expenseTypes)
@@ -372,6 +393,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       expenseTypes,
       users,
       currentUser,
+      paymentTransactions,
       addProduct, 
       updateProductStock, 
       updateProductPrice,
@@ -388,7 +410,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateUser,
       deleteUser,
       restoreData,
-      clearData
+      clearData,
+      addPaymentTransaction,
     }}>
       {children}
     </AppContext.Provider>

@@ -25,6 +25,16 @@ export interface User {
 export type PaymentMethod = 'cash' | 'visa' | 'instapay' | 'vodafone_cash';
 export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'purchase';
 
+// جدول حركات الدفع — كل دفعة عربون مرتبطة بفاتورة
+export interface PaymentTransaction {
+  id: string;
+  invoiceId: string;         // ربط بالفاتورة الأصلية (deposit_sale)
+  amount: number;            // قيمة الدفعة
+  date: string;              // تاريخ الدفعة (ISO string)
+  paymentMethod: PaymentMethod;
+  note?: string;
+}
+
 export interface Product {
   id: string;
   category?: string;

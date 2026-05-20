@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Transaction, PaymentMethod } from '../types';
 
 export function DepositPay() {
-  const { transactions, updateTransaction, addTransaction } = useAppStore();
+  const { transactions, updateTransaction, addTransaction, addPaymentTransaction } = useAppStore();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -55,6 +55,14 @@ export function DepositPay() {
       updateTransaction(selectedTransaction.id, {
         depositAmount: (selectedTransaction.depositAmount || 0) + amountToPay,
         isDelivered: isFullyPaidNow,
+      });
+
+      // تسجيل الدفعة في جدول حركات الدفع
+      addPaymentTransaction({
+        invoiceId: selectedTransaction.id,
+        amount: amountToPay,
+        date: new Date().toISOString(),
+        paymentMethod: method,
       });
 
       // Create new completion transaction for reports
