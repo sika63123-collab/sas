@@ -290,7 +290,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Update stock based on transaction type (skip for payment records)
     if (t.type !== 'deposit_payment' && t.type !== 'installment_payment') {
-      const multiplier = (t.type === 'sale' || t.type === 'deposit_sale') ? -1 : 1;
+      const multiplier = (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale') ? -1 : 1;
     
       let currentProducts = [...products];
       t.items.forEach(item => {
@@ -328,6 +328,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setInstallmentContracts(prev => [...prev, newContract]);
+
+    // تسجيل حركة بيع تقسيط في التقارير
+    addTransaction({
+      type: 'installment_sale',
+      totalAmount: contract.purchasePrice,
+      depositAmount: contract.downPayment,
+      paymentMethod: 'cash',
+      items: [{
+        productId: '',
+        name: contract.deviceName,
+        quantity: 1,
+        price: contract.purchasePrice,
+      }],
+      customerName: contract.customerName,
+      customerPhone: contract.customerPhone,
+      customerAddress: contract.customerAddress,
+    });
   };
 
   const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod) => {

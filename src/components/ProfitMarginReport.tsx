@@ -4,7 +4,7 @@ import { Calculator } from 'lucide-react';
 
 export default function ProfitMarginReport({ selectedDate }: { selectedDate: string }) {
   const { transactions, products, expenses } = useAppStore();
-  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
+  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale');
   const returnTransactions = transactions.filter(t => t.type === 'return' || t.type === 'deposit_return');
 
   const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
@@ -13,7 +13,7 @@ export default function ProfitMarginReport({ selectedDate }: { selectedDate: str
   let totalSales = 0;
   let totalCost = 0;
   
-  const profitDetails = dailyTransactions.filter(t => t.type === 'sale' || t.type === 'return').flatMap(t => {
+  const profitDetails = dailyTransactions.filter(t => t.type === 'sale' || t.type === 'return' || t.type === 'installment_sale').flatMap(t => {
     return t.items.map(item => {
       const product = products.find(p => p.id === item.productId);
       const costPrice = product?.costPrice || 0;

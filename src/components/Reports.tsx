@@ -5,17 +5,17 @@ import ProfitMarginReport from './ProfitMarginReport';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
   const { transactions, expenses } = useAppStore();
-  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
+  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Filter transactions by selected date
   const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
 
   // Helper to calculate actual paid/returned amount
-  const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return') ? (t.depositAmount || 0) : t.totalAmount;
+  const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
 
   // --- Cash Account Logic ---
-  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
   const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const netCash = cashSales - cashReturns;
 
@@ -26,7 +26,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
 
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
-  const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment').reduce((sum, t) => sum + getAmount(t), 0);
+  const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale').reduce((sum, t) => sum + getAmount(t), 0);
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
 
@@ -47,6 +47,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       case 'deposit_return': return { label: 'مرتجع عربون', color: 'text-purple-600 bg-purple-50' };
       case 'deposit_payment': return { label: 'سداد عربون', color: 'text-teal-600 bg-teal-50' };
       case 'installment_payment': return { label: 'سداد قسط', color: 'text-blue-600 bg-blue-50' };
+      case 'installment_sale': return { label: 'بيع تقسيط', color: 'text-indigo-600 bg-indigo-50' };
       case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
       default: return { label: type, color: 'text-gray-600 bg-gray-50' };
     }
@@ -332,6 +333,14 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                               {t.isDelivered ? 'تم استلام العميل' : 'لم يتم استلام العميل'}
                             </div>
                           )}
+                           {t.type === 'installment_sale' && (
+                             <div className="mt-2 text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded inline-block">
+                               مقدم: {t.depositAmount || 0} ج.م | 
+                               إجمالي سعر الجهاز: {t.totalAmount} ج.م | 
+                               متبقي: {t.totalAmount - (t.depositAmount || 0)} ج.م | 
+                               العميل: {t.customerName} ({t.customerPhone}) {t.customerAddress ? `- ${t.customerAddress}` : ''}
+                             </div>
+                           )}
                        </td>
                      </tr>
                    ))}
