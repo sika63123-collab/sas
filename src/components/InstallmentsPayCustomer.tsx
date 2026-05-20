@@ -10,6 +10,7 @@ export function InstallmentsPayCustomer() {
   const [payAmount, setPayAmount] = useState<number | ''>('');
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
   const [walletLast4, setWalletLast4] = useState('');
+  const [receiverWalletLast4, setReceiverWalletLast4] = useState('');
   const [searchResults, setSearchResults] = useState<InstallmentContract[]>([]);
 
   // Handle pre-selected contract from Archive double click
@@ -85,21 +86,28 @@ export function InstallmentsPayCustomer() {
       return;
     }
 
-    if (selectedMethod !== 'cash' && (!walletLast4 || walletLast4.trim().length < 4)) {
-      alert('يرجى إدخال آخر 4 أرقام لوسيلة الدفع (على الأقل 4 أرقام)');
-      return;
+    if (selectedMethod !== 'cash') {
+      if (!walletLast4 || walletLast4.trim().length < 4) {
+        alert('يرجى إدخال آخر 4 أرقام لوسيلة الدفع (المرسلة) (على الأقل 4 أرقام)');
+        return;
+      }
+      if (!receiverWalletLast4 || receiverWalletLast4.trim().length < 4) {
+        alert('يرجى إدخال آخر 4 أرقام للمحفظة المستقبلة (على الأقل 4 أرقام)');
+        return;
+      }
     }
 
     const methodName = selectedMethod === 'cash' ? 'نقدي' : selectedMethod === 'visa' ? 'فيزا' : selectedMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش';
-    const confirmMsg = `تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${methodName})${selectedMethod !== 'cash' ? ` - آخر 4 أرقام: ${walletLast4}` : ''}؟`;
+    const confirmMsg = `تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${methodName})${selectedMethod !== 'cash' ? ` - من: *${walletLast4} إلى: *${receiverWalletLast4}` : ''}؟`;
 
     if (window.confirm(confirmMsg)) {
-      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, selectedMethod, selectedMethod !== 'cash' ? walletLast4 : undefined);
+      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, selectedMethod, selectedMethod !== 'cash' ? walletLast4 : undefined, selectedMethod !== 'cash' ? receiverWalletLast4 : undefined);
       alert('تم تسجيل الدفع بنجاح');
       
       // Reset inputs
       setSelectedMethod('cash');
       setWalletLast4('');
+      setReceiverWalletLast4('');
 
       // Refresh selected contract from store
       const updated = installmentContracts.find(c => c.id === selectedContract.id);
@@ -310,13 +318,14 @@ export function InstallmentsPayCustomer() {
                                                           <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded mt-0.5">
                                                             {p.paymentMethod === 'cash' ? 'كاش' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستاباي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
                                                             {p.walletLast4 ? ` (*${p.walletLast4})` : ''}
+                                                            {p.receiverWalletLast4 ? ` ➔ (*${p.receiverWalletLast4})` : ''}
                                                           </span>
                                                         </div>
                                                     ) : isNextDue ? (
-                                                        <div className="flex flex-col gap-1.5 p-1 items-center justify-center">
-                                                          <div className="flex gap-1 items-center">
+                                                        <div className="flex flex-col gap-1.5 p-1.5 items-center justify-center bg-gray-50 rounded border border-gray-300">
+                                                          <div className="flex flex-col gap-1 w-full">
                                                             <select 
-                                                              className="h-8 border border-gray-300 rounded px-1 text-xs font-bold bg-white"
+                                                              className="h-8 border border-gray-300 rounded px-1 text-xs font-bold bg-white w-full"
                                                               value={selectedMethod}
                                                               onChange={e => setSelectedMethod(e.target.value as any)}
                                                             >
@@ -326,19 +335,27 @@ export function InstallmentsPayCustomer() {
                                                               <option value="vodafone_cash">فودافون كاش</option>
                                                             </select>
                                                             {selectedMethod !== 'cash' && (
-                                                              <input 
-                                                                type="text" 
-                                                                placeholder="آخر 4 أرقام"
-                                                                className="w-20 h-8 border-2 border-red-300 rounded text-center text-xs font-bold bg-white"
-                                                                maxLength={15}
-                                                                value={walletLast4}
-                                                                onChange={e => setWalletLast4(e.target.value)}
-                                                              />
+                                                              <div className="flex flex-col gap-1 w-full mt-1">
+                                                                <input 
+                                                                  type="text" 
+                                                                  placeholder="المرسل: آخر 4 أرقام"
+                                                                  className="w-full h-8 border border-gray-300 rounded text-center text-xs font-bold bg-white"
+                                                                  value={walletLast4}
+                                                                  onChange={e => setWalletLast4(e.target.value.replace(/\D/g, ''))}
+                                                                />
+                                                                <input 
+                                                                  type="text" 
+                                                                  placeholder="المستلم: آخر 4 أرقام"
+                                                                  className="w-full h-8 border border-gray-300 rounded text-center text-xs font-bold bg-white"
+                                                                  value={receiverWalletLast4}
+                                                                  onChange={e => setReceiverWalletLast4(e.target.value.replace(/\D/g, ''))}
+                                                                />
+                                                              </div>
                                                             )}
                                                           </div>
                                                           <button 
                                                             onClick={handlePay}
-                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-4 shadow transition-colors w-full"
+                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-4 shadow transition-colors w-full rounded mt-1"
                                                           >
                                                             تأكيد الدفع
                                                           </button>

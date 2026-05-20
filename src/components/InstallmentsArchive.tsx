@@ -199,7 +199,8 @@ export default function InstallmentsArchive({ onNavigateToPay }: { onNavigateToP
                                           {contract.downPayment > 0 && (
                                              <span className="text-gray-500 text-[10px] font-bold absolute bottom-0 left-0 right-0">
                                                 {contract.downPaymentMethod === 'cash' ? 'كاش' : contract.downPaymentMethod === 'visa' ? 'فيزا' : contract.downPaymentMethod === 'instapay' ? 'إنستاباي' : contract.downPaymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
-                                                {contract.downPaymentWalletLast4 ? ` (*${contract.downPaymentWalletLast4})` : ''}
+                                                {contract.downPaymentWalletLast4 ? ` (من: *${contract.downPaymentWalletLast4})` : ''}
+                                                {contract.downPaymentReceiverWalletLast4 ? ` (إلى: *${contract.downPaymentReceiverWalletLast4})` : ''}
                                              </span>
                                           )}
                                        </div>
@@ -251,7 +252,8 @@ export default function InstallmentsArchive({ onNavigateToPay }: { onNavigateToP
                                                                    <span className="text-green-600">تم الدفع</span>
                                                                    <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded mt-0.5">
                                                                        {p.paymentMethod === 'cash' ? 'كاش' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستاباي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
-                                                                       {p.walletLast4 ? ` (*${p.walletLast4})` : ''}
+                                                                       {p.walletLast4 ? ` (من: *${p.walletLast4})` : ''}
+                                                                       {p.receiverWalletLast4 ? ` (إلى: *${p.receiverWalletLast4})` : ''}
                                                                    </span>
                                                                </div>
                                                            ) : isLate ? (

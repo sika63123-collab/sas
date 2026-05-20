@@ -82,6 +82,7 @@ export interface InstallmentPayment {
   isPaid: boolean;
   paymentMethod?: PaymentMethod;
   walletLast4?: string;
+  receiverWalletLast4?: string;
 }
 
 export interface InstallmentContract {
@@ -105,6 +106,7 @@ export interface InstallmentContract {
   createdAt: string;
   downPaymentMethod?: PaymentMethod;
   downPaymentWalletLast4?: string;
+  downPaymentReceiverWalletLast4?: string;
 }
 
 export interface Expense {

@@ -17,7 +17,7 @@ interface AppContextType {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   addInstallmentContract: (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => void;
-  payInstallment: (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string) => void;
+  payInstallment: (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string, receiverWalletLast4?: string) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => void;
   addExpenseType: (typeName: string) => void;
   deleteExpenseType: (typeName: string) => void;
@@ -349,10 +349,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       customerPhone: contract.customerPhone,
       customerAddress: contract.customerAddress,
       senderWalletLast4: contract.downPaymentWalletLast4,
+      receiverWalletLast4: contract.downPaymentReceiverWalletLast4,
     });
   };
 
-  const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string) => {
+  const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string, receiverWalletLast4?: string) => {
     let customerName = '';
     let customerPhone = '';
     
@@ -364,7 +365,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...contract,
           payments: contract.payments.map(payment => {
             if (payment.id === paymentId && !payment.isPaid) {
-              return { ...payment, isPaid: true, paidDate: new Date().toISOString(), paidAmount, paymentMethod, walletLast4 };
+              return { ...payment, isPaid: true, paidDate: new Date().toISOString(), paidAmount, paymentMethod, walletLast4, receiverWalletLast4 };
             }
             return payment;
           })
@@ -383,6 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         customerName: customerName,
         customerPhone: customerPhone,
         senderWalletLast4: walletLast4,
+        receiverWalletLast4: receiverWalletLast4,
       });
     }
   };
