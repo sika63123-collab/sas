@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { CheckCircle } from 'lucide-react';
 
-export default function InstallmentsArchive() {
-  const { installmentContracts } = useAppStore();
+export default function InstallmentsArchive({ onNavigateToPay }: { onNavigateToPay?: () => void }) {
+  const { installmentContracts, setSelectedContractIdForPayment } = useAppStore();
   
   const [searchTerm, setSearchTerm] = useState('');
   // We'll store the selected customer key
@@ -148,12 +148,23 @@ export default function InstallmentsArchive() {
                         const globalIndex = installmentContracts.findIndex(c => c.id === contract.id) + 1;
 
                         return (
-                           <div key={contract.id} className="bg-white border border-gray-300 shadow-sm flex flex-col">
+                           <div 
+                              key={contract.id} 
+                              onDoubleClick={() => {
+                                 setSelectedContractIdForPayment(contract.id);
+                                 if (onNavigateToPay) onNavigateToPay();
+                              }}
+                              className="bg-white border border-gray-300 shadow-sm flex flex-col cursor-pointer select-none hover:border-blue-500 transition-colors"
+                              title="انقر مرتين لتسجيل السداد لهذا العقد"
+                            >
                               <div className="bg-[#1a365d] text-white px-4 py-2.5 flex justify-between items-center shrink-0">
                                  {latePayments.length > 0 ? (
                                     <div className="bg-red-100 text-red-600 px-3 py-1 font-bold text-sm">متأخر {latePayments.length} قسط</div>
                                  ) : <div/>}
-                                 <div className="font-bold text-lg">عقد #{globalIndex} — {contract.deviceName}</div>
+                                 <div className="font-bold text-lg flex items-center gap-2">
+                                    <span>عقد #{globalIndex} — {contract.deviceName}</span>
+                                    <span className="text-[11px] bg-blue-600 text-white px-2 py-0.5 rounded font-bold animate-pulse">انقر مرتين للسداد ⚡</span>
+                                 </div>
                               </div>
 
                               <div className="p-6 pb-2 shrink-0">
@@ -182,10 +193,16 @@ export default function InstallmentsArchive() {
                                          <span className="font-bold text-gray-900">{contract.purchasePrice} ج.م</span>
                                          <span className="text-green-600 text-xs font-bold absolute bottom-0 left-0 right-0">مدفوع: {totalPaidAmount} ج.م</span>
                                       </div>
-                                      <div className="flex flex-col gap-2 mt-4">
-                                         <span className="text-gray-500 font-medium text-sm">المقدم</span>
-                                         <span className="font-bold text-blue-600">{contract.downPayment} ج.م</span>
-                                      </div>
+                                       <div className="flex flex-col gap-2 mt-4 relative pb-5">
+                                          <span className="text-gray-500 font-medium text-sm">المقدم</span>
+                                          <span className="font-bold text-blue-600">{contract.downPayment} ج.م</span>
+                                          {contract.downPayment > 0 && (
+                                             <span className="text-gray-500 text-[10px] font-bold absolute bottom-0 left-0 right-0">
+                                                {contract.downPaymentMethod === 'cash' ? 'كاش' : contract.downPaymentMethod === 'visa' ? 'فيزا' : contract.downPaymentMethod === 'instapay' ? 'إنستاباي' : contract.downPaymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
+                                                {contract.downPaymentWalletLast4 ? ` (*${contract.downPaymentWalletLast4})` : ''}
+                                             </span>
+                                          )}
+                                       </div>
                                       <div className="flex flex-col gap-2 mt-4">
                                          <span className="text-gray-500 font-medium text-sm">القسط الشهري</span>
                                          <span className="font-bold text-gray-900">{contract.monthlyPayment} ج.م</span>
@@ -228,15 +245,21 @@ export default function InstallmentsArchive() {
                                                       <td className="py-2 text-sm font-bold border-l border-gray-200 text-gray-600">
                                                           {p.isPaid ? new Date(p.paidDate!).toLocaleDateString('en-GB') : '—'}
                                                       </td>
-                                                      <td className="py-2 text-sm font-bold">
-                                                          {p.isPaid ? (
-                                                              <span className="text-green-600">تم الدفع</span>
-                                                          ) : isLate ? (
-                                                              <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded">متأخر</span>
-                                                          ) : (
-                                                              <span className="text-gray-600">قادم</span>
-                                                          )}
-                                                      </td>
+                                                       <td className="py-2 text-sm font-bold">
+                                                           {p.isPaid ? (
+                                                               <div className="flex flex-col items-center">
+                                                                   <span className="text-green-600">تم الدفع</span>
+                                                                   <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded mt-0.5">
+                                                                       {p.paymentMethod === 'cash' ? 'كاش' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستاباي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
+                                                                       {p.walletLast4 ? ` (*${p.walletLast4})` : ''}
+                                                                   </span>
+                                                               </div>
+                                                           ) : isLate ? (
+                                                               <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded">متأخر</span>
+                                                           ) : (
+                                                               <span className="text-gray-600">قادم</span>
+                                                           )}
+                                                       </td>
                                                   </tr>
                                               )
                                           })}

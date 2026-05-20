@@ -1,32 +1,54 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { InstallmentContract } from '../types';
 
 export function InstallmentsPayCustomer() {
-  const { installmentContracts, payInstallment } = useAppStore();
+  const { installmentContracts, payInstallment, selectedContractIdForPayment, setSelectedContractIdForPayment } = useAppStore();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContract, setSelectedContract] = useState<InstallmentContract | null>(null);
   const [payAmount, setPayAmount] = useState<number | ''>('');
+  const [selectedMethod, setSelectedMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [walletLast4, setWalletLast4] = useState('');
+  const [searchResults, setSearchResults] = useState<InstallmentContract[]>([]);
+
+  // Handle pre-selected contract from Archive double click
+  useEffect(() => {
+    if (selectedContractIdForPayment) {
+      const match = installmentContracts.find(c => c.id === selectedContractIdForPayment);
+      if (match) {
+        setSelectedContract(match);
+        const nextPayment = match.payments.find(p => !p.isPaid);
+        setPayAmount(nextPayment ? nextPayment.amount : '');
+        setSearchTerm(match.pageNumber || match.customerName);
+      }
+      setSelectedContractIdForPayment(null);
+    }
+  }, [selectedContractIdForPayment, installmentContracts, setSelectedContractIdForPayment]);
 
   const handleSearch = () => {
     const q = searchTerm.trim();
     if (!q) return;
 
-    const match = installmentContracts.find(c =>
+    const matches = installmentContracts.filter(c =>
       String(c.customerNumber) === q ||
       String(c.pageNumber) === q ||
       c.customerName.includes(q) ||
       c.customerPhone.includes(q)
     );
 
-    if (match) {
-      setSelectedContract(match);
-      // Find next unpaid installment amount
-      const nextPayment = match.payments.find(p => !p.isPaid);
+    if (matches.length > 1) {
+      setSearchResults(matches);
+      setSelectedContract(null);
+      setPayAmount('');
+    } else if (matches.length === 1) {
+      setSearchResults([]);
+      setSelectedContract(matches[0]);
+      const nextPayment = matches[0].payments.find(p => !p.isPaid);
       setPayAmount(nextPayment ? nextPayment.amount : '');
     } else {
       alert('لم يتم العثور على عميل بهذه البيانات');
+      setSearchResults([]);
       setSelectedContract(null);
       setPayAmount('');
     }
@@ -36,6 +58,9 @@ export function InstallmentsPayCustomer() {
     setSearchTerm('');
     setSelectedContract(null);
     setPayAmount('');
+    setSelectedMethod('cash');
+    setWalletLast4('');
+    setSearchResults([]);
   };
 
   // Calculations for selected contract
@@ -52,7 +77,7 @@ export function InstallmentsPayCustomer() {
     return { totalPaidInstallments, remaining, paidCount, totalCount, nextPayment, globalIndex };
   }, [selectedContract, installmentContracts]);
 
-  const handlePay = (method: 'cash' | 'visa') => {
+  const handlePay = () => {
     if (!selectedContract || !contractCalcs?.nextPayment) return;
     const amount = typeof payAmount === 'number' ? payAmount : 0;
     if (amount <= 0) {
@@ -60,9 +85,22 @@ export function InstallmentsPayCustomer() {
       return;
     }
 
-    if (window.confirm(`تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${method === 'cash' ? 'نقدي' : 'فيزا'})؟`)) {
-      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, method);
+    if (selectedMethod !== 'cash' && (!walletLast4 || walletLast4.trim().length < 4)) {
+      alert('يرجى إدخال آخر 4 أرقام لوسيلة الدفع (على الأقل 4 أرقام)');
+      return;
+    }
+
+    const methodName = selectedMethod === 'cash' ? 'نقدي' : selectedMethod === 'visa' ? 'فيزا' : selectedMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش';
+    const confirmMsg = `تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${methodName})${selectedMethod !== 'cash' ? ` - آخر 4 أرقام: ${walletLast4}` : ''}؟`;
+
+    if (window.confirm(confirmMsg)) {
+      payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, selectedMethod, selectedMethod !== 'cash' ? walletLast4 : undefined);
       alert('تم تسجيل الدفع بنجاح');
+      
+      // Reset inputs
+      setSelectedMethod('cash');
+      setWalletLast4('');
+
       // Refresh selected contract from store
       const updated = installmentContracts.find(c => c.id === selectedContract.id);
       if (updated) {
@@ -132,6 +170,37 @@ export function InstallmentsPayCustomer() {
                             🔍
                         </button>
                     </div>
+
+                    {/* Multiple Search Results Picker */}
+                    {searchResults.length > 0 && (
+                     <div className="bg-[#cbd5e1] border-2 border-[#94a3b8] p-4 rounded-sm mb-6">
+                       <h3 className="font-bold text-[#1e293b] mb-4 text-center text-lg">العميل لديه أكثر من عقد، يرجى اختيار العقد المطلوب لسداده:</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {searchResults.map((contract) => {
+                           const globalIndex = installmentContracts.findIndex(c => c.id === contract.id) + 1;
+                           const paid = contract.payments.reduce((sum, p) => sum + (p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : 0), 0);
+                           const remaining = Math.max(0, contract.totalAmount - paid);
+                           return (
+                             <button
+                               key={contract.id}
+                               onClick={() => {
+                                 setSelectedContract(contract);
+                                 const nextPayment = contract.payments.find(p => !p.isPaid);
+                                 setPayAmount(nextPayment ? nextPayment.amount : '');
+                                 setSearchResults([]);
+                               }}
+                               className="border border-[#475569] hover:border-black bg-white hover:bg-blue-50 p-4 rounded-sm text-right transition-all flex flex-col gap-1.5 shadow-sm"
+                             >
+                               <div className="font-black text-blue-900 text-lg">عقد #{globalIndex} — {contract.deviceName}</div>
+                               <div className="text-sm font-bold text-gray-700">اسم العميل: <span className="text-gray-900">{contract.customerName}</span></div>
+                               <div className="text-sm font-bold text-gray-700">رقم الصفحة: <span className="text-gray-900">{contract.pageNumber || '-'}</span></div>
+                               <div className="text-sm font-extrabold text-red-600 mt-1">المتبقي: {remaining.toLocaleString()} ج.م</div>
+                             </button>
+                           );
+                         })}
+                       </div>
+                     </div>
+                    )}
 
                     {selectedContract && contractCalcs && (
                       <>
@@ -236,20 +305,42 @@ export function InstallmentsPayCustomer() {
                                                 </td>
                                                 <td className="py-2.5 px-3">
                                                     {p.isPaid ? (
-                                                        <span className="text-green-600 font-bold">✓ تم الدفع</span>
+                                                        <div className="flex flex-col items-center">
+                                                          <span className="text-green-600 font-bold">✓ تم الدفع</span>
+                                                          <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded mt-0.5">
+                                                            {p.paymentMethod === 'cash' ? 'كاش' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستاباي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
+                                                            {p.walletLast4 ? ` (*${p.walletLast4})` : ''}
+                                                          </span>
+                                                        </div>
                                                     ) : isNextDue ? (
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="flex flex-col gap-1.5 p-1 items-center justify-center">
+                                                          <div className="flex gap-1 items-center">
+                                                            <select 
+                                                              className="h-8 border border-gray-300 rounded px-1 text-xs font-bold bg-white"
+                                                              value={selectedMethod}
+                                                              onChange={e => setSelectedMethod(e.target.value as any)}
+                                                            >
+                                                              <option value="cash">كاش</option>
+                                                              <option value="visa">فيزا</option>
+                                                              <option value="instapay">إنستا باي</option>
+                                                              <option value="vodafone_cash">فودافون كاش</option>
+                                                            </select>
+                                                            {selectedMethod !== 'cash' && (
+                                                              <input 
+                                                                type="text" 
+                                                                placeholder="آخر 4 أرقام"
+                                                                className="w-20 h-8 border-2 border-red-300 rounded text-center text-xs font-bold bg-white"
+                                                                maxLength={15}
+                                                                value={walletLast4}
+                                                                onChange={e => setWalletLast4(e.target.value)}
+                                                              />
+                                                            )}
+                                                          </div>
                                                           <button 
-                                                            onClick={() => handlePay('cash')}
-                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-3 shadow transition-colors"
+                                                            onClick={handlePay}
+                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-4 shadow transition-colors w-full"
                                                           >
-                                                            نقدي
-                                                          </button>
-                                                          <button 
-                                                            onClick={() => handlePay('visa')}
-                                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1 px-3 shadow transition-colors"
-                                                          >
-                                                            فيزا
+                                                            تأكيد الدفع
                                                           </button>
                                                         </div>
                                                     ) : isLate ? (

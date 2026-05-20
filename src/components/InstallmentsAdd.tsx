@@ -32,6 +32,8 @@ export function InstallmentsAdd() {
 
   const [purchasePrice, setPurchasePrice] = useState<number | ''>('');
   const [downPayment, setDownPayment] = useState<number | ''>('');
+  const [downPaymentMethod, setDownPaymentMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [downPaymentWalletLast4, setDownPaymentWalletLast4] = useState('');
   const [interestRate, setInterestRate] = useState<number | ''>('');
   const [months, setMonths] = useState<number | ''>('');
 
@@ -50,6 +52,11 @@ export function InstallmentsAdd() {
   const handleSave = () => {
     if (!customerName || !customerPhone || !deviceName || m <= 0 || !contractDate) {
       alert('برجاء استكمال البيانات الأساسية وعـدد الشهور بشكل صحيح');
+      return;
+    }
+
+    if (dPayment > 0 && downPaymentMethod !== 'cash' && (!downPaymentWalletLast4 || downPaymentWalletLast4.trim().length < 4)) {
+      alert('برجاء إدخال آخر 4 أرقام لوسيلة دفع المقدم (على الأقل 4 أرقام)');
       return;
     }
 
@@ -98,7 +105,9 @@ export function InstallmentsAdd() {
         monthlyPayment,
         totalAmount, // This is total after downpayment in this context
         startDate: new Date(contractDate).toISOString(),
-        payments
+        payments,
+        downPaymentMethod,
+        downPaymentWalletLast4: downPaymentMethod !== 'cash' ? downPaymentWalletLast4 : undefined
     });
 
     alert(`تم تسجيل بيانات التقسيط بنجاح\nرقم الصفحة: ${pageNumber}`);
@@ -117,6 +126,8 @@ export function InstallmentsAdd() {
      setCustomerAddress('');
      setPurchasePrice('');
      setDownPayment('');
+     setDownPaymentMethod('cash');
+     setDownPaymentWalletLast4('');
      setInterestRate('');
      setMonths('');
   };
@@ -228,6 +239,31 @@ export function InstallmentsAdd() {
                                 <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">المقدم :</label>
                                 <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold" type="number" value={downPayment} onChange={e => setDownPayment(e.target.value === '' ? '' : Number(e.target.value))} />
                             </div>
+                            <div className="flex">
+                                <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">وسيلة المقدم :</label>
+                                <select 
+                                    className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right font-bold bg-white"
+                                    value={downPaymentMethod} 
+                                    onChange={e => setDownPaymentMethod(e.target.value as any)}
+                                >
+                                    <option value="cash">كاش (نقدي)</option>
+                                    <option value="visa">فيزا</option>
+                                    <option value="instapay">إنستا باي</option>
+                                    <option value="vodafone_cash">فودافون كاش</option>
+                                </select>
+                            </div>
+                            {downPaymentMethod !== 'cash' && (
+                                <div className="flex">
+                                    <label className="w-36 bg-red-50 text-red-900 font-bold px-2 py-1 border border-red-200 text-center flex items-center justify-center text-xs leading-tight">* آخر 4 أرقام :</label>
+                                    <input 
+                                        className="flex-1 h-8 border-2 border-red-300 shadow-inner px-2 outline-none text-center font-bold"
+                                        placeholder="آخر 4 أرقام من الحساب/الكارت"
+                                        maxLength={15}
+                                        value={downPaymentWalletLast4} 
+                                        onChange={e => setDownPaymentWalletLast4(e.target.value)}
+                                    />
+                                </div>
+                            )}
                             <div className="flex">
                                 <label className="w-36 bg-[#eef5fa] text-blue-900 font-bold px-2 py-1 border border-indigo-200 text-center flex items-center justify-center">النسبة (%) :</label>
                                 <input className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-center font-bold" type="number" value={interestRate} onChange={e => setInterestRate(e.target.value === '' ? '' : Number(e.target.value))} />

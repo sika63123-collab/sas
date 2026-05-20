@@ -230,7 +230,7 @@ function MainApp() {
           {activeView === 'installments-add' && <InstallmentsAdd />}
           {activeView === 'installments-pay' && <InstallmentsPay onOpenInvoice={openInvoiceInCashier} />}
           {activeView === 'installments-late' && <InstallmentsLate />}
-          {activeView === 'installments-archive' && <InstallmentsArchive />}
+          {activeView === 'installments-archive' && <InstallmentsArchive onNavigateToPay={() => setActiveView('installments-pay-customer')} />}
           {activeView === 'installments-pay-customer' && <InstallmentsPayCustomer />}
           {activeView === 'deposit-pay' && <DepositPay />}
           {activeView === 'settings' && <Settings />}

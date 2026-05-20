@@ -17,7 +17,7 @@ interface AppContextType {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   addInstallmentContract: (contract: Omit<InstallmentContract, 'id' | 'createdAt' | 'customerNumber'>) => void;
-  payInstallment: (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod) => void;
+  payInstallment: (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => void;
   addExpenseType: (typeName: string) => void;
   deleteExpenseType: (typeName: string) => void;
@@ -29,6 +29,8 @@ interface AppContextType {
   restoreData: (data: any) => Promise<void>;
   clearData: () => Promise<void>;
   addPaymentTransaction: (pt: Omit<PaymentTransaction, 'id'>) => void;
+  selectedContractIdForPayment: string | null;
+  setSelectedContractIdForPayment: (id: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -93,6 +95,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = getStorageItem('mobile_shop_payment_transactions');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const [selectedContractIdForPayment, setSelectedContractIdForPayment] = useState<string | null>(null);
 
   useEffect(() => {
     setStorageItem('mobile_shop_products', JSON.stringify(products));
@@ -334,7 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       type: 'installment_sale',
       totalAmount: contract.purchasePrice,
       depositAmount: contract.downPayment,
-      paymentMethod: 'cash',
+      paymentMethod: contract.downPaymentMethod || 'cash',
       items: [{
         productId: '',
         name: contract.deviceName,
@@ -344,10 +348,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       customerName: contract.customerName,
       customerPhone: contract.customerPhone,
       customerAddress: contract.customerAddress,
+      senderWalletLast4: contract.downPaymentWalletLast4,
     });
   };
 
-  const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod) => {
+  const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string) => {
     let customerName = '';
     let customerPhone = '';
     
@@ -359,7 +364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...contract,
           payments: contract.payments.map(payment => {
             if (payment.id === paymentId && !payment.isPaid) {
-              return { ...payment, isPaid: true, paidDate: new Date().toISOString(), paidAmount };
+              return { ...payment, isPaid: true, paidDate: new Date().toISOString(), paidAmount, paymentMethod, walletLast4 };
             }
             return payment;
           })
@@ -377,6 +382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         items: [],
         customerName: customerName,
         customerPhone: customerPhone,
+        senderWalletLast4: walletLast4,
       });
     }
   };
@@ -429,6 +435,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       restoreData,
       clearData,
       addPaymentTransaction,
+      selectedContractIdForPayment,
+      setSelectedContractIdForPayment,
     }}>
       {children}
     </AppContext.Provider>

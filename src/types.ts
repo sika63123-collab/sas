@@ -80,6 +80,8 @@ export interface InstallmentPayment {
   paidDate?: string;
   paidAmount?: number;
   isPaid: boolean;
+  paymentMethod?: PaymentMethod;
+  walletLast4?: string;
 }
 
 export interface InstallmentContract {
@@ -101,6 +103,8 @@ export interface InstallmentContract {
   startDate: string; // Starting date for installments
   payments: InstallmentPayment[];
   createdAt: string;
+  downPaymentMethod?: PaymentMethod;
+  downPaymentWalletLast4?: string;
 }
 
 export interface Expense {
