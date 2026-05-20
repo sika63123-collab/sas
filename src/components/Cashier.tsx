@@ -4,7 +4,7 @@ import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
 import { CheckCircle, Search, X, Plus, Trash2 } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvoiceLoaded }: { initialType?: TransactionType; initialInvoiceId?: string | null | undefined; onInvoiceLoaded?: () => void; key?: any }) {
-  const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType } = useAppStore();
+  const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType, addPaymentTransaction } = useAppStore();
   const cashierTransactions = transactions.filter(t => 
     t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'return' || t.type === 'deposit_return'
   );
@@ -332,6 +332,15 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
           customerName: existingTx.customerName,
           paymentDate: paymentDate
         });
+
+        // تسجيل الدفعة في جدول حركات الدفع التفصيلي
+        addPaymentTransaction({
+          invoiceId: existingTx.id,
+          amount: paymentVal,
+          date: new Date().toISOString(),
+          paymentMethod: actualPaymentMethod,
+        });
+
         alert('تم تسجيل الدفعة بنجاح وتحديث الفاتورة');
       } else {
         alert('تم تحديث الفاتورة بنجاح');

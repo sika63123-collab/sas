@@ -28,6 +28,15 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
     [transactions]
   );
 
+  /* -------- saleTransactions بنفس منطق الكاشير (للترقيم الصحيح) -------- */
+  const saleTransactions = useMemo(
+    () => transactions.filter(t =>
+      t.type === 'sale' || t.type === 'deposit_sale' ||
+      t.type === 'return' || t.type === 'deposit_return'
+    ).filter(t => !t.type.includes('return')),
+    [transactions]
+  );
+
   /* -------- فواتير العربون المفلترة (للعرض) -------- */
   const depositInvoices = useMemo(() => {
     if (!searchTerm.trim()) return allDepositInvoices;
@@ -105,7 +114,8 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
                     const isExpanded = expandedRows.has(t.id);
                     const invoicePayments = paymentTransactions.filter(pt => pt.invoiceId === t.id);
                     const hasPayments = invoicePayments.length > 0;
-                    const invoiceSeq = allDepositInvoices.findIndex(inv => inv.id === t.id) + 1;
+                    /* رقم الفاتورة بنفس منطق الكاشير */
+                    const invoiceSeq = saleTransactions.findIndex(inv => inv.id === t.id) + 1;
                     const paid = paidAmount(t);
                     const remaining = remainingAmount(t);
                     const isFullyPaid = remaining === 0;
@@ -120,16 +130,15 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
                           onDoubleClick={() => handleRowDoubleClick(t.id)}
                           title="دبل كليك لفتح الفاتورة"
                         >
-                          {/* زر السهم */}
+                          {/* زر السهم — مفعّل دايماً */}
                           <td className="py-3 px-2 text-center">
                             <button
                               onClick={e => toggleRow(t.id, e)}
                               className={`w-7 h-7 rounded-full flex items-center justify-center transition-all
-                                ${hasPayments
-                                  ? 'bg-indigo-100 hover:bg-indigo-200 text-indigo-600'
-                                  : 'bg-gray-100 text-gray-300 cursor-default'}`}
-                              disabled={!hasPayments}
-                              title={hasPayments ? (isExpanded ? 'إخفاء الدفعات' : 'عرض الدفعات') : 'لا توجد دفعات'}
+                                ${isExpanded
+                                  ? 'bg-indigo-200 text-indigo-700'
+                                  : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-600'}`}
+                              title={isExpanded ? 'إخفاء الدفعات' : 'عرض الدفعات'}
                             >
                               {isExpanded
                                 ? <ChevronUp  className="w-4 h-4" />
@@ -155,8 +164,8 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
                           <td className="py-3 px-3 font-bold text-gray-900">{t.totalAmount.toFixed(2)}</td>
                         </tr>
 
-                        {/* ===== السطر الموسَّع (Sub-table) ===== */}
-                        {isExpanded && hasPayments && (
+                        {/* ===== السطر الموسّع (Sub-table) ===== */}
+                        {isExpanded && (
                           <tr className="bg-indigo-50/40 border-b border-indigo-100">
                             <td colSpan={8} className="p-0">
                               <div className="px-8 py-3 animate-[fadeIn_0.18s_ease]">
@@ -172,38 +181,48 @@ export function InstallmentsPay({ onOpenInvoice }: { onOpenInvoice?: (invoiceId:
                                 </div>
 
                                 {/* الجدول الداخلي */}
-                                <table className="w-full text-sm rounded-xl overflow-hidden border border-indigo-100 shadow-sm">
-                                  <thead>
-                                    <tr className="bg-indigo-600 text-white text-xs">
-                                      <th className="py-2 px-4 font-semibold text-center">#</th>
-                                      <th className="py-2 px-4 font-semibold text-center">المبلغ</th>
-                                      <th className="py-2 px-4 font-semibold text-center">التاريخ</th>
-                                      <th className="py-2 px-4 font-semibold text-center">طريقة الدفع</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-indigo-50">
-                                    {invoicePayments.map((pt, idx) => (
-                                      <tr key={pt.id} className="hover:bg-indigo-50/40 transition-colors">
-                                        <td className="py-2 px-4 text-center text-gray-400 text-xs font-mono">
-                                          دفعة {idx + 1}
-                                        </td>
-                                        <td className="py-2 px-4 text-center font-bold text-emerald-600">
-                                          {pt.amount.toLocaleString('ar-EG')} ج.م
-                                        </td>
-                                        <td className="py-2 px-4 text-center text-gray-600">
-                                          {new Date(pt.date).toLocaleDateString('ar-EG', {
-                                            year: 'numeric', month: '2-digit', day: '2-digit'
-                                          })}
-                                        </td>
-                                        <td className="py-2 px-4 text-center">
-                                          <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full ${METHOD_COLORS[pt.paymentMethod] || 'bg-gray-100 text-gray-600'}`}>
-                                            {METHOD_LABELS[pt.paymentMethod] || pt.paymentMethod}
-                                          </span>
-                                        </td>
+                                {hasPayments ? (
+                                  <table className="w-full text-sm rounded-xl overflow-hidden border border-indigo-100 shadow-sm">
+                                    <thead>
+                                      <tr className="bg-indigo-600 text-white text-xs">
+                                        <th className="py-2 px-4 font-semibold text-center">#</th>
+                                        <th className="py-2 px-4 font-semibold text-center">المبلغ</th>
+                                        <th className="py-2 px-4 font-semibold text-center">التاريخ</th>
+                                        <th className="py-2 px-4 font-semibold text-center">طريقة الدفع</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-indigo-50">
+                                      {invoicePayments.map((pt, idx) => (
+                                        <tr key={pt.id} className="hover:bg-indigo-50/40 transition-colors">
+                                          <td className="py-2 px-4 text-center text-gray-400 text-xs font-mono">
+                                            دفعة {idx + 1}
+                                          </td>
+                                          <td className="py-2 px-4 text-center font-bold text-emerald-600">
+                                            {pt.amount.toLocaleString('ar-EG')} ج.م
+                                          </td>
+                                          <td className="py-2 px-4 text-center text-gray-600">
+                                            {new Date(pt.date).toLocaleDateString('ar-EG', {
+                                              year: 'numeric', month: '2-digit', day: '2-digit'
+                                            })}
+                                          </td>
+                                          <td className="py-2 px-4 text-center">
+                                            <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full ${METHOD_COLORS[pt.paymentMethod] || 'bg-gray-100 text-gray-600'}`}>
+                                              {METHOD_LABELS[pt.paymentMethod] || pt.paymentMethod}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2 py-4 text-sm text-amber-600 bg-amber-50 rounded-xl border border-amber-100">
+                                    <span>⚠️</span>
+                                    <span className="font-medium">
+                                      لا توجد تفاصيل دفعات مسجّلة لهذه الفاتورة — الدفعات القديمة لا تظهر هنا.
+                                      افتح الفاتورة بالدبل كليك لإضافة دفعة جديدة.
+                                    </span>
+                                  </div>
+                                )}
 
                                 {/* تلميح الدبل كليك */}
                                 <div className="mt-2 text-center text-xs text-gray-400">
