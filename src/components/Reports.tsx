@@ -82,19 +82,19 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       // Determine amounts and description based on transaction type
       switch (t.type) {
         case 'sale':
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           description = `بيع نقدية: ${itemsList}`;
           break;
         case 'deposit_sale':
-          outward = t.depositAmount || 0;
+          inward = t.depositAmount || 0;
           description = `بيع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'installment_sale':
-          outward = t.depositAmount || 0;
+          inward = t.depositAmount || 0;
           description = `مقدم قسط: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'deposit_payment':
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           let linkedInvoiceDisplay = '';
           if (t.items && t.items[0] && t.items[0].name) {
             linkedInvoiceDisplay = t.items[0].name;
@@ -104,11 +104,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           description = `${linkedInvoiceDisplay} (العميل: ${t.customerName || '—'})`;
           break;
         case 'installment_payment':
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           description = `سداد قسط (العميل: ${t.customerName || '—'})`;
           break;
         case 'return':
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           description = `مرتجع مبيعات نقدية: ${itemsList}`;
           if (t.returnInvoiceNumber) {
             const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
@@ -117,15 +117,15 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           }
           break;
         case 'deposit_return':
-          inward = t.depositAmount || 0;
+          outward = t.depositAmount || 0;
           description = `مرتجع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'purchase':
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           description = `فاتورة مشتريات (مخزن): ${itemsList}`;
           break;
         default:
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           description = `${getTypeName(t.type).label}: ${itemsList}`;
       }
 
@@ -149,8 +149,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
         time: `${new Date(e.timestamp).toLocaleDateString('en-GB')} ${new Date(e.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
         type: 'expense',
         description: `مصروف: ${e.expenseType} (${e.notes || '—'})`,
-        inward: e.amount,
-        outward: 0,
+        inward: 0,
+        outward: e.amount,
         rawTimestamp: e.timestamp
       });
     });
