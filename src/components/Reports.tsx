@@ -32,6 +32,12 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // --- Opening Balances for Shift Closing ---
+  const [openingCash, setOpeningCash] = useState(0);
+  const [openingVisa, setOpeningVisa] = useState(0);
+  const [openingVodafoneCash, setOpeningVodafoneCash] = useState(0);
+  const [openingInstapay, setOpeningInstapay] = useState(0);
+
   // Filter transactions by selected date range
   const dailyTransactions = transactions.filter(t => {
     const dateStr = t.timestamp.split('T')[0];
@@ -187,6 +193,31 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale').reduce((sum, t) => sum + getAmount(t), 0);
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
+
+  // --- Per Payment Method Breakdown for Shift ---
+  const cashPurchases = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type === 'purchase').reduce((sum, t) => sum + t.totalAmount, 0);
+
+  const visaSales = dailyTransactions.filter(t => t.paymentMethod === 'visa' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const visaReturns = dailyTransactions.filter(t => t.paymentMethod === 'visa' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+
+  const vodafoneSales = dailyTransactions.filter(t => t.paymentMethod === 'vodafone_cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const vodafoneReturns = dailyTransactions.filter(t => t.paymentMethod === 'vodafone_cash' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+
+  const instapaySales = dailyTransactions.filter(t => t.paymentMethod === 'instapay' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const instapayReturns = dailyTransactions.filter(t => t.paymentMethod === 'instapay' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+
+  // Shift balance rows
+  const shiftMethods = [
+    { name: 'النقدية (كاش)', opening: openingCash, setOpening: setOpeningCash, inward: cashSales, outward: cashReturns + totalExpenses + cashPurchases, colorScheme: 'emerald' },
+    { name: 'ماكينة الفيزا', opening: openingVisa, setOpening: setOpeningVisa, inward: visaSales, outward: visaReturns, colorScheme: 'blue' },
+    { name: 'فودافون كاش', opening: openingVodafoneCash, setOpening: setOpeningVodafoneCash, inward: vodafoneSales, outward: vodafoneReturns, colorScheme: 'red' },
+    { name: 'انستا باي', opening: openingInstapay, setOpening: setOpeningInstapay, inward: instapaySales, outward: instapayReturns, colorScheme: 'purple' },
+  ];
+
+  const totalOpening = shiftMethods.reduce((s, m) => s + m.opening, 0);
+  const totalShiftInward = shiftMethods.reduce((s, m) => s + m.inward, 0);
+  const totalShiftOutward = shiftMethods.reduce((s, m) => s + m.outward, 0);
+  const totalClosing = shiftMethods.reduce((s, m) => s + m.opening + m.inward - m.outward, 0);
 
   // --- Electronic Account Ledger Logic ---
   const electronicLedgerEntries = (() => {
@@ -481,38 +512,112 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       )}
 
       {view === 'shift' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-4xl mx-auto p-8 text-center space-y-6">
-           <FileText className="h-16 w-16 text-gray-300 mx-auto" />
-           <h2 className="text-2xl font-bold text-gray-800">تقفيل الوردية</h2>
-           <p className="text-gray-500">تفاصيل إجمالي الحركات اليومية</p>
-           
-           <div className="grid grid-cols-2 gap-4 text-right">
-              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                  <div className="text-sm text-emerald-600 font-bold mb-2">صافي النقدية</div>
-                  <div className="text-3xl font-black text-emerald-700">{netCash} ج.م</div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <div className="text-sm text-blue-600 font-bold mb-2">صافي المدفوعات الإلكترونية</div>
-                  <div className="text-3xl font-black text-blue-700">{netElec} ج.م</div>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                  <div className="text-sm text-orange-600 font-bold mb-2">إجمالي المصروفات</div>
-                  <div className="text-3xl font-black text-orange-700">- {totalExpenses} ج.م</div>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div className="text-sm text-gray-600 font-bold mb-2">صافي النقدية بعد المصروفات</div>
-                  <div className="text-3xl font-black text-gray-800">{netCashAfterExpenses} ج.م</div>
-              </div>
-           </div>
-           
-           <div className="bg-gray-100 p-6 rounded-xl border border-gray-200 mt-6 flex justify-between items-center">
-               <span className="text-xl font-bold text-gray-700">إجمالي إيراد اليوم:</span>
-               <span className="text-4xl font-black text-gray-900">{netCashAfterExpenses + netElec} ج.م</span>
-           </div>
+        <div className="space-y-6 w-full max-w-5xl mx-auto">
 
-           <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg mt-4 w-full md:w-auto">
-             طباعة تقرير الوردية
-           </button>
+          {/* Opening Balances Input */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
+              <span className="bg-amber-100 p-1.5 rounded-md"><Wallet className="h-5 w-5 text-amber-700" /></span>
+              الأرصدة الافتتاحية (بداية الوردية)
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {shiftMethods.map((m) => (
+                <div key={m.name} className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600">{m.name}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={m.opening || ''}
+                    onChange={(e) => m.setOpening(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none text-center"
+                    dir="ltr"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Detailed Balance Table */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-100 p-4">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <span className="bg-blue-100 p-1.5 rounded-md"><FileText className="h-5 w-5 text-blue-700" /></span>
+                تفاصيل حركة الأرصدة (تقفيل الوردية)
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                  <tr>
+                    <th className="px-5 py-3 font-bold border-b text-right w-40">وسيلة الدفع</th>
+                    <th className="px-4 py-3 font-bold border-b text-center w-32">الرصيد الافتتاحي</th>
+                    <th className="px-4 py-3 font-bold border-b text-center w-32">الوارد</th>
+                    <th className="px-4 py-3 font-bold border-b text-center w-32">الصادر</th>
+                    <th className="px-4 py-3 font-bold border-b text-center w-36 bg-blue-50/50">الرصيد الختامي</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {shiftMethods.map((m) => {
+                    const closing = m.opening + m.inward - m.outward;
+                    return (
+                      <tr key={m.name} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-5 py-3.5 text-right font-bold text-gray-800">{m.name}</td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 font-mono font-bold">{m.opening > 0 ? `${m.opening} ج.م` : '—'}</td>
+                        <td className="px-4 py-3.5 text-center text-green-600 font-bold">{m.inward > 0 ? `${m.inward} ج.م` : '—'}</td>
+                        <td className="px-4 py-3.5 text-center text-red-600 font-bold">{m.outward > 0 ? `${m.outward} ج.م` : '—'}</td>
+                        <td className="px-4 py-3.5 text-center font-black text-blue-800 bg-blue-50/30">{closing} ج.م</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="border-t-2 border-gray-300 bg-gray-50">
+                  <tr>
+                    <td className="px-5 py-3 text-right font-black text-gray-900">الإجمالي</td>
+                    <td className="px-4 py-3 text-center text-gray-700 font-black">{totalOpening > 0 ? `${totalOpening} ج.م` : '—'}</td>
+                    <td className="px-4 py-3 text-center text-green-700 font-black">{totalShiftInward > 0 ? `${totalShiftInward} ج.م` : '—'}</td>
+                    <td className="px-4 py-3 text-center text-red-700 font-black">{totalShiftOutward > 0 ? `${totalShiftOutward} ج.م` : '—'}</td>
+                    <td className="px-4 py-3 text-center font-black text-blue-900 text-lg bg-blue-50/50">{totalClosing} ج.م</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Shift Handover Summary */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <span className="bg-emerald-100 p-1.5 rounded-md"><FileText className="h-5 w-5 text-emerald-700" /></span>
+              ملخص تسليم الوردية
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {shiftMethods.map((m) => {
+                const closing = m.opening + m.inward - m.outward;
+                const net = m.inward - m.outward;
+                const bg = m.colorScheme === 'emerald' ? 'bg-emerald-50/50 border-emerald-100' : m.colorScheme === 'blue' ? 'bg-blue-50/50 border-blue-100' : m.colorScheme === 'red' ? 'bg-red-50/50 border-red-100' : 'bg-purple-50/50 border-purple-100';
+                const textSm = m.colorScheme === 'emerald' ? 'text-emerald-700' : m.colorScheme === 'blue' ? 'text-blue-700' : m.colorScheme === 'red' ? 'text-red-700' : 'text-purple-700';
+                const textLg = m.colorScheme === 'emerald' ? 'text-emerald-800' : m.colorScheme === 'blue' ? 'text-blue-800' : m.colorScheme === 'red' ? 'text-red-800' : 'text-purple-800';
+                return (
+                  <div key={m.name} className={`p-3 rounded-lg border ${bg}`}>
+                    <div className={`text-xs font-bold mb-1 ${textSm}`}>{m.name}</div>
+                    <div className={`text-lg font-black ${textLg}`}>{closing} ج.م</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">صافي الحركة: {net >= 0 ? '+' : ''}{net} ج.م</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="bg-gray-100 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
+              <span className="text-lg font-bold text-gray-700">إجمالي الرصيد الختامي:</span>
+              <span className="text-3xl font-black text-gray-900">{totalClosing} ج.م</span>
+            </div>
+
+            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg w-full md:w-auto transition-colors">
+              طباعة تقرير الوردية
+            </button>
+          </div>
+
         </div>
       )}
 
