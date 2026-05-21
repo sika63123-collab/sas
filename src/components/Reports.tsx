@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FileText, CreditCard, Box, Calendar, Wallet, Plus, Trash2, UserCheck, Lock, Unlock, Key } from 'lucide-react';
+import { FileText, CreditCard, Box, Calendar, Wallet, Plus, Trash2, UserCheck, Lock, Unlock, Key, ChevronDown, ChevronUp } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
 const getMethodName = (method: string) => {
@@ -35,6 +35,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     shiftInventoryItems,
     addShiftAccount,
     removeShiftAccount,
+    updateShiftAccount,
     addShiftInventoryItem,
     removeShiftInventoryItem,
     users,
@@ -50,6 +51,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   // --- Dynamic Shift Closing States ---
   const [openingBalances, setOpeningBalances] = useState<Record<string, number>>({});
   const [handoverBalances, setHandoverBalances] = useState<Record<string, number>>({});
+  const [isVodafoneExpanded, setIsVodafoneExpanded] = useState(false);
   
   const [openingInventory, setOpeningInventory] = useState<Record<string, number>>({});
   const [handoverInventory, setHandoverInventory] = useState<Record<string, number>>({});
@@ -67,6 +69,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const [showAddAccountRow, setShowAddAccountRow] = useState(false);
   const [newAccName, setNewAccName] = useState('');
   const [newAccSubLabel, setNewAccSubLabel] = useState('');
+  const [newAccWalletNumber, setNewAccWalletNumber] = useState('');
 
   // Add Inventory Item inline state
   const [showAddItemRow, setShowAddItemRow] = useState(false);
@@ -245,21 +248,68 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     return n.includes('فوري') || n.includes('امان') || n.includes('ضامن') || n.includes('شحن');
   };
 
-  const getSystemFlows = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('نقدي') || n.includes('كاش') || n === 'النقدية') {
-      return { inward: cashSales, outward: cashReturns + totalExpenses + cashPurchases };
+  const isTransactionForAccount = (t: any, acc: any) => {
+    const name = acc.name.toLowerCase();
+    
+    // 1. Match payment method type
+    let methodMatches = false;
+    if (t.paymentMethod === 'vodafone_cash' && (name.includes('فودافون') || name.includes('vodafone'))) {
+      methodMatches = true;
+    } else if (t.paymentMethod === 'instapay' && (name.includes('انستا') || name.includes('insta'))) {
+      methodMatches = true;
+    } else if (t.paymentMethod === 'visa' && name.includes('فيزا')) {
+      methodMatches = true;
+    } else if (t.paymentMethod === 'cash' && (name.includes('نقدي') || name.includes('كاش') || name === 'النقدية')) {
+      methodMatches = true;
     }
-    if (n.includes('فيزا')) {
-      return { inward: visaSales, outward: visaReturns };
+
+    if (!methodMatches) return false;
+
+    // 2. Count active accounts of this payment method type
+    const sameMethodAccounts = shiftAccounts.filter(a => {
+      const aName = a.name.toLowerCase();
+      if (t.paymentMethod === 'vodafone_cash') return aName.includes('فودافون') || aName.includes('vodafone');
+      if (t.paymentMethod === 'instapay') return aName.includes('انستا') || aName.includes('insta');
+      if (t.paymentMethod === 'visa') return aName.includes('فيزا');
+      if (t.paymentMethod === 'cash') return aName.includes('نقدي') || aName.includes('كاش') || aName === 'النقدية';
+      return false;
+    });
+
+    // If there is only one account for this method, always match it
+    if (sameMethodAccounts.length === 1) return true;
+
+    // 3. Match wallet number if transaction has receiverWalletLast4
+    if (t.receiverWalletLast4) {
+      if (acc.walletNumber && acc.walletNumber.length >= 4) {
+        const last4 = acc.walletNumber.slice(-4);
+        return t.receiverWalletLast4 === last4;
+      }
+      return false;
     }
-    if (n.includes('انستا') || n.includes('insta')) {
-      return { inward: instapaySales, outward: instapayReturns };
+
+    // 4. Transaction has no receiverWalletLast4 and there are multiple accounts.
+    // Match only if this account has no wallet number set.
+    return !acc.walletNumber;
+  };
+
+  const getSystemFlows = (acc: any) => {
+    const matchingTx = dailyTransactions.filter(t => isTransactionForAccount(t, acc));
+
+    const inward = matchingTx
+      .filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')
+      .reduce((sum, t) => sum + getAmount(t), 0);
+
+    const outward = matchingTx
+      .filter(t => t.type === 'return' || t.type === 'deposit_return')
+      .reduce((sum, t) => sum + getAmount(t), 0);
+
+    const name = acc.name.toLowerCase();
+    let additionalOutward = 0;
+    if (name.includes('نقدي') || name.includes('كاش') || name === 'النقدية') {
+      additionalOutward = totalExpenses + cashPurchases;
     }
-    if (n.includes('فودافون') || n.includes('vodafone')) {
-      return { inward: vodafoneSales, outward: vodafoneReturns };
-    }
-    return null;
+
+    return { inward, outward: outward + additionalOutward };
   };
 
   const getAccountColor = (name: string) => {
@@ -280,7 +330,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     const handover = handoverBalances[acc.id] ?? 0;
     const isMachine = isChargingMachine(acc.name);
     const net = isMachine ? (opening - handover) : Math.abs(handover - opening);
-    const sysFlows = getSystemFlows(acc.name);
+    const sysFlows = getSystemFlows(acc);
 
     return {
       ...acc,
@@ -292,9 +342,27 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     };
   });
 
-  const totalOpening = shiftAccountRows.reduce((s, m) => s + m.opening, 0);
-  const totalHandover = shiftAccountRows.reduce((s, m) => s + m.handover, 0);
-  const totalNet = shiftAccountRows.reduce((s, m) => s + m.net, 0);
+  const isVodafoneCash = (name: string) => {
+    const n = name.trim();
+    return n.includes('فودافون') || n.toLowerCase().includes('vodafone');
+  };
+
+  // Filter out the first two accounts (sa1 and sa2) in case they exist in localStorage
+  const shiftAccountRowsFiltered = shiftAccountRows.filter(acc => acc.id !== 'sa1' && acc.id !== 'sa2');
+
+  const vodafoneAccounts = shiftAccountRowsFiltered.filter(acc => isVodafoneCash(acc.name));
+  const otherAccounts = shiftAccountRowsFiltered.filter(acc => !isVodafoneCash(acc.name));
+
+  const vodafoneTotalOpening = vodafoneAccounts.reduce((s, m) => s + m.opening, 0);
+  const vodafoneTotalHandover = vodafoneAccounts.reduce((s, m) => s + m.handover, 0);
+  const vodafoneTotalNet = vodafoneAccounts.reduce((s, m) => s + m.net, 0);
+
+  const vodafoneTotalInward = vodafoneAccounts.reduce((s, m) => s + (m.sysFlows?.inward || 0), 0);
+  const vodafoneTotalOutward = vodafoneAccounts.reduce((s, m) => s + (m.sysFlows?.outward || 0), 0);
+
+  const totalOpening = shiftAccountRowsFiltered.reduce((s, m) => s + m.opening, 0);
+  const totalHandover = shiftAccountRowsFiltered.reduce((s, m) => s + m.handover, 0);
+  const totalNet = shiftAccountRowsFiltered.reduce((s, m) => s + m.net, 0);
 
   // --- Electronic Account Ledger Logic ---
   const electronicLedgerEntries = (() => {
@@ -602,7 +670,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                 تقفيل الوردية اليومي
               </span>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-right">
                 <thead className="bg-[#f8fafc] text-slate-600 border-b border-slate-200">
@@ -615,15 +683,195 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {shiftAccountRows.map((m) => {
+                  {/* Vodafone Cash Group Row */}
+                  <tr 
+                    onClick={() => setIsVodafoneExpanded(!isVodafoneExpanded)}
+                    className="cursor-pointer hover:bg-red-50/20 bg-red-50/5 transition-colors select-none"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-rose-600 bg-rose-50 p-2 rounded-lg">
+                          <Wallet className="h-5 w-5" />
+                        </span>
+                        <div className="flex flex-col flex-1">
+                          <span className="font-bold text-slate-800 text-base">فودافون كاش</span>
+                          {(vodafoneTotalInward > 0 || vodafoneTotalOutward > 0) && (
+                            <div className="flex gap-1.5 mt-1">
+                              {vodafoneTotalInward > 0 && (
+                                <span className="text-[10px] font-bold bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                                  وارد السيستم: {vodafoneTotalInward} ج.م
+                                </span>
+                              )}
+                              {vodafoneTotalOutward > 0 && (
+                                <span className="text-[10px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+                                  صادر: {vodafoneTotalOutward} ج.م
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <span className="text-xs text-slate-500 mt-1">
+                            {isVodafoneExpanded ? 'اضغط لإخفاء الحسابات' : 'اضغط لعرض الحسابات والأرصدة'}
+                          </span>
+                        </div>
+                        {isVodafoneExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-slate-400 mr-auto" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-slate-400 mr-auto" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-700">
+                      {vodafoneTotalOpening} ج.م
+                    </td>
+                    <td className="px-6 py-4 text-center font-mono font-bold text-slate-700">
+                      {vodafoneTotalHandover} ج.م
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-base font-extrabold px-3 py-1.5 rounded-lg text-rose-700 bg-rose-50">
+                        {vodafoneTotalNet} ج.م
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center font-bold text-slate-400">—</td>
+                  </tr>
+
+                  {/* Vodafone Cash Wallet Sub-rows */}
+                  {isVodafoneExpanded && vodafoneAccounts.map((m) => {
+                    return (
+                      <tr key={m.id} className="bg-red-50/10 hover:bg-red-50/20 transition-colors">
+                        <td className="px-6 py-4 pr-12">
+                          <div className="flex flex-col border-r-2 border-rose-200 pr-3 gap-1.5">
+                            <span className="font-bold text-slate-700 text-sm">{m.subLabel || m.name}</span>
+                            <input
+                              type="text"
+                              maxLength={11}
+                              placeholder="رقم المحفظة (مثال: 010xxxxxxxx)"
+                              value={m.walletNumber || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (/^\d*$/.test(val)) {
+                                  updateShiftAccount(m.id, { walletNumber: val });
+                                }
+                              }}
+                              className="text-xs border border-rose-200 rounded px-2 py-1 max-w-[180px] focus:ring-1 focus:ring-rose-500 outline-none font-bold bg-white text-right"
+                            />
+                            {m.sysFlows && (m.sysFlows.inward > 0 || m.sysFlows.outward > 0) && (
+                              <div className="flex gap-1.5 mt-1">
+                                {m.sysFlows.inward > 0 && (
+                                  <span className="text-[10px] font-bold bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                                    وارد السيستم: {m.sysFlows.inward} ج.م
+                                  </span>
+                                )}
+                                {m.sysFlows.outward > 0 && (
+                                  <span className="text-[10px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+                                    صادر: {m.sysFlows.outward} ج.م
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={openingBalances[m.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setOpeningBalances(prev => ({ ...prev, [m.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-red-100 hover:border-red-200 focus:border-red-500 rounded-lg px-3 py-2 text-center text-sm font-bold text-slate-800 outline-none transition-all bg-white"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={handoverBalances[m.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setHandoverBalances(prev => ({ ...prev, [m.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-red-100 hover:border-red-200 focus:border-red-500 rounded-lg px-3 py-2 text-center text-sm font-bold text-slate-800 outline-none transition-all bg-white"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-bold px-2.5 py-1 rounded-md text-rose-700 bg-rose-50/50">
+                            {m.net} ج.م
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {!['sa3'].includes(m.id) ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeShiftAccount(m.id);
+                                setOpeningBalances(prev => { const c = {...prev}; delete c[m.id]; return c; });
+                                setHandoverBalances(prev => { const c = {...prev}; delete c[m.id]; return c; });
+                              }}
+                              className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Other Accounts Rows */}
+                  {otherAccounts.map((m) => {
                     const color = getAccountColor(m.name);
                     const sysFlows = m.sysFlows;
+                    const isWalletOrVisa = 
+                      m.name.toLowerCase().includes('vodafone') || m.name.includes('فودافون') ||
+                      m.name.toLowerCase().includes('insta') || m.name.includes('انستا') ||
+                      m.name.toLowerCase().includes('visa') || m.name.includes('فيزا') ||
+                      (m.subLabel && (
+                        m.subLabel.toLowerCase().includes('vodafone') || m.subLabel.includes('فودافون') ||
+                        m.subLabel.toLowerCase().includes('insta') || m.subLabel.includes('انستا') ||
+                        m.subLabel.toLowerCase().includes('visa') || m.subLabel.includes('فيزا')
+                      ));
                     return (
                       <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1.5">
                             <span className="font-bold text-slate-800 text-base">{m.name}</span>
-                            {m.subLabel && <span className="text-xs text-slate-500 mt-0.5">{m.subLabel}</span>}
+                            {m.subLabel && <span className="text-xs text-slate-500">{m.subLabel}</span>}
+                            {isWalletOrVisa && (
+                              <>
+                                <input
+                                  type="text"
+                                  maxLength={11}
+                                  placeholder="رقم الحساب / المحفظة (مثال: 010xxxxxxxx)"
+                                  value={m.walletNumber || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (/^\d*$/.test(val)) {
+                                      updateShiftAccount(m.id, { walletNumber: val });
+                                    }
+                                  }}
+                                  className="text-xs border border-slate-200 rounded px-2 py-1 max-w-[180px] focus:ring-1 focus:ring-blue-500 outline-none font-bold text-right"
+                                />
+                                {sysFlows && (sysFlows.inward > 0 || sysFlows.outward > 0) && (
+                                  <div className="flex gap-1.5 mt-1">
+                                    {sysFlows.inward > 0 && (
+                                      <span className="text-[10px] font-bold bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-200">
+                                        وارد السيستم: {sysFlows.inward} ج.م
+                                      </span>
+                                    )}
+                                    {sysFlows.outward > 0 && (
+                                      <span className="text-[10px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+                                        صادر: {sysFlows.outward} ج.م
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -664,8 +912,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          {/* Defaults sa1 - sa7 can't be deleted */}
-                          {!['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7'].includes(m.id) ? (
+                          {!['sa3', 'sa4', 'sa5', 'sa6', 'sa7'].includes(m.id) ? (
                             <button
                               onClick={() => {
                                 removeShiftAccount(m.id);
@@ -686,7 +933,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                   {showAddAccountRow ? (
                     <tr className="bg-slate-50/50">
                       <td className="px-6 py-4" colSpan={2}>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 md:flex-row">
                           <input
                             type="text"
                             placeholder="اسم الحساب (مثال: فودافون كاش)"
@@ -701,6 +948,19 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                             onChange={(e) => setNewAccSubLabel(e.target.value)}
                             className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
                           />
+                          <input
+                            type="text"
+                            maxLength={11}
+                            placeholder="رقم الهاتف للمطابقة (11 رقم)"
+                            value={newAccWalletNumber}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (/^\d*$/.test(val)) {
+                                setNewAccWalletNumber(val);
+                              }
+                            }}
+                            className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold text-right"
+                          />
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center" colSpan={3}>
@@ -708,9 +968,14 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                           <button
                             onClick={() => {
                               if (!newAccName.trim()) return;
-                              addShiftAccount({ name: newAccName, subLabel: newAccSubLabel });
+                              if (newAccWalletNumber && newAccWalletNumber.length !== 11) {
+                                alert('رقم المحفظة يجب أن يكون مكوناً من 11 رقماً');
+                                return;
+                              }
+                              addShiftAccount({ name: newAccName, subLabel: newAccSubLabel, walletNumber: newAccWalletNumber });
                               setNewAccName('');
                               setNewAccSubLabel('');
+                              setNewAccWalletNumber('');
                               setShowAddAccountRow(false);
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors"
@@ -721,6 +986,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                             onClick={() => {
                               setNewAccName('');
                               setNewAccSubLabel('');
+                              setNewAccWalletNumber('');
                               setShowAddAccountRow(false);
                             }}
                             className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition-colors"
@@ -757,7 +1023,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                     <td className="px-4 py-4"></td>
                   </tr>
                   {shiftAccountRows.map(m => {
-                    const sysFlows = getSystemFlows(m.name);
+                    const sysFlows = getSystemFlows(m);
                     if (!sysFlows) return null;
                     
                     const isCash = m.name === 'النقدية';

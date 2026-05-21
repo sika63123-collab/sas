@@ -35,6 +35,7 @@ interface AppContextType {
   shiftInventoryItems: ShiftInventoryItem[];
   addShiftAccount: (account: Omit<ShiftAccount, 'id'>) => void;
   removeShiftAccount: (id: string) => void;
+  updateShiftAccount: (id: string, updates: Partial<ShiftAccount>) => void;
   addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
   removeShiftInventoryItem: (id: string) => void;
 }
@@ -107,8 +108,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shiftAccounts, setShiftAccounts] = useState<ShiftAccount[]>(() => {
     const saved = getStorageItem('mobile_shop_shift_accounts');
     return saved ? JSON.parse(saved) : [
-      { id: 'sa1', name: 'النقدية' },
-      { id: 'sa2', name: 'ماكينة الفيزا' },
       { id: 'sa3', name: 'فودافون كاش', subLabel: 'محفظة 1' },
       { id: 'sa4', name: 'انستا باي' },
       { id: 'sa5', name: 'فوري' },
@@ -461,6 +460,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShiftAccounts(prev => prev.filter(a => a.id !== id));
   };
 
+  const updateShiftAccount = (id: string, updates: Partial<ShiftAccount>) => {
+    setShiftAccounts(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+  };
+
   const addShiftInventoryItem = (item: Omit<ShiftInventoryItem, 'id'>) => {
     const newItem: ShiftInventoryItem = { ...item, id: 'si' + Date.now().toString() };
     setShiftInventoryItems(prev => [...prev, newItem]);
@@ -504,6 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       shiftInventoryItems,
       addShiftAccount,
       removeShiftAccount,
+      updateShiftAccount,
       addShiftInventoryItem,
       removeShiftInventoryItem,
     }}>

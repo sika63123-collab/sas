@@ -122,6 +122,7 @@ export interface ShiftAccount {
   id: string;
   name: string;
   subLabel?: string;
+  walletNumber?: string;
 }
 
 export interface ShiftInventoryItem {
