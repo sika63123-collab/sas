@@ -4,8 +4,8 @@ import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
-  const { transactions, expenses } = useAppStore();
-  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale');
+  const { transactions, expenses, installmentContracts } = useAppStore();
+  const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -58,9 +58,15 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
         : '';
 
       // Get invoice number display
-      if (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale') {
+      if (t.type === 'sale' || t.type === 'deposit_sale') {
         const saleIdx = saleTransactions.findIndex(tx => tx.id === t.id);
         invoiceNumber = saleIdx >= 0 ? String(saleIdx + 1) : t.id;
+      } else if (t.type === 'installment_sale') {
+        const contractIdx = installmentContracts.findIndex(c => 
+          c.customerName === t.customerName && 
+          c.customerPhone === t.customerPhone
+        );
+        invoiceNumber = contractIdx >= 0 ? `عقد #${contractIdx + 1}` : '—';
       } else if (t.type === 'return' || t.type === 'deposit_return') {
         const returnTransactionsList = transactions.filter(tx => tx.type === 'return' || tx.type === 'deposit_return');
         const returnIdx = returnTransactionsList.findIndex(tx => tx.id === t.id);
@@ -76,19 +82,19 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       // Determine amounts and description based on transaction type
       switch (t.type) {
         case 'sale':
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           description = `بيع نقدية: ${itemsList}`;
           break;
         case 'deposit_sale':
-          inward = t.depositAmount || 0;
+          outward = t.depositAmount || 0;
           description = `بيع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'installment_sale':
-          inward = t.depositAmount || 0;
+          outward = t.depositAmount || 0;
           description = `مقدم قسط: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'deposit_payment':
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           let linkedInvoiceDisplay = '';
           if (t.items && t.items[0] && t.items[0].name) {
             linkedInvoiceDisplay = t.items[0].name;
@@ -98,11 +104,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           description = `${linkedInvoiceDisplay} (العميل: ${t.customerName || '—'})`;
           break;
         case 'installment_payment':
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           description = `سداد قسط (العميل: ${t.customerName || '—'})`;
           break;
         case 'return':
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           description = `مرتجع مبيعات نقدية: ${itemsList}`;
           if (t.returnInvoiceNumber) {
             const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
@@ -111,22 +117,22 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           }
           break;
         case 'deposit_return':
-          outward = t.depositAmount || 0;
+          inward = t.depositAmount || 0;
           description = `مرتجع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
           break;
         case 'purchase':
-          outward = t.totalAmount;
+          inward = t.totalAmount;
           description = `فاتورة مشتريات (مخزن): ${itemsList}`;
           break;
         default:
-          inward = t.totalAmount;
+          outward = t.totalAmount;
           description = `${getTypeName(t.type).label}: ${itemsList}`;
       }
 
       entries.push({
         id: t.id,
         invoiceNumber,
-        time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        time: `${new Date(t.timestamp).toLocaleDateString('en-GB')} ${new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
         type: t.type,
         description,
         inward,
@@ -140,11 +146,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       entries.push({
         id: e.id,
         invoiceNumber: String(e.expenseNumber),
-        time: new Date(e.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        time: `${new Date(e.timestamp).toLocaleDateString('en-GB')} ${new Date(e.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
         type: 'expense',
         description: `مصروف: ${e.expenseType} (${e.notes || '—'})`,
-        inward: 0,
-        outward: e.amount,
+        inward: e.amount,
+        outward: 0,
         rawTimestamp: e.timestamp
       });
     });
@@ -267,7 +273,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
               <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 font-bold border-b text-center w-24">رقم فاتورة</th>
-                  <th className="px-4 py-3 font-bold border-b text-center w-28">التاريخ</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-44">التاريخ</th>
                   <th className="px-4 py-3 font-bold border-b text-right">البيان</th>
                   <th className="px-4 py-3 font-bold border-b text-center w-32">الوارد</th>
                   <th className="px-4 py-3 font-bold border-b text-center w-32">الصادر</th>
@@ -294,25 +300,6 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                   ))
                 )}
               </tbody>
-              {ledgerEntries.length > 0 && (
-                <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-200">
-                  <tr className="text-gray-700">
-                    <td colSpan={3} className="px-4 py-3 text-left pl-6">الإجماليات:</td>
-                    <td className="px-4 py-3 text-center text-green-700 bg-green-50">
-                      {ledgerEntries.reduce((sum, e) => sum + e.inward, 0)} ج.م
-                    </td>
-                    <td className="px-4 py-3 text-center text-red-700 bg-red-50">
-                      {ledgerEntries.reduce((sum, e) => sum + e.outward, 0)} ج.م
-                    </td>
-                  </tr>
-                  <tr className="bg-emerald-50 text-emerald-950 text-[15px] border-t border-emerald-100">
-                    <td colSpan={3} className="px-4 py-3 text-left pl-6 font-black">صافي النقدي الفعلي:</td>
-                    <td colSpan={2} className="px-4 py-3 text-center font-black text-lg text-emerald-700">
-                      {ledgerEntries.reduce((sum, e) => sum + e.inward, 0) - ledgerEntries.reduce((sum, e) => sum + e.outward, 0)} ج.م
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
             </table>
           </div>
         </div>
