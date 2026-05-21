@@ -3,6 +3,29 @@ import { useAppStore } from '../store';
 import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
+const getMethodName = (method: string) => {
+  switch(method) {
+    case 'visa': return 'فيزا';
+    case 'instapay': return 'انستا باي';
+    case 'vodafone_cash': return 'فودافون كاش';
+    default: return 'نقدي';
+  }
+};
+
+const getTypeName = (type: string) => {
+  switch(type) {
+    case 'sale': return { label: 'بيع', color: 'text-green-600 bg-green-50' };
+    case 'return': return { label: 'مرتجع', color: 'text-red-600 bg-red-50' };
+    case 'deposit_sale': return { label: 'مبيعات عربون', color: 'text-orange-600 bg-orange-50' };
+    case 'deposit_return': return { label: 'مرتجع عربون', color: 'text-purple-600 bg-purple-50' };
+    case 'deposit_payment': return { label: 'سداد عربون', color: 'text-teal-600 bg-teal-50' };
+    case 'installment_payment': return { label: 'سداد قسط', color: 'text-blue-600 bg-blue-50' };
+    case 'installment_sale': return { label: 'بيع تقسيط', color: 'text-indigo-600 bg-indigo-50' };
+    case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
+    default: return { label: type, color: 'text-gray-600 bg-gray-50' };
+  }
+};
+
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
   const { transactions, expenses, installmentContracts } = useAppStore();
   const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
@@ -165,28 +188,113 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
 
-  const getMethodName = (method: string) => {
-    switch(method) {
-      case 'visa': return 'فيزا';
-      case 'instapay': return 'انستا باي';
-      case 'vodafone_cash': return 'فودافون كاش';
-      default: return 'نقدي';
-    }
-  };
+  // --- Electronic Account Ledger Logic ---
+  const electronicLedgerEntries = (() => {
+    const entries: {
+      id: string;
+      invoiceNumber: string;
+      time: string;
+      type: string;
+      description: string;
+      inward: number;
+      outward: number;
+      rawTimestamp: string;
+    }[] = [];
 
-  const getTypeName = (type: string) => {
-    switch(type) {
-      case 'sale': return { label: 'بيع', color: 'text-green-600 bg-green-50' };
-      case 'return': return { label: 'مرتجع', color: 'text-red-600 bg-red-50' };
-      case 'deposit_sale': return { label: 'مبيعات عربون', color: 'text-orange-600 bg-orange-50' };
-      case 'deposit_return': return { label: 'مرتجع عربون', color: 'text-purple-600 bg-purple-50' };
-      case 'deposit_payment': return { label: 'سداد عربون', color: 'text-teal-600 bg-teal-50' };
-      case 'installment_payment': return { label: 'سداد قسط', color: 'text-blue-600 bg-blue-50' };
-      case 'installment_sale': return { label: 'بيع تقسيط', color: 'text-indigo-600 bg-indigo-50' };
-      case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
-      default: return { label: type, color: 'text-gray-600 bg-gray-50' };
-    }
-  };
+    electronicTransactions.forEach(t => {
+      let inward = 0;
+      let outward = 0;
+      let description = '';
+      let invoiceNumber = '';
+
+      const itemsList = t.items && t.items.length > 0
+        ? t.items.map(item => `${item.name} (${item.quantity}×${item.price})`).join(', ')
+        : '';
+
+      // Get invoice number display
+      if (t.type === 'sale' || t.type === 'deposit_sale') {
+        const saleIdx = saleTransactions.findIndex(tx => tx.id === t.id);
+        invoiceNumber = saleIdx >= 0 ? String(saleIdx + 1) : t.id;
+      } else if (t.type === 'installment_sale') {
+        const contractIdx = installmentContracts.findIndex(c => 
+          c.customerName === t.customerName && 
+          c.customerPhone === t.customerPhone
+        );
+        invoiceNumber = contractIdx >= 0 ? `عقد #${contractIdx + 1}` : '—';
+      } else if (t.type === 'return' || t.type === 'deposit_return') {
+        const returnTransactionsList = transactions.filter(tx => tx.type === 'return' || tx.type === 'deposit_return');
+        const returnIdx = returnTransactionsList.findIndex(tx => tx.id === t.id);
+        invoiceNumber = returnIdx >= 0 ? String(returnIdx + 1) : t.id;
+      } else {
+        invoiceNumber = '—';
+      }
+
+      // Determine amounts and description based on transaction type
+      const methodLabel = getMethodName(t.paymentMethod);
+      const walletsInfo = (t.senderWalletLast4 || t.receiverWalletLast4)
+        ? ` (من: ${t.senderWalletLast4 ? `*${t.senderWalletLast4}` : '—'} | إلى: ${t.receiverWalletLast4 ? `*${t.receiverWalletLast4}` : '—'})`
+        : '';
+
+      switch (t.type) {
+        case 'sale':
+          inward = t.totalAmount;
+          description = `بيع ${methodLabel}: ${itemsList}${walletsInfo}`;
+          break;
+        case 'deposit_sale':
+          inward = t.depositAmount || 0;
+          description = `بيع عربون ${methodLabel}: ${itemsList} (العميل: ${t.customerName || '—'})${walletsInfo}`;
+          break;
+        case 'installment_sale':
+          inward = t.depositAmount || 0;
+          description = `مقدم قسط ${methodLabel}: ${itemsList} (العميل: ${t.customerName || '—'})${walletsInfo}`;
+          break;
+        case 'deposit_payment':
+          inward = t.totalAmount;
+          let linkedInvoiceDisplay = '';
+          if (t.items && t.items[0] && t.items[0].name) {
+            linkedInvoiceDisplay = t.items[0].name;
+          } else {
+            linkedInvoiceDisplay = `سداد دفعة عربون`;
+          }
+          description = `${linkedInvoiceDisplay} ${methodLabel} (العميل: ${t.customerName || '—'})${walletsInfo}`;
+          break;
+        case 'installment_payment':
+          inward = t.totalAmount;
+          description = `سداد قسط ${methodLabel} (العميل: ${t.customerName || '—'})${walletsInfo}`;
+          break;
+        case 'return':
+          outward = t.totalAmount;
+          description = `مرتجع مبيعات ${methodLabel}: ${itemsList}${walletsInfo}`;
+          if (t.returnInvoiceNumber) {
+            const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+            const origInvoiceDisplay = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+            description += ` (لفاتورة رقم: ${origInvoiceDisplay})`;
+          }
+          break;
+        case 'deposit_return':
+          outward = t.depositAmount || 0;
+          description = `مرتجع عربون ${methodLabel}: ${itemsList} (العميل: ${t.customerName || '—'})${walletsInfo}`;
+          break;
+        default:
+          inward = t.totalAmount;
+          description = `${getTypeName(t.type).label} ${methodLabel}: ${itemsList}${walletsInfo}`;
+      }
+
+      entries.push({
+        id: t.id,
+        invoiceNumber,
+        time: `${new Date(t.timestamp).toLocaleDateString('en-GB')} ${new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`,
+        type: t.type,
+        description,
+        inward,
+        outward,
+        rawTimestamp: t.timestamp
+      });
+    });
+
+    // Sort entries chronologically
+    return entries.sort((a, b) => a.rawTimestamp.localeCompare(b.rawTimestamp));
+  })();
 
   const getTitle = () => {
     switch(view) {
@@ -307,69 +415,69 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       )}
 
       {view === 'visa' && (
-        <div className="space-y-6 max-w-4xl mx-auto">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-blue-50 border-b border-blue-100 p-4">
-              <h2 className="text-lg font-bold text-blue-800 flex items-center gap-2">
-                <span className="bg-blue-200 p-1 rounded-md"><CreditCard className="h-5 w-5 text-blue-700" /></span>
-                كشف حساب الفيزا والإلكتروني
-              </h2>
-              <p className="text-sm text-blue-600/80 mt-1">جميع عمليات (فيزا، انستا باي، فودافون كاش)</p>
+      <>
+        {/* Visa Summary Cards */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-right">
+            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+              <div className="text-xs text-blue-700 font-bold mb-1">إجمالي المبيعات الإلكترونية</div>
+              <div className="text-lg font-black text-blue-800">{elecSales} ج.م</div>
             </div>
-            <div className="p-6 space-y-4">
-               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <span className="text-gray-600 text-lg">إجمالي المبيعات الإلكترونية:</span>
-                <span className="font-bold text-2xl text-gray-900">{elecSales} ج.م</span>
-              </div>
-              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                <span className="text-gray-600 text-lg">إجمالي المرتجعات الإلكترونية:</span>
-                <span className="font-bold text-xl text-red-600">- {elecReturns} ج.م</span>
-              </div>
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-xl font-bold text-gray-800">الصافي الإلكتروني:</span>
-                <span className="text-3xl font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 shadow-inner">{netElec} ج.م</span>
-              </div>
+            <div className="bg-red-50/50 p-3 rounded-lg border border-red-100">
+              <div className="text-xs text-red-700 font-bold mb-1">إجمالي المرتجعات الإلكترونية</div>
+              <div className="text-lg font-black text-red-800">{elecReturns} ج.م</div>
+            </div>
+            <div className="bg-blue-100 p-3 rounded-lg border border-blue-200">
+              <div className="text-xs text-blue-900 font-bold mb-1">الصافي الإلكتروني</div>
+              <div className="text-xl font-black text-blue-950">{netElec} ج.م</div>
             </div>
           </div>
-
-          {electronicTransactions.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                <h3 className="font-bold text-gray-800">تفاصيل العمليات الإلكترونية (المحافظ والفيزا)</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm min-w-[700px]">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold border-b">الوقت</th>
-                      <th className="px-4 py-3 font-semibold border-b">النوع</th>
-                      <th className="px-4 py-3 font-semibold border-b">طريقة الدفع</th>
-                      <th className="px-4 py-3 font-semibold border-b">القيمة</th>
-                      <th className="px-4 py-3 font-semibold border-b">المحفظة المرسلة</th>
-                      <th className="px-4 py-3 font-semibold border-b">المحفظة المستلمة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {electronicTransactions.map(t => (
-                      <tr key={t.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-500" dir="ltr">{new Date(t.timestamp).toLocaleTimeString('ar-EG')}</td>
-                        <td className="px-4 py-3">
-                           <span className={`font-medium px-2 py-0.5 rounded ${getTypeName(t.type).color}`}>
-                             {getTypeName(t.type).label}
-                           </span>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-800">{getMethodName(t.paymentMethod)}</td>
-                        <td className="px-4 py-3 font-bold">{getAmount(t)} ج.م</td>
-                        <td className="px-4 py-3 text-gray-600 font-mono tracking-widest">{t.senderWalletLast4 ? `*${t.senderWalletLast4}` : '-'}</td>
-                        <td className="px-4 py-3 text-gray-600 font-mono tracking-widest">{t.receiverWalletLast4 ? `*${t.receiverWalletLast4}` : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Visa Ledger Table */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden w-full mt-6">
+          <div className="bg-blue-50/50 border-b border-blue-100 p-4 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-blue-800 flex items-center gap-2">
+              <span className="bg-blue-200 p-1 rounded-md"><CreditCard className="h-5 w-5 text-blue-700" /></span>
+              تفاصيل حركة الحساب الإلكتروني (فيزا، محفظة)
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 font-bold border-b text-center w-24">رقم فاتورة</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-44">التاريخ</th>
+                  <th className="px-4 py-3 font-bold border-b text-right">البيان</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-32">الوارد</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-32">الصادر</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {electronicLedgerEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">لا توجد حركات إلكترونية مسجلة في هذا اليوم</td>
+                  </tr>
+                ) : (
+                  electronicLedgerEntries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-gray-50/80 transition-colors">
+                      <td className="px-4 py-3 text-center font-mono font-bold text-gray-700">{entry.invoiceNumber}</td>
+                      <td className="px-4 py-3 text-center text-gray-500" dir="ltr">{entry.time}</td>
+                      <td className="px-4 py-3 text-right text-gray-800 font-medium">{entry.description}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-bold bg-green-50/10">
+                        {entry.inward > 0 ? `${entry.inward} ج.م` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-red-600 font-bold bg-red-50/10">
+                        {entry.outward > 0 ? `${entry.outward} ج.م` : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>
       )}
 
       {view === 'shift' && (
