@@ -117,3 +117,14 @@ export interface Expense {
   notes: string;
   timestamp: string;
 }
+
+export interface ShiftAccount {
+  id: string;
+  name: string;
+  subLabel?: string;
+}
+
+export interface ShiftInventoryItem {
+  id: string;
+  name: string;
+}

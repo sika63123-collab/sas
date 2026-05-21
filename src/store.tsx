@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
 
 interface AppContextType {
@@ -31,6 +31,12 @@ interface AppContextType {
   addPaymentTransaction: (pt: Omit<PaymentTransaction, 'id'>) => void;
   selectedContractIdForPayment: string | null;
   setSelectedContractIdForPayment: (id: string | null) => void;
+  shiftAccounts: ShiftAccount[];
+  shiftInventoryItems: ShiftInventoryItem[];
+  addShiftAccount: (account: Omit<ShiftAccount, 'id'>) => void;
+  removeShiftAccount: (id: string) => void;
+  addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
+  removeShiftInventoryItem: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -98,6 +104,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [selectedContractIdForPayment, setSelectedContractIdForPayment] = useState<string | null>(null);
 
+  const [shiftAccounts, setShiftAccounts] = useState<ShiftAccount[]>(() => {
+    const saved = getStorageItem('mobile_shop_shift_accounts');
+    return saved ? JSON.parse(saved) : [
+      { id: 'sa1', name: 'النقدية' },
+      { id: 'sa2', name: 'ماكينة الفيزا' },
+      { id: 'sa3', name: 'فودافون كاش', subLabel: 'محفظة 1' },
+      { id: 'sa4', name: 'انستا باي' },
+      { id: 'sa5', name: 'فوري' },
+      { id: 'sa6', name: 'امان' },
+      { id: 'sa7', name: 'ضامن' },
+    ];
+  });
+
+  const [shiftInventoryItems, setShiftInventoryItems] = useState<ShiftInventoryItem[]>(() => {
+    const saved = getStorageItem('mobile_shop_shift_inventory');
+    return saved ? JSON.parse(saved) : [
+      { id: 'si1', name: 'ميموري' },
+      { id: 'si2', name: 'فلاشات' },
+    ];
+  });
+
   useEffect(() => {
     setStorageItem('mobile_shop_products', JSON.stringify(products));
   }, [products]);
@@ -125,6 +152,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setStorageItem('mobile_shop_payment_transactions', JSON.stringify(paymentTransactions));
   }, [paymentTransactions]);
+
+  useEffect(() => {
+    setStorageItem('mobile_shop_shift_accounts', JSON.stringify(shiftAccounts));
+  }, [shiftAccounts]);
+
+  useEffect(() => {
+    setStorageItem('mobile_shop_shift_inventory', JSON.stringify(shiftInventoryItems));
+  }, [shiftInventoryItems]);
 
   useEffect(() => {
     if (currentUser) {
@@ -177,6 +212,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.expenseTypes) {
       setExpenseTypes(data.expenseTypes);
       storageData['mobile_shop_expense_types'] = JSON.stringify(data.expenseTypes);
+    }
+    if (data.shiftAccounts) {
+      setShiftAccounts(data.shiftAccounts);
+      storageData['mobile_shop_shift_accounts'] = JSON.stringify(data.shiftAccounts);
+    }
+    if (data.shiftInventoryItems) {
+      setShiftInventoryItems(data.shiftInventoryItems);
+      storageData['mobile_shop_shift_inventory'] = JSON.stringify(data.shiftInventoryItems);
     }
 
     // Write all data to storage before reloading
@@ -409,6 +452,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenseTypes(prev => prev.filter(t => t !== typeName));
   };
 
+  const addShiftAccount = (account: Omit<ShiftAccount, 'id'>) => {
+    const newAccount: ShiftAccount = { ...account, id: 'sa' + Date.now().toString() };
+    setShiftAccounts(prev => [...prev, newAccount]);
+  };
+
+  const removeShiftAccount = (id: string) => {
+    setShiftAccounts(prev => prev.filter(a => a.id !== id));
+  };
+
+  const addShiftInventoryItem = (item: Omit<ShiftInventoryItem, 'id'>) => {
+    const newItem: ShiftInventoryItem = { ...item, id: 'si' + Date.now().toString() };
+    setShiftInventoryItems(prev => [...prev, newItem]);
+  };
+
+  const removeShiftInventoryItem = (id: string) => {
+    setShiftInventoryItems(prev => prev.filter(i => i.id !== id));
+  };
+
   return (
     <AppContext.Provider value={{ 
       products, 
@@ -439,6 +500,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addPaymentTransaction,
       selectedContractIdForPayment,
       setSelectedContractIdForPayment,
+      shiftAccounts,
+      shiftInventoryItems,
+      addShiftAccount,
+      removeShiftAccount,
+      addShiftInventoryItem,
+      removeShiftInventoryItem,
     }}>
       {children}
     </AppContext.Provider>

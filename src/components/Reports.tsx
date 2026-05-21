@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FileText, CreditCard, Box, Calendar, Wallet } from 'lucide-react';
+import { FileText, CreditCard, Box, Calendar, Wallet, Plus, Trash2, UserCheck, Lock, Unlock, Key } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
 const getMethodName = (method: string) => {
@@ -27,16 +27,50 @@ const getTypeName = (type: string) => {
 };
 
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
-  const { transactions, expenses, installmentContracts } = useAppStore();
+  const { 
+    transactions, 
+    expenses, 
+    installmentContracts,
+    shiftAccounts,
+    shiftInventoryItems,
+    addShiftAccount,
+    removeShiftAccount,
+    addShiftInventoryItem,
+    removeShiftInventoryItem,
+    users,
+    currentUser,
+    login,
+    logout
+  } = useAppStore();
+
   const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- Opening Balances for Shift Closing ---
-  const [openingCash, setOpeningCash] = useState(0);
-  const [openingVisa, setOpeningVisa] = useState(0);
-  const [openingVodafoneCash, setOpeningVodafoneCash] = useState(0);
-  const [openingInstapay, setOpeningInstapay] = useState(0);
+  // --- Dynamic Shift Closing States ---
+  const [openingBalances, setOpeningBalances] = useState<Record<string, number>>({});
+  const [handoverBalances, setHandoverBalances] = useState<Record<string, number>>({});
+  
+  const [openingInventory, setOpeningInventory] = useState<Record<string, number>>({});
+  const [handoverInventory, setHandoverInventory] = useState<Record<string, number>>({});
+
+  // Handover confirmation state
+  const [isHandoverConfirmed, setIsHandoverConfirmed] = useState(false);
+  const [handoverUser, setHandoverUser] = useState<string | null>(null);
+  
+  // Login modal state
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginCode, setLoginCode] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Add Account inline state
+  const [showAddAccountRow, setShowAddAccountRow] = useState(false);
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccSubLabel, setNewAccSubLabel] = useState('');
+
+  // Add Inventory Item inline state
+  const [showAddItemRow, setShowAddItemRow] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
 
   // Filter transactions by selected date range
   const dailyTransactions = transactions.filter(t => {
@@ -206,18 +240,61 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const instapaySales = dailyTransactions.filter(t => t.paymentMethod === 'instapay' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
   const instapayReturns = dailyTransactions.filter(t => t.paymentMethod === 'instapay' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
 
-  // Shift balance rows
-  const shiftMethods = [
-    { name: 'النقدية (كاش)', opening: openingCash, setOpening: setOpeningCash, inward: cashSales, outward: cashReturns + totalExpenses + cashPurchases, colorScheme: 'emerald' },
-    { name: 'ماكينة الفيزا', opening: openingVisa, setOpening: setOpeningVisa, inward: visaSales, outward: visaReturns, colorScheme: 'blue' },
-    { name: 'فودافون كاش', opening: openingVodafoneCash, setOpening: setOpeningVodafoneCash, inward: vodafoneSales, outward: vodafoneReturns, colorScheme: 'red' },
-    { name: 'انستا باي', opening: openingInstapay, setOpening: setOpeningInstapay, inward: instapaySales, outward: instapayReturns, colorScheme: 'purple' },
-  ];
+  const isChargingMachine = (name: string) => {
+    const n = name.toLowerCase();
+    return n.includes('فوري') || n.includes('امان') || n.includes('ضامن') || n.includes('شحن');
+  };
 
-  const totalOpening = shiftMethods.reduce((s, m) => s + m.opening, 0);
-  const totalShiftInward = shiftMethods.reduce((s, m) => s + m.inward, 0);
-  const totalShiftOutward = shiftMethods.reduce((s, m) => s + m.outward, 0);
-  const totalClosing = shiftMethods.reduce((s, m) => s + m.opening + m.inward - m.outward, 0);
+  const getSystemFlows = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('نقدي') || n.includes('كاش') || n === 'النقدية') {
+      return { inward: cashSales, outward: cashReturns + totalExpenses + cashPurchases };
+    }
+    if (n.includes('فيزا')) {
+      return { inward: visaSales, outward: visaReturns };
+    }
+    if (n.includes('انستا') || n.includes('insta')) {
+      return { inward: instapaySales, outward: instapayReturns };
+    }
+    if (n.includes('فودافون') || n.includes('vodafone')) {
+      return { inward: vodafoneSales, outward: vodafoneReturns };
+    }
+    return null;
+  };
+
+  const getAccountColor = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('نقدي') || n.includes('كاش') || n === 'النقدية') return 'emerald';
+    if (n.includes('فيزا')) return 'blue';
+    if (n.includes('فودافون') || n.includes('vodafone')) return 'red';
+    if (n.includes('انستا') || n.includes('insta')) return 'purple';
+    if (n.includes('فوري')) return 'orange';
+    if (n.includes('امان')) return 'amber';
+    if (n.includes('ضامن')) return 'indigo';
+    return 'gray';
+  };
+
+  // Shift balance rows
+  const shiftAccountRows = shiftAccounts.map(acc => {
+    const opening = openingBalances[acc.id] ?? 0;
+    const handover = handoverBalances[acc.id] ?? 0;
+    const isMachine = isChargingMachine(acc.name);
+    const net = isMachine ? (opening - handover) : (handover - opening);
+    const sysFlows = getSystemFlows(acc.name);
+
+    return {
+      ...acc,
+      opening,
+      handover,
+      net,
+      isMachine,
+      sysFlows
+    };
+  });
+
+  const totalOpening = shiftAccountRows.reduce((s, m) => s + m.opening, 0);
+  const totalHandover = shiftAccountRows.reduce((s, m) => s + m.handover, 0);
+  const totalNet = shiftAccountRows.reduce((s, m) => s + m.net, 0);
 
   // --- Electronic Account Ledger Logic ---
   const electronicLedgerEntries = (() => {
@@ -512,111 +589,448 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       )}
 
       {view === 'shift' && (
-        <div className="space-y-6 w-full max-w-5xl mx-auto">
+        <div className="space-y-8">
 
-          {/* Opening Balances Input */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
-              <span className="bg-amber-100 p-1.5 rounded-md"><Wallet className="h-5 w-5 text-amber-700" /></span>
-              الأرصدة الافتتاحية (بداية الوردية)
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {shiftMethods.map((m) => (
-                <div key={m.name} className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600">{m.name}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={m.opening || ''}
-                    onChange={(e) => m.setOpening(Number(e.target.value) || 0)}
-                    placeholder="0"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                    dir="ltr"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Detailed Balance Table */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50 border-b border-gray-100 p-4">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <span className="bg-blue-100 p-1.5 rounded-md"><FileText className="h-5 w-5 text-blue-700" /></span>
-                تفاصيل حركة الأرصدة (تقفيل الوردية)
+          {/* Accounts & Balances Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+            <div className="bg-[#1e293b] text-white p-5 flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-3">
+                <span className="bg-slate-700 p-2 rounded-lg"><Wallet className="h-6 w-6 text-emerald-400" /></span>
+                الحسابات والأرصدة (جرد الخزنة والمحافظ ومكينات الشحن)
               </h2>
+              <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full font-bold">
+                تقفيل الوردية اليومي
+              </span>
             </div>
+            
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+              <table className="w-full text-sm text-right">
+                <thead className="bg-[#f8fafc] text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="px-5 py-3 font-bold border-b text-right w-40">وسيلة الدفع</th>
-                    <th className="px-4 py-3 font-bold border-b text-center w-32">الرصيد الافتتاحي</th>
-                    <th className="px-4 py-3 font-bold border-b text-center w-32">الوارد</th>
-                    <th className="px-4 py-3 font-bold border-b text-center w-32">الصادر</th>
-                    <th className="px-4 py-3 font-bold border-b text-center w-36 bg-blue-50/50">الرصيد الختامي</th>
+                    <th className="px-6 py-4 font-bold w-[35%] text-slate-800">الحساب</th>
+                    <th className="px-6 py-4 font-bold text-center w-[20%]">رصيد افتتاحي (ج.م)</th>
+                    <th className="px-6 py-4 font-bold text-center w-[25%]">استلام الوردية / رصيد حالي</th>
+                    <th className="px-6 py-4 font-bold text-center w-[15%]">الصافي</th>
+                    <th className="px-4 py-4 font-bold text-center w-[5%]">حذف</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {shiftMethods.map((m) => {
-                    const closing = m.opening + m.inward - m.outward;
+                <tbody className="divide-y divide-slate-100">
+                  {shiftAccountRows.map((m) => {
+                    const color = getAccountColor(m.name);
+                    const sysFlows = m.sysFlows;
                     return (
-                      <tr key={m.name} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="px-5 py-3.5 text-right font-bold text-gray-800">{m.name}</td>
-                        <td className="px-4 py-3.5 text-center text-gray-600 font-mono font-bold">{m.opening > 0 ? `${m.opening} ج.م` : '—'}</td>
-                        <td className="px-4 py-3.5 text-center text-green-600 font-bold">{m.inward > 0 ? `${m.inward} ج.م` : '—'}</td>
-                        <td className="px-4 py-3.5 text-center text-red-600 font-bold">{m.outward > 0 ? `${m.outward} ج.م` : '—'}</td>
-                        <td className="px-4 py-3.5 text-center font-black text-blue-800 bg-blue-50/30">{closing} ج.م</td>
+                      <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800 text-base">{m.name}</span>
+                            {m.subLabel && <span className="text-xs text-slate-500 mt-0.5">{m.subLabel}</span>}
+                            {sysFlows && (
+                              <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block w-fit mt-1.5 font-bold">
+                                حسابات النظام: {sysFlows.inward - sysFlows.outward >= 0 ? '+' : ''}{sysFlows.inward - sysFlows.outward} ج.م (وارد: {sysFlows.inward} | صادر: {sysFlows.outward})
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={openingBalances[m.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setOpeningBalances(prev => ({ ...prev, [m.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-800 outline-none transition-all"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={handoverBalances[m.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setHandoverBalances(prev => ({ ...prev, [m.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-slate-200 hover:border-slate-300 focus:border-emerald-500 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-800 outline-none transition-all"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`text-base font-extrabold px-3 py-1.5 rounded-lg ${
+                            m.net > 0 ? 'text-emerald-700 bg-emerald-50' : m.net < 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-500 bg-slate-50'
+                          }`}>
+                            {m.net} ج.م
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {/* Defaults sa1 - sa7 can't be deleted */}
+                          {!['sa1', 'sa2', 'sa3', 'sa4', 'sa5', 'sa6', 'sa7'].includes(m.id) ? (
+                            <button
+                              onClick={() => {
+                                removeShiftAccount(m.id);
+                                setOpeningBalances(prev => { const c = {...prev}; delete c[m.id]; return c; });
+                                setHandoverBalances(prev => { const c = {...prev}; delete c[m.id]; return c; });
+                              }}
+                              className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          ) : '—'}
+                        </td>
                       </tr>
                     );
                   })}
+
+                  {/* Add Account Inline Form */}
+                  {showAddAccountRow ? (
+                    <tr className="bg-slate-50/50">
+                      <td className="px-6 py-4" colSpan={2}>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="اسم الحساب (مثال: فودافون كاش)"
+                            value={newAccName}
+                            onChange={(e) => setNewAccName(e.target.value)}
+                            className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
+                          />
+                          <input
+                            type="text"
+                            placeholder="رقم المحفظة / تفاصيل (اختياري)"
+                            value={newAccSubLabel}
+                            onChange={(e) => setNewAccSubLabel(e.target.value)}
+                            className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center" colSpan={3}>
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (!newAccName.trim()) return;
+                              addShiftAccount({ name: newAccName, subLabel: newAccSubLabel });
+                              setNewAccName('');
+                              setNewAccSubLabel('');
+                              setShowAddAccountRow(false);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+                          >
+                            حفظ الحساب
+                          </button>
+                          <button
+                            onClick={() => {
+                              setNewAccName('');
+                              setNewAccSubLabel('');
+                              setShowAddAccountRow(false);
+                            }}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <td className="px-6 py-4" colSpan={5}>
+                        <button
+                          onClick={() => setShowAddAccountRow(true)}
+                          className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-all"
+                        >
+                          <Plus className="h-4 w-4" />
+                          إضافة حساب جديد
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
-                <tfoot className="border-t-2 border-gray-300 bg-gray-50">
-                  <tr>
-                    <td className="px-5 py-3 text-right font-black text-gray-900">الإجمالي</td>
-                    <td className="px-4 py-3 text-center text-gray-700 font-black">{totalOpening > 0 ? `${totalOpening} ج.م` : '—'}</td>
-                    <td className="px-4 py-3 text-center text-green-700 font-black">{totalShiftInward > 0 ? `${totalShiftInward} ج.م` : '—'}</td>
-                    <td className="px-4 py-3 text-center text-red-700 font-black">{totalShiftOutward > 0 ? `${totalShiftOutward} ج.م` : '—'}</td>
-                    <td className="px-4 py-3 text-center font-black text-blue-900 text-lg bg-blue-50/50">{totalClosing} ج.م</td>
+                <tfoot className="border-t-2 border-slate-200 bg-[#f8fafc]">
+                  <tr className="font-extrabold text-slate-800 text-base">
+                    <td className="px-6 py-4 text-right">الإجمالي</td>
+                    <td className="px-6 py-4 text-center font-mono">{totalOpening} ج.م</td>
+                    <td className="px-6 py-4 text-center font-mono">{totalHandover} ج.م</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-3 py-1.5 rounded-lg text-lg ${
+                        totalHandover - totalOpening >= 0 ? 'text-emerald-800 bg-emerald-100' : 'text-rose-800 bg-rose-100'
+                      }`}>
+                        {totalHandover - totalOpening >= 0 ? '+' : ''}{totalHandover - totalOpening} ج.م
+                      </span>
+                    </td>
+                    <td className="px-4 py-4"></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
 
-          {/* Shift Handover Summary */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <span className="bg-emerald-100 p-1.5 rounded-md"><FileText className="h-5 w-5 text-emerald-700" /></span>
-              ملخص تسليم الوردية
+          {/* Small Items Inventory Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+            <div className="bg-[#0f172a] text-white p-5 flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-3">
+                <span className="bg-slate-800 p-2 rounded-lg"><Box className="h-6 w-6 text-blue-400" /></span>
+                جرد الأصناف الصغيرة (ميموري، فلاشات، كروت شحن...)
+              </h2>
+              <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full font-bold">
+                جرد عيني يومي
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-right">
+                <thead className="bg-[#f8fafc] text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 font-bold w-[45%] text-slate-800">الصنف</th>
+                    <th className="px-6 py-4 font-bold text-center w-[20%]">رصيد افتتاحي (العدد)</th>
+                    <th className="px-6 py-4 font-bold text-center w-[20%]">استلام الوردية (العدد الحالي)</th>
+                    <th className="px-6 py-4 font-bold text-center w-[10%]">المنصرف</th>
+                    <th className="px-4 py-4 font-bold text-center w-[5%]">حذف</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {shiftInventoryItems.map((item) => {
+                    const opening = openingInventory[item.id] ?? 0;
+                    const handover = handoverInventory[item.id] ?? 0;
+                    const sold = opening - handover;
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-800 text-base">{item.name}</td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={openingInventory[item.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setOpeningInventory(prev => ({ ...prev, [item.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-slate-200 hover:border-slate-300 focus:border-blue-500 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-800 outline-none transition-all"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={handoverInventory[item.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              setHandoverInventory(prev => ({ ...prev, [item.id]: val }));
+                            }}
+                            placeholder="0"
+                            className="w-full max-w-[120px] mx-auto border-2 border-slate-200 hover:border-slate-300 focus:border-emerald-500 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-800 outline-none transition-all"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`text-base font-extrabold px-3 py-1.5 rounded-lg ${
+                            sold > 0 ? 'text-orange-700 bg-orange-50' : sold < 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-500 bg-slate-50'
+                          }`}>
+                            {sold} قطع
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {!['si1', 'si2'].includes(item.id) ? (
+                            <button
+                              onClick={() => {
+                                removeShiftInventoryItem(item.id);
+                                setOpeningInventory(prev => { const c = {...prev}; delete c[item.id]; return c; });
+                                setHandoverInventory(prev => { const c = {...prev}; delete c[item.id]; return c; });
+                              }}
+                              className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Add Item Inline Form */}
+                  {showAddItemRow ? (
+                    <tr className="bg-slate-50/50">
+                      <td className="px-6 py-4" colSpan={2}>
+                        <input
+                          type="text"
+                          placeholder="اسم الصنف الجديد (مثال: ميموري 64 جيجا)"
+                          value={newItemName}
+                          onChange={(e) => setNewItemName(e.target.value)}
+                          className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-bold"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-center" colSpan={3}>
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (!newItemName.trim()) return;
+                              addShiftInventoryItem({ name: newItemName });
+                              setNewItemName('');
+                              setShowAddItemRow(false);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+                          >
+                            حفظ الصنف
+                          </button>
+                          <button
+                            onClick={() => {
+                              setNewItemName('');
+                              setShowAddItemRow(false);
+                            }}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <td className="px-6 py-4" colSpan={5}>
+                        <button
+                          onClick={() => setShowAddItemRow(true)}
+                          className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-all"
+                        >
+                          <Plus className="h-4 w-4" />
+                          إضافة صنف جرد جديد
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Verification & Handover Card */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6 space-y-6">
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
+              <span className="bg-blue-50 p-2 rounded-lg"><UserCheck className="h-6 w-6 text-blue-600" /></span>
+              تسليم واستلام الوردية
             </h2>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {shiftMethods.map((m) => {
-                const closing = m.opening + m.inward - m.outward;
-                const net = m.inward - m.outward;
-                const bg = m.colorScheme === 'emerald' ? 'bg-emerald-50/50 border-emerald-100' : m.colorScheme === 'blue' ? 'bg-blue-50/50 border-blue-100' : m.colorScheme === 'red' ? 'bg-red-50/50 border-red-100' : 'bg-purple-50/50 border-purple-100';
-                const textSm = m.colorScheme === 'emerald' ? 'text-emerald-700' : m.colorScheme === 'blue' ? 'text-blue-700' : m.colorScheme === 'red' ? 'text-red-700' : 'text-purple-700';
-                const textLg = m.colorScheme === 'emerald' ? 'text-emerald-800' : m.colorScheme === 'blue' ? 'text-blue-800' : m.colorScheme === 'red' ? 'text-red-800' : 'text-purple-800';
-                return (
-                  <div key={m.name} className={`p-3 rounded-lg border ${bg}`}>
-                    <div className={`text-xs font-bold mb-1 ${textSm}`}>{m.name}</div>
-                    <div className={`text-lg font-black ${textLg}`}>{closing} ج.م</div>
-                    <div className="text-[10px] text-gray-500 mt-0.5">صافي الحركة: {net >= 0 ? '+' : ''}{net} ج.م</div>
-                  </div>
-                );
-              })}
+            <div className="border-t border-slate-100 pt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="confirmHandover"
+                  checked={isHandoverConfirmed}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setShowLoginModal(true);
+                    } else {
+                      setIsHandoverConfirmed(false);
+                      setHandoverUser(null);
+                    }
+                  }}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="confirmHandover" className="text-base font-bold text-slate-700 cursor-pointer select-none">
+                  تأكيد استلام الوردية من الموظف التالي
+                </label>
+              </div>
+
+              {isHandoverConfirmed && handoverUser && (
+                <div className="bg-emerald-50 text-emerald-800 px-4 py-2 rounded-xl border border-emerald-100 flex items-center gap-2 font-bold text-base shadow-sm">
+                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                  تم استلام الوردية بواسطة: {handoverUser}
+                </div>
+              )}
             </div>
 
-            <div className="bg-gray-100 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
-              <span className="text-lg font-bold text-gray-700">إجمالي الرصيد الختامي:</span>
-              <span className="text-3xl font-black text-gray-900">{totalClosing} ج.م</span>
-            </div>
+            <div className="border-t border-slate-100 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex justify-between items-center w-full sm:w-[400px]">
+                <span className="text-base font-bold text-slate-600">إجمالي الفارق المالي بالوردية:</span>
+                <span className={`text-2xl font-black ${
+                  totalHandover - totalOpening >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                }`}>{totalHandover - totalOpening} ج.م</span>
+              </div>
 
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg w-full md:w-auto transition-colors">
-              طباعة تقرير الوردية
-            </button>
+              <div className="flex gap-3 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    logout();
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 w-full sm:w-auto"
+                >
+                  <Lock className="h-5 w-5" />
+                  تقفيل الوردية وتسجيل الخروج
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* User Code Verification Modal */}
+          {showLoginModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[999] p-4">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 max-w-sm w-full text-center space-y-6 animate-in fade-in zoom-in duration-200">
+                <div className="bg-blue-50 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+                  <Key className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">تأكيد هوية الموظف المستلم</h3>
+                  <p className="text-xs text-slate-500 mt-1">برجاء إدخال كود الدخول الخاص بك لتأكيد الاستلام</p>
+                </div>
+
+                <div className="space-y-2">
+                  <input
+                    type="password"
+                    maxLength={2}
+                    placeholder="••"
+                    value={loginCode}
+                    onChange={(e) => {
+                      setLoginCode(e.target.value);
+                      setLoginError('');
+                    }}
+                    autoFocus
+                    className="w-full text-center text-4xl h-16 border-2 border-slate-200 rounded-xl shadow-inner focus:border-blue-500 outline-none tracking-[1em] font-bold"
+                  />
+                  {loginError && <p className="text-sm text-rose-600 font-bold">{loginError}</p>}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!loginCode) return;
+                      const matched = users.find(u => u.code === loginCode);
+                      if (matched) {
+                        const success = login(loginCode);
+                        if (success) {
+                          setHandoverUser(matched.name);
+                          setIsHandoverConfirmed(true);
+                          setShowLoginModal(false);
+                          setLoginCode('');
+                          setLoginError('');
+                        } else {
+                          setLoginError('كود غير صحيح');
+                        }
+                      } else {
+                        setLoginError('المستخدم غير موجود');
+                      }
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-md"
+                  >
+                    تأكيد الاستلام
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowLoginModal(false);
+                      setLoginCode('');
+                      setLoginError('');
+                      setIsHandoverConfirmed(false);
+                      setHandoverUser(null);
+                    }}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-all"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       )}
