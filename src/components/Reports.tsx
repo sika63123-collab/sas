@@ -24,6 +24,128 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netCashAfterExpenses = netCash - totalExpenses;
 
+  // --- Cash Account Ledger Logic ---
+  const ledgerEntries = (() => {
+    const entries: {
+      id: string;
+      invoiceNumber: string;
+      time: string;
+      type: string;
+      description: string;
+      inward: number;
+      outward: number;
+      rawTimestamp: string;
+    }[] = [];
+
+    // Filter cash transactions
+    const dailyCashTransactions = dailyTransactions.filter(t => t.paymentMethod === 'cash');
+
+    dailyCashTransactions.forEach(t => {
+      let inward = 0;
+      let outward = 0;
+      let description = '';
+      let invoiceNumber = '';
+
+      const itemsList = t.items && t.items.length > 0
+        ? t.items.map(item => `${item.name} (${item.quantity}×${item.price})`).join(', ')
+        : '';
+
+      // Get invoice number display
+      if (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale') {
+        const saleIdx = saleTransactions.findIndex(tx => tx.id === t.id);
+        invoiceNumber = saleIdx >= 0 ? String(saleIdx + 1) : t.id;
+      } else if (t.type === 'return' || t.type === 'deposit_return') {
+        const returnTransactionsList = transactions.filter(tx => tx.type === 'return' || tx.type === 'deposit_return');
+        const returnIdx = returnTransactionsList.findIndex(tx => tx.id === t.id);
+        invoiceNumber = returnIdx >= 0 ? String(returnIdx + 1) : t.id;
+      } else if (t.type === 'purchase') {
+        const purchaseTransactions = transactions.filter(tx => tx.type === 'purchase');
+        const purchaseIdx = purchaseTransactions.findIndex(tx => tx.id === t.id);
+        invoiceNumber = purchaseIdx >= 0 ? String(purchaseIdx + 1) : t.id;
+      } else {
+        invoiceNumber = '—';
+      }
+
+      // Determine amounts and description based on transaction type
+      switch (t.type) {
+        case 'sale':
+          inward = t.totalAmount;
+          description = `بيع نقدية: ${itemsList}`;
+          break;
+        case 'deposit_sale':
+          inward = t.depositAmount || 0;
+          description = `بيع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
+          break;
+        case 'installment_sale':
+          inward = t.depositAmount || 0;
+          description = `مقدم قسط: ${itemsList} (العميل: ${t.customerName || '—'})`;
+          break;
+        case 'deposit_payment':
+          inward = t.totalAmount;
+          let linkedInvoiceDisplay = '';
+          if (t.items && t.items[0] && t.items[0].name) {
+            linkedInvoiceDisplay = t.items[0].name;
+          } else {
+            linkedInvoiceDisplay = `سداد دفعة عربون`;
+          }
+          description = `${linkedInvoiceDisplay} (العميل: ${t.customerName || '—'})`;
+          break;
+        case 'installment_payment':
+          inward = t.totalAmount;
+          description = `سداد قسط (العميل: ${t.customerName || '—'})`;
+          break;
+        case 'return':
+          outward = t.totalAmount;
+          description = `مرتجع مبيعات نقدية: ${itemsList}`;
+          if (t.returnInvoiceNumber) {
+            const origIdx = saleTransactions.findIndex(tx => tx.id === t.returnInvoiceNumber);
+            const origInvoiceDisplay = origIdx >= 0 ? String(origIdx + 1) : t.returnInvoiceNumber;
+            description += ` (لفاتورة رقم: ${origInvoiceDisplay})`;
+          }
+          break;
+        case 'deposit_return':
+          outward = t.depositAmount || 0;
+          description = `مرتجع عربون: ${itemsList} (العميل: ${t.customerName || '—'})`;
+          break;
+        case 'purchase':
+          outward = t.totalAmount;
+          description = `فاتورة مشتريات (مخزن): ${itemsList}`;
+          break;
+        default:
+          inward = t.totalAmount;
+          description = `${getTypeName(t.type).label}: ${itemsList}`;
+      }
+
+      entries.push({
+        id: t.id,
+        invoiceNumber,
+        time: new Date(t.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        type: t.type,
+        description,
+        inward,
+        outward,
+        rawTimestamp: t.timestamp
+      });
+    });
+
+    // Add expenses
+    dailyExpenses.forEach(e => {
+      entries.push({
+        id: e.id,
+        invoiceNumber: String(e.expenseNumber),
+        time: new Date(e.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        type: 'expense',
+        description: `مصروف: ${e.expenseType} (${e.notes || '—'})`,
+        inward: 0,
+        outward: e.amount,
+        rawTimestamp: e.timestamp
+      });
+    });
+
+    // Sort entries chronologically
+    return entries.sort((a, b) => a.rawTimestamp.localeCompare(b.rawTimestamp));
+  })();
+
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
   const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale').reduce((sum, t) => sum + getAmount(t), 0);
@@ -117,47 +239,68 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           </div>
         </div>
 
-        {/* Daily Expenses Table */}
-        {dailyExpenses.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto mt-6">
-            <div className="bg-orange-50 border-b border-orange-100 p-4">
-              <h2 className="text-lg font-bold text-orange-800">تفاصيل المصروفات</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+        {/* Ledger Table */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden w-full mt-6">
+          <div className="bg-gray-50 border-b border-gray-100 p-4 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <span className="bg-blue-100 p-1 rounded-md"><FileText className="h-5 w-5 text-blue-700" /></span>
+              تفاصيل حركة الصندوق (كشف الحساب النقدي)
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 font-bold border-b text-center w-24">رقم فاتورة</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-28">التاريخ</th>
+                  <th className="px-4 py-3 font-bold border-b text-right">البيان</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-32">الوارد</th>
+                  <th className="px-4 py-3 font-bold border-b text-center w-32">الصادر</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ledgerEntries.length === 0 ? (
                   <tr>
-                    <th className="px-4 py-3 font-semibold border-b">رقم</th>
-                    <th className="px-4 py-3 font-semibold border-b">الوقت</th>
-                    <th className="px-4 py-3 font-semibold border-b">النوع</th>
-                    <th className="px-4 py-3 font-semibold border-b">المبلغ</th>
-                    <th className="px-4 py-3 font-semibold border-b">ملاحظات</th>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">لا توجد حركات نقدية مسجلة في هذا اليوم</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {dailyExpenses.map(e => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-gray-500">{e.expenseNumber}</td>
-                      <td className="px-4 py-3 text-gray-500" dir="ltr">{new Date(e.timestamp).toLocaleTimeString('ar-EG')}</td>
-                      <td className="px-4 py-3 font-medium text-orange-700">
-                        <span className="bg-orange-50 px-2 py-0.5 rounded">{e.expenseType}</span>
+                ) : (
+                  ledgerEntries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-gray-50/80 transition-colors">
+                      <td className="px-4 py-3 text-center font-mono font-bold text-gray-700">{entry.invoiceNumber}</td>
+                      <td className="px-4 py-3 text-center text-gray-500" dir="ltr">{entry.time}</td>
+                      <td className="px-4 py-3 text-right text-gray-800 font-medium">{entry.description}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-bold bg-green-50/10">
+                        {entry.inward > 0 ? `${entry.inward} ج.م` : '—'}
                       </td>
-                      <td className="px-4 py-3 font-bold text-gray-900">{e.amount} ج.م</td>
-                      <td className="px-4 py-3 text-gray-500">{e.notes || '—'}</td>
+                      <td className="px-4 py-3 text-center text-red-600 font-bold bg-red-50/10">
+                        {entry.outward > 0 ? `${entry.outward} ج.م` : '—'}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-orange-50 font-bold">
-                    <td colSpan={3} className="px-4 py-3 text-orange-800">إجمالي المصروفات</td>
-                    <td className="px-4 py-3 text-orange-800">{totalExpenses} ج.م</td>
-                    <td></td>
+                  ))
+                )}
+              </tbody>
+              {ledgerEntries.length > 0 && (
+                <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-200">
+                  <tr className="text-gray-700">
+                    <td colSpan={3} className="px-4 py-3 text-left pl-6">الإجماليات:</td>
+                    <td className="px-4 py-3 text-center text-green-700 bg-green-50">
+                      {ledgerEntries.reduce((sum, e) => sum + e.inward, 0)} ج.م
+                    </td>
+                    <td className="px-4 py-3 text-center text-red-700 bg-red-50">
+                      {ledgerEntries.reduce((sum, e) => sum + e.outward, 0)} ج.م
+                    </td>
+                  </tr>
+                  <tr className="bg-emerald-50 text-emerald-950 text-[15px] border-t border-emerald-100">
+                    <td colSpan={3} className="px-4 py-3 text-left pl-6 font-black">صافي النقدي الفعلي:</td>
+                    <td colSpan={2} className="px-4 py-3 text-center font-black text-lg text-emerald-700">
+                      {ledgerEntries.reduce((sum, e) => sum + e.inward, 0) - ledgerEntries.reduce((sum, e) => sum + e.outward, 0)} ج.م
+                    </td>
                   </tr>
                 </tfoot>
-              </table>
-            </div>
+              )}
+            </table>
           </div>
-        )}
+        </div>
       </>
       )}
 
