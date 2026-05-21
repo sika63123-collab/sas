@@ -6,10 +6,14 @@ import ProfitMarginReport from './ProfitMarginReport';
 export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'shift' | 'item-card' | 'profit-margin' }) {
   const { transactions, expenses } = useAppStore();
   const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Filter transactions by selected date
-  const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
+  // Filter transactions by selected date range
+  const dailyTransactions = transactions.filter(t => {
+    const dateStr = t.timestamp.split('T')[0];
+    return dateStr >= startDate && dateStr <= endDate;
+  });
 
   // Helper to calculate actual paid/returned amount
   const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
@@ -20,7 +24,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const netCash = cashSales - cashReturns;
 
   // --- Expenses Logic ---
-  const dailyExpenses = expenses.filter(e => e.timestamp.startsWith(selectedDate));
+  const dailyExpenses = expenses.filter(e => {
+    const dateStr = e.timestamp.split('T')[0];
+    return dateStr >= startDate && dateStr <= endDate;
+  });
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netCashAfterExpenses = netCash - totalExpenses;
 
@@ -189,52 +196,60 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     <div className="p-6 max-w-6xl mx-auto space-y-8 w-full">
       
       {/* Header & Date Filter */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <FileText className="h-6 w-6 text-blue-600" />
           {getTitle()}
         </h1>
-        <div className="flex items-center gap-2">
-          <label className="text-gray-600 font-medium">اختر التاريخ:</label>
-          <div className="relative">
-             <input 
-               type="date" 
-               value={selectedDate}
-               onChange={(e) => setSelectedDate(e.target.value)}
-               className="border border-gray-300 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-48 text-left"
-               dir="ltr"
-             />
-             <Calendar className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600 font-semibold text-sm">من تاريخ:</span>
+            <div className="relative">
+               <input 
+                 type="date" 
+                 value={startDate}
+                 onChange={(e) => setStartDate(e.target.value)}
+                 className="border border-gray-300 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-44 text-left font-semibold text-sm text-gray-700"
+                 dir="ltr"
+               />
+               <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600 font-semibold text-sm">إلى تاريخ:</span>
+            <div className="relative">
+               <input 
+                 type="date" 
+                 value={endDate}
+                 onChange={(e) => setEndDate(e.target.value)}
+                 className="border border-gray-300 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-44 text-left font-semibold text-sm text-gray-700"
+                 dir="ltr"
+               />
+               <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
 
       {view === 'cash' && (
       <>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden max-w-2xl mx-auto">
-          <div className="bg-emerald-50 border-b border-emerald-100 p-4">
-            <h2 className="text-lg font-bold text-emerald-800 flex items-center gap-2">
-              <span className="bg-emerald-200 p-1 rounded-md"><Wallet className="h-5 w-5 text-emerald-700" /></span>
-              كشف حساب النقدي
-            </h2>
-            <p className="text-sm text-emerald-600/80 mt-1">يجمع إجمالي الفاتورة النقدية والمرتجعات</p>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-              <span className="text-gray-600 text-lg">إجمالي المبيعات النقدية:</span>
-              <span className="font-bold text-2xl text-gray-900">{cashSales} ج.م</span>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-right">
+            <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+              <div className="text-xs text-emerald-700 font-bold mb-1">إجمالي المبيعات النقدية</div>
+              <div className="text-lg font-black text-emerald-800">{cashSales} ج.م</div>
             </div>
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-              <span className="text-gray-600 text-lg">إجمالي المرتجعات النقدية:</span>
-              <span className="font-bold text-xl text-red-600">- {cashReturns} ج.م</span>
+            <div className="bg-red-50/50 p-3 rounded-lg border border-red-100">
+              <div className="text-xs text-red-700 font-bold mb-1">إجمالي المرتجعات النقدية</div>
+              <div className="text-lg font-black text-red-800">{cashReturns} ج.م</div>
             </div>
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-              <span className="text-gray-600 text-lg">إجمالي المصروفات:</span>
-              <span className="font-bold text-xl text-orange-600">- {totalExpenses} ج.م</span>
+            <div className="bg-orange-50/50 p-3 rounded-lg border border-orange-100">
+              <div className="text-xs text-orange-700 font-bold mb-1">إجمالي المصروفات</div>
+              <div className="text-lg font-black text-orange-800">{totalExpenses} ج.م</div>
             </div>
-            <div className="flex justify-between items-center pt-2">
-              <span className="text-xl font-bold text-gray-800">صافي النقدي بعد المصروفات:</span>
-              <span className="text-3xl font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100 shadow-inner">{netCashAfterExpenses} ج.م</span>
+            <div className="bg-emerald-100 p-3 rounded-lg border border-emerald-200">
+              <div className="text-xs text-emerald-900 font-bold mb-1">صافي الصندوق بعد المصروفات</div>
+              <div className="text-xl font-black text-emerald-950">{netCashAfterExpenses} ج.م</div>
             </div>
           </div>
         </div>
@@ -495,7 +510,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       )}
 
       {view === 'profit-margin' && (
-        <ProfitMarginReport selectedDate={selectedDate} />
+        <ProfitMarginReport startDate={startDate} endDate={endDate} />
       )}
     </div>
   );

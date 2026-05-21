@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Calculator } from 'lucide-react';
 
-export default function ProfitMarginReport({ selectedDate }: { selectedDate: string }) {
+export default function ProfitMarginReport({ startDate, endDate }: { startDate: string; endDate: string }) {
   const { transactions, products, expenses } = useAppStore();
   const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'installment_sale');
   const returnTransactions = transactions.filter(t => t.type === 'return' || t.type === 'deposit_return');
 
-  const dailyTransactions = transactions.filter(t => t.timestamp.startsWith(selectedDate));
+  const dailyTransactions = transactions.filter(t => {
+    const dateStr = t.timestamp.split('T')[0];
+    return dateStr >= startDate && dateStr <= endDate;
+  });
   
   // Calculate profits
   let totalSales = 0;
@@ -52,7 +55,10 @@ export default function ProfitMarginReport({ selectedDate }: { selectedDate: str
   const totalProfit = totalSales - totalCost;
 
   // Expenses
-  const dailyExpenses = expenses.filter(e => e.timestamp.startsWith(selectedDate));
+  const dailyExpenses = expenses.filter(e => {
+    const dateStr = e.timestamp.split('T')[0];
+    return dateStr >= startDate && dateStr <= endDate;
+  });
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalProfit - totalExpenses;
 
@@ -63,7 +69,7 @@ export default function ProfitMarginReport({ selectedDate }: { selectedDate: str
       <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
          <div className="flex items-center gap-2">
            <Calculator className="h-5 w-5 text-emerald-600" />
-           <h3 className="font-bold text-gray-800">تقرير هامش الربح ({selectedDate})</h3>
+           <h3 className="font-bold text-gray-800">تقرير هامش الربح (من {startDate} إلى {endDate})</h3>
          </div>
          <button onClick={() => window.print()} className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors hidden print:hidden md:block">
            طباعة التقرير
