@@ -624,11 +624,6 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-800 text-base">{m.name}</span>
                             {m.subLabel && <span className="text-xs text-slate-500 mt-0.5">{m.subLabel}</span>}
-                            {sysFlows && (
-                              <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block w-fit mt-1.5 font-bold">
-                                حسابات النظام: {sysFlows.inward - sysFlows.outward >= 0 ? '+' : ''}{sysFlows.inward - sysFlows.outward} ج.م (وارد: {sysFlows.inward} | صادر: {sysFlows.outward})
-                              </div>
-                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -761,6 +756,34 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                     </td>
                     <td className="px-4 py-4"></td>
                   </tr>
+                  {shiftAccountRows.map(m => {
+                    const sysFlows = getSystemFlows(m.name);
+                    if (!sysFlows) return null;
+                    
+                    const isCash = m.name === 'النقدية';
+                    if (!isCash) return null;
+                    
+                    const displayName = 'إجمالي مبيعات نقدية';
+                    const rowBg = 'bg-emerald-50/35 text-emerald-950';
+                    const textNetColor = 'text-emerald-800';
+                    
+                    return (
+                      <tr key={`sys-${m.id}`} className={`border-t border-slate-200 ${rowBg} text-xs font-bold`}>
+                        <td className="px-6 py-3 text-right" colSpan={2}>
+                          {displayName}
+                        </td>
+                        <td className="px-6 py-3 text-center font-mono font-bold" colSpan={2}>
+                          <span className={textNetColor}>
+                            {sysFlows.inward - sysFlows.outward >= 0 ? '+' : ''}{sysFlows.inward - sysFlows.outward} ج.م
+                          </span>
+                          <span className="text-slate-400 font-sans text-[10px] mr-2">
+                            (وارد: {sysFlows.inward} | صادر: {sysFlows.outward})
+                          </span>
+                        </td>
+                        <td className="px-4 py-3"></td>
+                      </tr>
+                    );
+                  })}
                 </tfoot>
               </table>
             </div>
@@ -944,9 +967,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
             <div className="border-t border-slate-100 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 flex justify-between items-center w-full sm:w-[400px]">
                 <span className="text-base font-bold text-slate-600">إجمالي الفارق المالي بالوردية:</span>
-                <span className={`text-2xl font-black ${
-                  totalHandover - totalOpening >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                }`}>{totalHandover - totalOpening} ج.م</span>
+                <span className="text-2xl font-black text-blue-700">{totalNet} ج.م</span>
               </div>
 
               <div className="flex gap-3 w-full sm:w-auto">
