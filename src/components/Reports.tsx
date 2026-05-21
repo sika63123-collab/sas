@@ -279,7 +279,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     const opening = openingBalances[acc.id] ?? 0;
     const handover = handoverBalances[acc.id] ?? 0;
     const isMachine = isChargingMachine(acc.name);
-    const net = isMachine ? (opening - handover) : (handover - opening);
+    const net = isMachine ? (opening - handover) : Math.abs(handover - opening);
     const sysFlows = getSystemFlows(acc.name);
 
     return {
@@ -661,9 +661,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className={`text-base font-extrabold px-3 py-1.5 rounded-lg ${
-                            m.net > 0 ? 'text-emerald-700 bg-emerald-50' : m.net < 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-500 bg-slate-50'
+                            m.isMachine
+                              ? (m.net > 0 ? 'text-emerald-700 bg-emerald-50' : m.net < 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-500 bg-slate-50')
+                              : 'text-blue-700 bg-blue-50'
                           }`}>
-                            {m.net} ج.م
+                            {m.isMachine && m.net > 0 ? `+${m.net}` : m.net} ج.م
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
@@ -753,10 +755,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
                     <td className="px-6 py-4 text-center font-mono">{totalOpening} ج.م</td>
                     <td className="px-6 py-4 text-center font-mono">{totalHandover} ج.م</td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1.5 rounded-lg text-lg ${
-                        totalHandover - totalOpening >= 0 ? 'text-emerald-800 bg-emerald-100' : 'text-rose-800 bg-rose-100'
-                      }`}>
-                        {totalHandover - totalOpening >= 0 ? '+' : ''}{totalHandover - totalOpening} ج.م
+                      <span className="px-3 py-1.5 rounded-lg text-lg text-blue-800 bg-blue-100 font-extrabold">
+                        {totalNet} ج.م
                       </span>
                     </td>
                     <td className="px-4 py-4"></td>
