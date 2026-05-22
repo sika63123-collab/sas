@@ -18,6 +18,8 @@ import { DepositPay } from './components/DepositPay';
 import { Login } from './components/Login';
 import { Settings } from './components/Settings';
 import CashExchange from './components/CashExchange';
+import CashShiftManagement from './components/CashShiftManagement';
+
 
 type ViewMode = 
   | 'home' 
@@ -37,11 +39,14 @@ type ViewMode =
   | 'deposit-pay'
   | 'pricing'
   | 'cash-exchange'
+  | 'shift-management'
   | 'settings';
 
+
 function MainApp() {
-  const { currentUser, logout } = useAppStore();
+  const { currentUser, logout, activeShift } = useAppStore();
   const [activeView, setActiveView] = useState<ViewMode>('home');
+
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
   const [loadInvoiceId, setLoadInvoiceId] = useState<string | null>(null);
   const [cashierKey, setCashierKey] = useState<number>(0);
@@ -53,6 +58,12 @@ function MainApp() {
   };
 
   const selectView = (view: ViewMode, cMode?: TransactionType) => {
+    if (!activeShift && view !== 'settings') {
+      alert('يجب بدء وتفعيل الوردية والعهد اليومية أولاً قبل استخدام باقي شاشات النظام!');
+      setActiveView('shift-management');
+      setOpenMenu(null);
+      return;
+    }
     setActiveView(view);
     if (cMode) {
       setCashierMode(cMode);
@@ -60,6 +71,7 @@ function MainApp() {
     }
     setOpenMenu(null);
   };
+
 
   const openInvoiceInCashier = (invoiceId: string) => {
     setLoadInvoiceId(invoiceId);
@@ -78,6 +90,13 @@ function MainApp() {
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!activeShift) {
+      setActiveView('shift-management');
+    }
+  }, [activeShift]);
+
 
   if (!currentUser) return <Login />;
 
@@ -111,6 +130,7 @@ function MainApp() {
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
                       {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">تسييل / تبادل عهدة</button>}
+                      <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
                    </div>
                  )}
               </div>
@@ -237,6 +257,7 @@ function MainApp() {
           {activeView === 'installments-pay-customer' && <InstallmentsPayCustomer />}
           {activeView === 'deposit-pay' && <DepositPay />}
           {activeView === 'cash-exchange' && <CashExchange />}
+          {activeView === 'shift-management' && <CashShiftManagement />}
           {activeView === 'settings' && <Settings />}
       </div>
     </div>

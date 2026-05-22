@@ -73,6 +73,7 @@ export interface Transaction {
   isDelivered?: boolean;
   paymentDate?: string;
   linkedExchangeId?: string;
+  exchangeRecordNumber?: string;
 }
 
 export interface InstallmentPayment {
@@ -130,4 +131,22 @@ export interface ShiftAccount {
 export interface ShiftInventoryItem {
   id: string;
   name: string;
+}
+
+export interface ManualCashTransaction {
+  id: string;
+  type: 'inflow' | 'outflow'; // inflow = إيداع يدوي، outflow = سحب يدوي
+  amount: number;
+  notes: string;
+  timestamp: string; // ISO string
+}
+
+export interface CashShift {
+  id: string;
+  openedAt: string;          // وقت بداية الوردية
+  closedAt?: string;         // وقت نهاية الوردية
+  isClosed: boolean;
+  openingCash: number;       // الرصيد الافتتاحي للدرج
+  closingCashActual?: number;// الرصيد الفعلي بعد العد عند الإغلاق
+  manualTransactions: ManualCashTransaction[]; // الإيداعات والمسحوبات اليدوية
 }

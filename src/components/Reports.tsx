@@ -143,6 +143,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
         const purchaseTransactions = transactions.filter(tx => tx.type === 'purchase');
         const purchaseIdx = purchaseTransactions.findIndex(tx => tx.id === t.id);
         invoiceNumber = purchaseIdx >= 0 ? String(purchaseIdx + 1) : t.id;
+      } else if (t.type === 'cash_exchange') {
+        invoiceNumber = t.exchangeRecordNumber || '—';
       } else {
         invoiceNumber = '—';
       }
@@ -407,6 +409,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
         const returnTransactionsList = transactions.filter(tx => tx.type === 'return' || tx.type === 'deposit_return');
         const returnIdx = returnTransactionsList.findIndex(tx => tx.id === t.id);
         invoiceNumber = returnIdx >= 0 ? String(returnIdx + 1) : t.id;
+      } else if (t.type === 'cash_exchange') {
+        invoiceNumber = t.exchangeRecordNumber || '—';
       } else {
         invoiceNumber = '—';
       }

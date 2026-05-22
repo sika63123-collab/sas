@@ -10,9 +10,10 @@ export default function CashExchange() {
   const [amount, setAmount] = useState<string>('');
   const [targetMethod, setTargetMethod] = useState<TargetMethod>('vodafone_cash');
   const [walletLast4, setWalletLast4] = useState('');
+  const [exchangeRecordNumber, setExchangeRecordNumber] = useState('');
   const [note, setNote] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string } | null>(null);
+  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; recordNumber?: string } | null>(null);
 
   const methodLabel = targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي';
 
@@ -27,14 +28,15 @@ export default function CashExchange() {
       return;
     }
 
-    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined);
+    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined, exchangeRecordNumber || undefined);
     
-    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4 });
+    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4, recordNumber: exchangeRecordNumber || undefined });
     setShowSuccess(true);
     
     // Reset form
     setAmount('');
     setWalletLast4('');
+    setExchangeRecordNumber('');
     setNote('');
     
     // Hide success after 4 seconds
@@ -68,6 +70,9 @@ export default function CashExchange() {
             <div>المبلغ: <span className="text-emerald-900 font-black">{lastExchange.amount.toLocaleString()} ج.م</span></div>
             <div>الوجهة: <span className="text-emerald-900 font-black">{lastExchange.method}</span></div>
             <div>المحفظة: <span className="text-emerald-900 font-black">*{lastExchange.wallet}</span></div>
+            {lastExchange.recordNumber && (
+              <div>رقم السجل: <span className="text-emerald-900 font-black">{lastExchange.recordNumber}</span></div>
+            )}
           </div>
           <div className="mt-3 mr-10 text-xs text-emerald-600 bg-emerald-100 px-3 py-1.5 rounded-lg inline-block font-bold">
             ✓ تم خصم {lastExchange.amount.toLocaleString()} من الكاش &nbsp;|&nbsp; ✓ تم إضافة {lastExchange.amount.toLocaleString()} لـ{lastExchange.method}
@@ -174,6 +179,23 @@ export default function CashExchange() {
             <p className="text-xs text-gray-400 mt-1 mr-1">آخر 4 أرقام من رقم المحفظة اللي بعتت الرصيد</p>
           </div>
 
+          {/* Exchange Record Number */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
+              <Hash className="h-4 w-4 text-gray-500" />
+              رقم السجل / العملية (اختياري)
+            </label>
+            <input
+              type="text"
+              value={exchangeRecordNumber}
+              onChange={(e) => setExchangeRecordNumber(e.target.value)}
+              placeholder="مثال: 48920174829"
+              className="w-full h-14 border-2 border-gray-200 hover:border-gray-300 focus:border-amber-500 rounded-xl px-4 text-lg font-bold text-gray-900 outline-none transition-all text-center"
+              dir="ltr"
+            />
+            <p className="text-xs text-gray-400 mt-1 mr-1">رقم المعاملة أو السجل من فودافون كاش أو انستا باي للتوثيق والمراجعة</p>
+          </div>
+
           {/* Note */}
           <div>
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
@@ -205,6 +227,12 @@ export default function CashExchange() {
                 <span className="font-bold">محفظة:</span>
                 <span className="font-black">*{walletLast4}</span>
               </div>
+              {exchangeRecordNumber && (
+                <div className="flex justify-between text-amber-900">
+                  <span className="font-bold">رقم السجل:</span>
+                  <span className="font-black">{exchangeRecordNumber}</span>
+                </div>
+              )}
             </div>
           )}
 

@@ -10,7 +10,7 @@ const defaultPermissions: UserPermissions = {
 };
 
 export function Settings() {
-  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData, clearData } = useAppStore();
+  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData, clearData, shifts } = useAppStore();
   
   const [editingCode, setEditingCode] = useState<string | null>(null);
   
@@ -73,7 +73,8 @@ export function Settings() {
       installmentContracts,
       users,
       expenses,
-      expenseTypes
+      expenseTypes,
+      shifts
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

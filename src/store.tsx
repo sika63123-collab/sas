@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
 
 interface AppContextType {
@@ -38,7 +38,12 @@ interface AppContextType {
   updateShiftAccount: (id: string, updates: Partial<ShiftAccount>) => void;
   addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
   removeShiftInventoryItem: (id: string) => void;
-  addCashExchange: (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string) => void;
+  addCashExchange: (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string, exchangeRecordNumber?: string) => void;
+  shifts: CashShift[];
+  activeShift: CashShift | undefined;
+  openShift: (openingCash: number) => void;
+  closeShift: (actualCash: number) => void;
+  addManualCashTransaction: (type: 'inflow' | 'outflow', amount: number, notes: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -125,6 +130,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ];
   });
 
+  const [shifts, setShifts] = useState<CashShift[]>(() => {
+    const saved = getStorageItem('mobile_shop_shifts');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+
   useEffect(() => {
     setStorageItem('mobile_shop_products', JSON.stringify(products));
   }, [products]);
@@ -162,6 +173,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [shiftInventoryItems]);
 
   useEffect(() => {
+    setStorageItem('mobile_shop_shifts', JSON.stringify(shifts));
+  }, [shifts]);
+
+
+  useEffect(() => {
     if (currentUser) {
       setSessionItem('mobile_shop_current_user', currentUser.code);
     } else {
@@ -186,7 +202,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteUser = (code: string) => 
     setUsers(prev => prev.filter(u => u.code !== code));
 
+  const activeShift = shifts.find(s => !s.isClosed);
+
+  const openShift = (openingCash: number) => {
+    if (shifts.some(s => !s.isClosed)) {
+      alert('يوجد وردية مفتوحة بالفعل، يجب إغلاقها أولاً!');
+      return;
+    }
+    const newShift: CashShift = {
+      id: Date.now().toString(),
+      openedAt: new Date().toISOString(),
+      isClosed: false,
+      openingCash,
+      manualTransactions: []
+    };
+    setShifts(prev => [...prev, newShift]);
+  };
+
+  const closeShift = (actualCash: number) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed) {
+        return {
+          ...s,
+          closedAt: new Date().toISOString(),
+          isClosed: true,
+          closingCashActual: actualCash
+        };
+      }
+      return s;
+    }));
+  };
+
+  const addManualCashTransaction = (type: 'inflow' | 'outflow', amount: number, notes: string) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed) {
+        const newTransaction: ManualCashTransaction = {
+          id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+          type,
+          amount,
+          notes,
+          timestamp: new Date().toISOString()
+        };
+        return {
+          ...s,
+          manualTransactions: [...s.manualTransactions, newTransaction]
+        };
+      }
+      return s;
+    }));
+  };
+
   const restoreData = async (data: any) => {
+
     // Build the storage entries
     const storageData: Record<string, string> = {};
     if (data.products) {
@@ -221,6 +288,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setShiftInventoryItems(data.shiftInventoryItems);
       storageData['mobile_shop_shift_inventory'] = JSON.stringify(data.shiftInventoryItems);
     }
+    if (data.shifts) {
+      setShifts(data.shifts);
+      storageData['mobile_shop_shifts'] = JSON.stringify(data.shifts);
+    }
 
     // Write all data to storage before reloading
     await restoreAllStorage(storageData);
@@ -242,19 +313,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInstallmentContracts([]);
     setExpenses([]);
     setPaymentTransactions([]);
+    setShifts([]);
     
     const storageData: Record<string, string> = {
       'mobile_shop_transactions': JSON.stringify([]),
       'mobile_shop_installments': JSON.stringify([]),
       'mobile_shop_expenses': JSON.stringify([]),
       'mobile_shop_payment_transactions': JSON.stringify([]),
+      'mobile_shop_shifts': JSON.stringify([]),
       'mobile_shop_products': JSON.stringify(products),
       'mobile_shop_users': JSON.stringify(users),
       'mobile_shop_expense_types': JSON.stringify(expenseTypes)
     };
     
     await restoreAllStorage(storageData);
-    alert('تم تصفير البيانات بنجاح! تم مسح الحركات والاقساط والمصروفات، مع الاحتفاظ بالأصناف.');
+    alert('تم تصفير البيانات بنجاح! تم مسح الحركات والاقساط والمصروفات والورديات، مع الاحتفاظ بالأصناف.');
     window.location.reload();
   };
 
@@ -474,7 +547,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShiftInventoryItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const addCashExchange = (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string) => {
+  const addCashExchange = (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string, exchangeRecordNumber?: string) => {
     const exchangeId = Date.now().toString() + Math.random().toString(36).slice(2, 7);
     const now = new Date().toISOString();
     const methodLabel = targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي';
@@ -491,6 +564,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       senderWalletLast4: walletLast4,
       linkedExchangeId: exchangeId,
       customerName: `تسييل عهدة → ${methodLabel}${noteText}`,
+      exchangeRecordNumber,
     };
 
     // حركة 2: وارد للمحفظة الإلكترونية (IN)
@@ -504,6 +578,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       senderWalletLast4: walletLast4,
       linkedExchangeId: exchangeId,
       customerName: `تسييل عهدة من الكاش${noteText}`,
+      exchangeRecordNumber,
     };
 
     setTransactions(prev => [...prev, cashOutTransaction, walletInTransaction]);
@@ -547,6 +622,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addShiftInventoryItem,
       removeShiftInventoryItem,
       addCashExchange,
+      shifts,
+      activeShift,
+      openShift,
+      closeShift,
+      addManualCashTransaction,
     }}>
       {children}
     </AppContext.Provider>
