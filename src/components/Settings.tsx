@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { User, UserPermissions } from '../types';
 
 const defaultPermissions: UserPermissions = {
-  cashier: false, cashierReturn: false, depositSale: false, depositReturn: false, depositPay: false,
+  cashier: false, cashierReturn: false, cashExchange: false, depositSale: false, depositReturn: false, depositPay: false,
   storeQuantities: false, itemCard: false, addItem: false,
   installmentsAdd: false, installmentsPay: false, installmentsLate: false,
   settings: false, reports: false
@@ -184,6 +184,7 @@ export function Settings() {
                             <div className="flex flex-col gap-2 mt-2">
                                 <Checkbox id="cashier" label="كاشير" />
                                 <Checkbox id="cashierReturn" label="مرتجع كاشير" />
+                                <Checkbox id="cashExchange" label="تسييل / تبادل عهدة" />
                                 <Checkbox id="depositSale" label="مبيعات عربون" />
                                 <Checkbox id="depositPay" label="سداد وتسليم عربون" />
                                 <Checkbox id="depositReturn" label="مرتجع مبيعات عربون" />

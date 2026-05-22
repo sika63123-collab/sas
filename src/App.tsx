@@ -17,6 +17,7 @@ import { InstallmentsPayCustomer } from './components/InstallmentsPayCustomer';
 import { DepositPay } from './components/DepositPay';
 import { Login } from './components/Login';
 import { Settings } from './components/Settings';
+import CashExchange from './components/CashExchange';
 
 type ViewMode = 
   | 'home' 
@@ -35,6 +36,7 @@ type ViewMode =
   | 'installments-pay-customer'
   | 'deposit-pay'
   | 'pricing'
+  | 'cash-exchange'
   | 'settings';
 
 function MainApp() {
@@ -94,7 +96,7 @@ function MainApp() {
               الرئيسية
             </button>
 
-            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay) && (
+            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.cashExchange) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('transaction')}
@@ -108,6 +110,7 @@ function MainApp() {
                       {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
+                      {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">تسييل / تبادل عهدة</button>}
                    </div>
                  )}
               </div>
@@ -233,6 +236,7 @@ function MainApp() {
           {activeView === 'installments-archive' && <InstallmentsArchive onNavigateToPay={() => setActiveView('installments-pay-customer')} />}
           {activeView === 'installments-pay-customer' && <InstallmentsPayCustomer />}
           {activeView === 'deposit-pay' && <DepositPay />}
+          {activeView === 'cash-exchange' && <CashExchange />}
           {activeView === 'settings' && <Settings />}
       </div>
     </div>

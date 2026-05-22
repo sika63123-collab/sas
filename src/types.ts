@@ -1,6 +1,7 @@
 export interface UserPermissions {
   cashier: boolean;
   cashierReturn: boolean;
+  cashExchange: boolean;
   depositSale: boolean;
   depositReturn: boolean;
   depositPay: boolean;
@@ -23,7 +24,7 @@ export interface User {
 }
 
 export type PaymentMethod = 'cash' | 'visa' | 'instapay' | 'vodafone_cash';
-export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'installment_sale' | 'purchase';
+export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'installment_sale' | 'purchase' | 'cash_exchange';
 
 // جدول حركات الدفع — كل دفعة عربون مرتبطة بفاتورة
 export interface PaymentTransaction {
@@ -71,6 +72,7 @@ export interface Transaction {
   depositAmount?: number;
   isDelivered?: boolean;
   paymentDate?: string;
+  linkedExchangeId?: string;
 }
 
 export interface InstallmentPayment {

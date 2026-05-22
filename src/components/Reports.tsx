@@ -22,6 +22,7 @@ const getTypeName = (type: string) => {
     case 'installment_payment': return { label: 'سداد قسط', color: 'text-blue-600 bg-blue-50' };
     case 'installment_sale': return { label: 'بيع تقسيط', color: 'text-indigo-600 bg-indigo-50' };
     case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
+    case 'cash_exchange': return { label: 'تسييل عهدة', color: 'text-amber-600 bg-amber-50' };
     default: return { label: type, color: 'text-gray-600 bg-gray-50' };
   }
 };
@@ -85,8 +86,9 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
   const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
 
   // --- Cash Account Logic ---
-  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
-  const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashExchangeOut = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange').reduce((sum, t) => sum + t.totalAmount, 0);
   const netCash = cashSales - cashReturns;
 
   // --- Expenses Logic ---
@@ -95,7 +97,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     return dateStr >= startDate && dateStr <= endDate;
   });
   const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netCashAfterExpenses = netCash - totalExpenses;
+  const netCashAfterExpenses = netCash - totalExpenses - cashExchangeOut;
 
   // --- Cash Account Ledger Logic ---
   const ledgerEntries = (() => {
@@ -190,6 +192,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           outward = t.totalAmount;
           description = `فاتورة مشتريات (مخزن): ${itemsList}`;
           break;
+        case 'cash_exchange':
+          outward = t.totalAmount;
+          description = `منصرف كاش - تسييل عهدة (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
+          break;
         default:
           inward = t.totalAmount;
           description = `${getTypeName(t.type).label}: ${itemsList}`;
@@ -227,8 +233,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
 
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
-  const elecSales = electronicTransactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale').reduce((sum, t) => sum + getAmount(t), 0);
-  const elecReturns = electronicTransactions.filter(t => t.type === 'return' || t.type === 'deposit_return').reduce((sum, t) => sum + getAmount(t), 0);
+  const elecSales = electronicTransactions.filter(t => t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const elecReturns = electronicTransactions.filter(t => t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
 
   // --- Per Payment Method Breakdown for Shift ---
@@ -296,11 +302,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
     const matchingTx = dailyTransactions.filter(t => isTransactionForAccount(t, acc));
 
     const inward = matchingTx
-      .filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')
+      .filter(t => t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale' || (t.type === 'cash_exchange' && t.paymentMethod !== 'cash'))
       .reduce((sum, t) => sum + getAmount(t), 0);
 
     const outward = matchingTx
-      .filter(t => t.type === 'return' || t.type === 'deposit_return')
+      .filter(t => t.type === 'return' || t.type === 'deposit_return' || (t.type === 'cash_exchange' && t.paymentMethod === 'cash'))
       .reduce((sum, t) => sum + getAmount(t), 0);
 
     const name = acc.name.toLowerCase();
@@ -451,6 +457,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
           outward = t.depositAmount || 0;
           description = `مرتجع عربون ${methodLabel}: ${itemsList} (العميل: ${t.customerName || '—'})${walletsInfo}`;
           break;
+        case 'cash_exchange':
+          inward = t.totalAmount;
+          description = `وارد ${methodLabel} - تسييل عهدة (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
+          break;
         default:
           inward = t.totalAmount;
           description = `${getTypeName(t.type).label} ${methodLabel}: ${itemsList}${walletsInfo}`;
@@ -524,7 +534,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
       {view === 'cash' && (
       <>
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 w-full">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-right">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-right">
             <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
               <div className="text-xs text-emerald-700 font-bold mb-1">إجمالي المبيعات النقدية</div>
               <div className="text-lg font-black text-emerald-800">{cashSales} ج.م</div>
@@ -537,8 +547,14 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 's
               <div className="text-xs text-orange-700 font-bold mb-1">إجمالي المصروفات</div>
               <div className="text-lg font-black text-orange-800">{totalExpenses} ج.م</div>
             </div>
+            {cashExchangeOut > 0 && (
+              <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-100">
+                <div className="text-xs text-amber-700 font-bold mb-1">تسييل عهدة (تحويل للمحافظ)</div>
+                <div className="text-lg font-black text-amber-800">{cashExchangeOut} ج.م</div>
+              </div>
+            )}
             <div className="bg-emerald-100 p-3 rounded-lg border border-emerald-200">
-              <div className="text-xs text-emerald-900 font-bold mb-1">صافي الصندوق بعد المصروفات</div>
+              <div className="text-xs text-emerald-900 font-bold mb-1">صافي الصندوق</div>
               <div className="text-xl font-black text-emerald-950">{netCashAfterExpenses} ج.م</div>
             </div>
           </div>

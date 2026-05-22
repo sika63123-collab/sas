@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
 
 interface AppContextType {
@@ -38,6 +38,7 @@ interface AppContextType {
   updateShiftAccount: (id: string, updates: Partial<ShiftAccount>) => void;
   addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
   removeShiftInventoryItem: (id: string) => void;
+  addCashExchange: (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -473,6 +474,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShiftInventoryItems(prev => prev.filter(i => i.id !== id));
   };
 
+  const addCashExchange = (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string) => {
+    const exchangeId = Date.now().toString() + Math.random().toString(36).slice(2, 7);
+    const now = new Date().toISOString();
+    const methodLabel = targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي';
+    const noteText = note ? ` - ${note}` : '';
+
+    // حركة 1: كاش خارج من الدرج (OUT)
+    const cashOutTransaction: Transaction = {
+      id: exchangeId + '_cash_out',
+      timestamp: now,
+      type: 'cash_exchange' as TransactionType,
+      items: [],
+      totalAmount: amount,
+      paymentMethod: 'cash',
+      senderWalletLast4: walletLast4,
+      linkedExchangeId: exchangeId,
+      customerName: `تسييل عهدة → ${methodLabel}${noteText}`,
+    };
+
+    // حركة 2: وارد للمحفظة الإلكترونية (IN)
+    const walletInTransaction: Transaction = {
+      id: exchangeId + '_wallet_in',
+      timestamp: now,
+      type: 'cash_exchange' as TransactionType,
+      items: [],
+      totalAmount: amount,
+      paymentMethod: targetMethod,
+      senderWalletLast4: walletLast4,
+      linkedExchangeId: exchangeId,
+      customerName: `تسييل عهدة من الكاش${noteText}`,
+    };
+
+    setTransactions(prev => [...prev, cashOutTransaction, walletInTransaction]);
+  };
+
   return (
     <AppContext.Provider value={{ 
       products, 
@@ -510,6 +546,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateShiftAccount,
       addShiftInventoryItem,
       removeShiftInventoryItem,
+      addCashExchange,
     }}>
       {children}
     </AppContext.Provider>
