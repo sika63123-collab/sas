@@ -38,13 +38,13 @@ type ViewMode =
   | 'deposit-pay'
   | 'pricing'
   | 'cash-exchange'
-  | 'settings';
+  | 'settings'
+  | 'shift-management';
 
 
 function MainApp() {
   const { currentUser, logout, activeShift } = useAppStore();
   const [activeView, setActiveView] = useState<ViewMode>('home');
-  const [isShiftPanelOpen, setIsShiftPanelOpen] = useState(false);
 
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
   const [loadInvoiceId, setLoadInvoiceId] = useState<string | null>(null);
@@ -57,9 +57,9 @@ function MainApp() {
   };
 
   const selectView = (view: ViewMode, cMode?: TransactionType) => {
-    if (!activeShift && view !== 'settings') {
+    if (!activeShift && view !== 'settings' && view !== 'shift-management') {
       alert('يجب بدء وتفعيل الوردية والعهد اليومية أولاً قبل استخدام باقي شاشات النظام!');
-      setIsShiftPanelOpen(true);
+      setActiveView('shift-management');
       setOpenMenu(null);
       return;
     }
@@ -92,14 +92,13 @@ function MainApp() {
 
   useEffect(() => {
     if (!activeShift) {
-      setIsShiftPanelOpen(true);
       if (activeView === 'settings') {
-        // Allow admin settings access but keep panel open
+        // Allow admin settings access
       } else {
-        setActiveView('home');
+        setActiveView('shift-management');
       }
     }
-  }, [activeShift]);
+  }, [activeShift, activeView]);
 
 
   if (!currentUser) return <Login />;
@@ -134,7 +133,7 @@ function MainApp() {
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
                       {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">تسييل / تبادل عهدة</button>}
-                      <button onClick={() => { setIsShiftPanelOpen(true); setOpenMenu(null); }} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
+                      <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
                    </div>
                  )}
               </div>
@@ -213,7 +212,7 @@ function MainApp() {
          
          <div className="flex items-center gap-3 text-[#1e3f66] ml-2 shrink-0 h-9">
              <button 
-               onClick={() => setIsShiftPanelOpen(true)}
+               onClick={() => selectView('shift-management')}
                className={`flex items-center gap-1.5 px-3 py-1 rounded border font-extrabold text-xs shadow-sm transition-all duration-200 cursor-pointer select-none ${
                  activeShift 
                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700' 
@@ -272,8 +271,8 @@ function MainApp() {
           {activeView === 'deposit-pay' && <DepositPay />}
           {activeView === 'cash-exchange' && <CashExchange />}
           {activeView === 'settings' && <Settings />}
+          {activeView === 'shift-management' && <CashShiftManagement />}
       </div>
-      <CashShiftManagement isOpen={isShiftPanelOpen} onClose={() => setIsShiftPanelOpen(false)} />
     </div>
   );
 }
