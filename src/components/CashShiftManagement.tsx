@@ -229,14 +229,20 @@ export default function CashShiftManagement() {
                 <div className="text-right">
                   <label className="block text-sm font-bold text-gray-700 mb-2">رصيد درج الكاش الافتتاحي (جنيه):</label>
                   <input 
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     required
                     placeholder="مثال: 1500"
                     value={openingInput}
-                    onChange={(e) => setOpeningInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                        setOpeningInput(val);
+                      }
+                    }}
                     className="w-full text-center h-12 text-xl font-bold bg-blue-50/50 border-2 border-blue-200 focus:border-blue-500 focus:bg-white outline-none rounded transition-all text-blue-900"
                   />
+
                 </div>
                 <button 
                   type="submit"
@@ -641,12 +647,17 @@ export default function CashShiftManagement() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">قيمة المبلغ (جنيه):</label>
                   <input 
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     required
                     placeholder="مثال: 500"
                     value={manualAmount}
-                    onChange={(e) => setManualAmount(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                        setManualAmount(val);
+                      }
+                    }}
                     className="w-full h-10 border border-gray-300 px-3 outline-none text-center font-bold text-lg rounded text-blue-900 bg-gray-50"
                   />
                 </div>
@@ -727,13 +738,18 @@ export default function CashShiftManagement() {
                 <div>
                   <label className="block text-sm font-black text-gray-800 mb-1.5 text-center">المبلغ الفعلي الموجود بالدرج حالياً (بعد العد):</label>
                   <input 
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     required
-                    autofocus
+                    autoFocus
                     placeholder="قم بعد الكاش الفعلي بالدرج واكتبه هنا..."
                     value={actualCashInput}
-                    onChange={(e) => setActualCashInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                        setActualCashInput(val);
+                      }
+                    }}
                     className="w-full text-center h-12 text-2xl font-black bg-red-50/50 border-2 border-red-200 focus:border-red-500 focus:bg-white outline-none rounded text-red-900 transition-all"
                   />
                 </div>
