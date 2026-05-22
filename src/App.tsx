@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Store, ChevronDown, LogOut } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Store, ChevronDown, LogOut, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Cashier from './components/Cashier';
 import Inventory from './components/Inventory';
 import Pricing from './components/Pricing';
@@ -28,7 +28,6 @@ type ViewMode =
   | 'inventory-add'
   | 'reports-visa' 
   | 'reports-cash' 
-  | 'reports-shift' 
   | 'reports-item-card'
   | 'reports-profit-margin'
   | 'installments-add'
@@ -39,13 +38,13 @@ type ViewMode =
   | 'deposit-pay'
   | 'pricing'
   | 'cash-exchange'
-  | 'shift-management'
   | 'settings';
 
 
 function MainApp() {
   const { currentUser, logout, activeShift } = useAppStore();
   const [activeView, setActiveView] = useState<ViewMode>('home');
+  const [isShiftPanelOpen, setIsShiftPanelOpen] = useState(false);
 
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
   const [loadInvoiceId, setLoadInvoiceId] = useState<string | null>(null);
@@ -60,7 +59,7 @@ function MainApp() {
   const selectView = (view: ViewMode, cMode?: TransactionType) => {
     if (!activeShift && view !== 'settings') {
       alert('يجب بدء وتفعيل الوردية والعهد اليومية أولاً قبل استخدام باقي شاشات النظام!');
-      setActiveView('shift-management');
+      setIsShiftPanelOpen(true);
       setOpenMenu(null);
       return;
     }
@@ -93,7 +92,12 @@ function MainApp() {
 
   useEffect(() => {
     if (!activeShift) {
-      setActiveView('shift-management');
+      setIsShiftPanelOpen(true);
+      if (activeView === 'settings') {
+        // Allow admin settings access but keep panel open
+      } else {
+        setActiveView('home');
+      }
     }
   }, [activeShift]);
 
@@ -130,7 +134,7 @@ function MainApp() {
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
                       {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">تسييل / تبادل عهدة</button>}
-                      <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
+                      <button onClick={() => { setIsShiftPanelOpen(true); setOpenMenu(null); }} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
                    </div>
                  )}
               </div>
@@ -149,7 +153,6 @@ function MainApp() {
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                       <button onClick={() => selectView('reports-visa')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب الفيزا</button>
                       <button onClick={() => selectView('reports-cash')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كشف حساب نقدي</button>
-                      <button onClick={() => selectView('reports-shift')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تقفيل وردية</button>
                       <button onClick={() => selectView('reports-profit-margin')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">هامش الربح</button>
                   </div>
                 )}
@@ -208,14 +211,25 @@ function MainApp() {
            )}
          </div>
          
-         {/* User Info & Logout */}
-         <div className="flex items-center gap-4 text-[#1e3f66] ml-2 shrink-0 h-9">
-            <span className="font-bold text-[15px]" dir="rtl">مرحباً: <span className="text-blue-800">{currentUser.name}</span></span>
-            <div className="w-[1px] h-6 bg-gray-300"></div>
-            <button onClick={logout} className="flex items-center gap-1 text-red-600 hover:text-red-800 hover:bg-red-50 bg-white font-bold px-3 py-1 rounded-sm border border-red-200 transition-colors shadow-sm text-sm">
-               <LogOut className="h-4 w-4" /> خروج
-            </button>
-         </div>
+         <div className="flex items-center gap-3 text-[#1e3f66] ml-2 shrink-0 h-9">
+             <button 
+               onClick={() => setIsShiftPanelOpen(true)}
+               className={`flex items-center gap-1.5 px-3 py-1 rounded border font-extrabold text-xs shadow-sm transition-all duration-200 cursor-pointer select-none ${
+                 activeShift 
+                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700' 
+                   : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 animate-pulse'
+               }`}
+             >
+               <span className={`w-2 h-2 rounded-full bg-white ${activeShift ? 'animate-ping shrink-0' : ''}`}></span>
+               {activeShift ? 'الوردية نشطة' : 'فتح الوردية'}
+             </button>
+             <div className="w-[1px] h-6 bg-gray-300"></div>
+             <span className="font-bold text-[15px]" dir="rtl">مرحباً: <span className="text-blue-800">{currentUser.name}</span></span>
+             <div className="w-[1px] h-6 bg-gray-300"></div>
+             <button onClick={logout} className="flex items-center gap-1 text-red-600 hover:text-red-800 hover:bg-red-50 bg-white font-bold px-3 py-1 rounded-sm border border-red-200 transition-colors shadow-sm text-sm">
+                <LogOut className="h-4 w-4" /> خروج
+             </button>
+          </div>
       </div>
 
       {/* Main Content Area */}
@@ -257,9 +271,9 @@ function MainApp() {
           {activeView === 'installments-pay-customer' && <InstallmentsPayCustomer />}
           {activeView === 'deposit-pay' && <DepositPay />}
           {activeView === 'cash-exchange' && <CashExchange />}
-          {activeView === 'shift-management' && <CashShiftManagement />}
           {activeView === 'settings' && <Settings />}
       </div>
+      <CashShiftManagement isOpen={isShiftPanelOpen} onClose={() => setIsShiftPanelOpen(false)} />
     </div>
   );
 }

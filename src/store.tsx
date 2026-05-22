@@ -42,7 +42,7 @@ interface AppContextType {
   shifts: CashShift[];
   activeShift: CashShift | undefined;
   openShift: (openingCash: number) => void;
-  closeShift: (actualCash: number) => void;
+  closeShift: () => void;
   addManualCashTransaction: (type: 'inflow' | 'outflow', amount: number, notes: string) => void;
 }
 
@@ -219,18 +219,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShifts(prev => [...prev, newShift]);
   };
 
-  const closeShift = (actualCash: number) => {
-    setShifts(prev => prev.map(s => {
-      if (!s.isClosed) {
-        return {
-          ...s,
-          closedAt: new Date().toISOString(),
-          isClosed: true,
-          closingCashActual: actualCash
-        };
-      }
-      return s;
-    }));
+  const closeShift = () => {
+    setShifts(prev => {
+      const active = prev.find(s => !s.isClosed);
+      if (!active) return prev;
+
+      const nowStr = new Date().toISOString();
+      const start = active.openedAt;
+
+      // Filter transactions within shift timeframe
+      const shiftTransactions = transactions.filter(t => t.timestamp >= start && t.timestamp <= nowStr);
+      const shiftExpenses = expenses.filter(e => e.timestamp >= start && e.timestamp <= nowStr);
+
+      const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
+
+      // 1. Sales & Collections in cash
+      const cashSales = shiftTransactions
+        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
+        .reduce((sum, t) => sum + getAmount(t), 0);
+
+      // 2. Manual Inflows
+      const manualInflow = active.manualTransactions.filter(t => t.type === 'inflow').reduce((sum, t) => sum + t.amount, 0);
+
+      // 3. Cash Returns
+      const cashReturns = shiftTransactions
+        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return'))
+        .reduce((sum, t) => sum + getAmount(t), 0);
+
+      // 4. Expenses (paid in cash)
+      const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+      // 5. Purchases (paid in cash)
+      const cashPurchases = shiftTransactions
+        .filter(t => t.paymentMethod === 'cash' && t.type === 'purchase')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
+
+      // 6. Cash Exchanges Out (تسييل عهدة - منصرف من الدرج)
+      const cashExchangeOut = shiftTransactions
+        .filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
+
+      // 7. Manual Outflows
+      const manualOutflow = active.manualTransactions.filter(t => t.type === 'outflow').reduce((sum, t) => sum + t.amount, 0);
+
+      const expectedCash = active.openingCash + cashSales + manualInflow - cashReturns - totalExpenses - cashPurchases - cashExchangeOut - manualOutflow;
+
+      const updatedShifts = prev.map(s => {
+        if (s.id === active.id) {
+          return {
+            ...s,
+            closedAt: nowStr,
+            isClosed: true,
+            closingCashActual: expectedCash
+          };
+        }
+        return s;
+      });
+
+      const newShift: CashShift = {
+        id: Date.now().toString(),
+        openedAt: nowStr,
+        isClosed: false,
+        openingCash: expectedCash,
+        manualTransactions: []
+      };
+
+      return [...updatedShifts, newShift];
+    });
   };
 
   const addManualCashTransaction = (type: 'inflow' | 'outflow', amount: number, notes: string) => {
