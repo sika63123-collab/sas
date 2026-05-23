@@ -112,6 +112,12 @@ export function InstallmentsPayCustomer() {
       return;
     }
 
+    // Prevent paying more than the remaining balance of the contract to prevent cashier excess
+    if (amount > contractCalcs.remaining) {
+      alert(`عذراً، المبلغ المطلوب لسداد العقد بالكامل هو ${contractCalcs.remaining.toFixed(2)} ج.م فقط.\nلقد أدخلت: ${amount.toFixed(2)} ج.م.\nلا يمكنك دفع مبلغ أكبر من المتبقي لتجنب حدوث زيادة بالخزنة.`);
+      return;
+    }
+
     if (selectedMethod !== 'cash') {
       if (!walletLast4 || walletLast4.trim().length < 4) {
         alert('يرجى إدخال آخر 4 أرقام لوسيلة الدفع (المرسلة) (على الأقل 4 أرقام)');
@@ -148,6 +154,12 @@ export function InstallmentsPayCustomer() {
     const totalAmount = typeof bulkAmount === 'number' ? bulkAmount : 0;
     if (totalAmount <= 0) {
       alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+      return;
+    }
+
+    // Prevent paying more than the remaining balance of the contract to prevent cashier excess
+    if (totalAmount > contractCalcs.remaining) {
+      alert(`عذراً، المبلغ المطلوب لسداد العقد بالكامل هو ${contractCalcs.remaining.toFixed(2)} ج.م فقط.\nلقد أدخلت: ${totalAmount.toFixed(2)} ج.م.\nلا يمكنك دفع مبلغ أكبر من المتبقي.`);
       return;
     }
 
@@ -469,9 +481,16 @@ export function InstallmentsPayCustomer() {
                               </div>
                             )}
 
+                            {bulkAmount !== '' && Number(bulkAmount) > contractCalcs.remaining && (
+                              <div className="p-3 border text-sm font-bold bg-red-50 border-red-300 text-red-800 flex items-center gap-2 rounded shadow-sm">
+                                <span>⚠️</span>
+                                <span>عذراً، المبلغ المدخل أكبر من المتبقي للعقد بالكامل ({contractCalcs.remaining.toFixed(2)} ج.م)</span>
+                              </div>
+                            )}
+
                             <button
                               onClick={handleBulkPay}
-                              disabled={bulkAmount === '' || bulkAmount <= 0}
+                              disabled={bulkAmount === '' || bulkAmount <= 0 || Number(bulkAmount) > contractCalcs.remaining}
                               className="w-full bg-[#2e7d32] hover:bg-[#1b5e20] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 shadow text-base transition-colors"
                             >
                               ✅ تأكيد الدفعة الإجمالية
@@ -558,9 +577,15 @@ export function InstallmentsPayCustomer() {
                                                               </div>
                                                             )}
                                                           </div>
+                                                          {payAmount !== '' && Number(payAmount) > contractCalcs.remaining && (
+                                                            <div className="text-[11px] text-red-600 font-bold text-center leading-tight bg-red-50 p-1.5 border border-red-200 mt-1 rounded w-full">
+                                                              ⚠️ خطأ: أكبر من المتبقي للعقد ({contractCalcs.remaining.toFixed(2)} ج.م)
+                                                            </div>
+                                                          )}
                                                           <button 
                                                             onClick={handlePay}
-                                                            className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1 px-4 shadow transition-colors w-full rounded mt-1"
+                                                            disabled={payAmount !== '' && Number(payAmount) > contractCalcs.remaining}
+                                                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs py-1.5 px-4 shadow transition-colors w-full rounded mt-1.5"
                                                           >
                                                             تأكيد الدفع
                                                           </button>
