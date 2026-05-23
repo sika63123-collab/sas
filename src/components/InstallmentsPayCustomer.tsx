@@ -7,7 +7,7 @@ export function InstallmentsPayCustomer() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContract, setSelectedContract] = useState<InstallmentContract | null>(null);
-  const [payAmount, setPayAmount] = useState<number | ''>('');
+  const [payAmount, setPayAmount] = useState<string>('');
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
   const [walletLast4, setWalletLast4] = useState('');
   const [receiverWalletLast4, setReceiverWalletLast4] = useState('');
@@ -15,7 +15,7 @@ export function InstallmentsPayCustomer() {
 
   // Bulk payment state
   const [showBulkPay, setShowBulkPay] = useState(false);
-  const [bulkAmount, setBulkAmount] = useState<number | ''>('');
+  const [bulkAmount, setBulkAmount] = useState<string>('');
   const [bulkMethod, setBulkMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
   const [bulkWalletLast4, setBulkWalletLast4] = useState('');
   const [bulkReceiverWalletLast4, setBulkReceiverWalletLast4] = useState('');
@@ -28,8 +28,8 @@ export function InstallmentsPayCustomer() {
         setSelectedContract(updated);
         // Auto-set next unpaid installment amount
         const nextUnpaid = updated.payments.find(p => !p.isPaid);
-        if (nextUnpaid && (payAmount === '' || payAmount === 0)) {
-          setPayAmount(nextUnpaid.amount);
+        if (nextUnpaid && (payAmount === '' || Number(payAmount) === 0)) {
+          setPayAmount(String(nextUnpaid.amount));
         }
       }
     }
@@ -42,7 +42,7 @@ export function InstallmentsPayCustomer() {
       if (match) {
         setSelectedContract(match);
         const nextPayment = match.payments.find(p => !p.isPaid);
-        setPayAmount(nextPayment ? nextPayment.amount : '');
+        setPayAmount(nextPayment ? String(nextPayment.amount) : '');
         setSearchTerm(match.pageNumber || match.customerName);
       }
       setSelectedContractIdForPayment(null);
@@ -68,7 +68,7 @@ export function InstallmentsPayCustomer() {
       setSearchResults([]);
       setSelectedContract(matches[0]);
       const nextPayment = matches[0].payments.find(p => !p.isPaid);
-      setPayAmount(nextPayment ? nextPayment.amount : '');
+      setPayAmount(nextPayment ? String(nextPayment.amount) : '');
     } else {
       alert('لم يتم العثور على عميل بهذه البيانات');
       setSearchResults([]);
@@ -106,7 +106,7 @@ export function InstallmentsPayCustomer() {
       alert('لا يمكن الدفع لأن المبلغ المتبقي صفر (العقد مسدد بالكامل)');
       return;
     }
-    const amount = typeof payAmount === 'number' ? payAmount : 0;
+    const amount = payAmount !== '' ? Number(payAmount) : 0;
     if (amount <= 0) {
       alert('يرجى إدخال مبلغ صحيح');
       return;
@@ -151,7 +151,7 @@ export function InstallmentsPayCustomer() {
       alert('لا يمكن الدفع لأن المبلغ المتبقي صفر (العقد مسدد بالكامل)');
       return;
     }
-    const totalAmount = typeof bulkAmount === 'number' ? bulkAmount : 0;
+    const totalAmount = bulkAmount !== '' ? Number(bulkAmount) : 0;
     if (totalAmount <= 0) {
       alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
       return;
@@ -305,7 +305,7 @@ export function InstallmentsPayCustomer() {
                                onClick={() => {
                                  setSelectedContract(contract);
                                  const nextPayment = contract.payments.find(p => !p.isPaid);
-                                 setPayAmount(nextPayment ? nextPayment.amount : '');
+                                 setPayAmount(nextPayment ? String(nextPayment.amount) : '');
                                  setSearchResults([]);
                                }}
                                className="border border-[#475569] hover:border-black bg-white hover:bg-blue-50 p-4 rounded-sm text-right transition-all flex flex-col gap-1.5 shadow-sm"
@@ -419,11 +419,17 @@ export function InstallmentsPayCustomer() {
                               <div className="flex flex-col gap-1.5">
                                 <label className="text-sm font-bold text-blue-900">المبلغ الإجمالي (ج.م):</label>
                                 <input
-                                  type="number"
+                                  type="text"
+                                  inputMode="decimal"
                                   className="h-10 border-2 border-blue-400 text-center font-bold text-lg outline-none shadow-inner bg-white"
                                   placeholder="مثال: 3000"
                                   value={bulkAmount}
-                                  onChange={e => setBulkAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                  onChange={e => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                                    const parts = val.split('.');
+                                    const cleanVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                                    setBulkAmount(cleanVal);
+                                  }}
                                 />
                               </div>
                               <div className="flex flex-col gap-1.5">
@@ -490,7 +496,7 @@ export function InstallmentsPayCustomer() {
 
                             <button
                               onClick={handleBulkPay}
-                              disabled={bulkAmount === '' || bulkAmount <= 0 || Number(bulkAmount) > contractCalcs.remaining}
+                              disabled={bulkAmount === '' || Number(bulkAmount) <= 0 || Number(bulkAmount) > contractCalcs.remaining}
                               className="w-full bg-[#2e7d32] hover:bg-[#1b5e20] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 shadow text-base transition-colors"
                             >
                               ✅ تأكيد الدفعة الإجمالية
@@ -523,10 +529,16 @@ export function InstallmentsPayCustomer() {
                                                 <td className="py-2.5 px-3 border-l border-gray-200">
                                                     {isNextDue ? (
                                                         <input 
-                                                          type="number" 
+                                                          type="text" 
+                                                          inputMode="decimal"
                                                           className="w-28 h-7 border-2 border-blue-400 text-center font-bold outline-none shadow-inner bg-yellow-50"
                                                           value={payAmount}
-                                                          onChange={e => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                                          onChange={e => {
+                                                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                                                            const parts = val.split('.');
+                                                            const cleanVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                                                            setPayAmount(cleanVal);
+                                                          }}
                                                         />
                                                     ) : (
                                                         <span className="font-bold">{p.isPaid ? (p.paidAmount !== undefined ? p.paidAmount : p.amount) : p.amount}</span>
