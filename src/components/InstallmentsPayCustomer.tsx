@@ -102,6 +102,10 @@ export function InstallmentsPayCustomer() {
 
   const handlePay = () => {
     if (!selectedContract || !contractCalcs?.nextPayment) return;
+    if (contractCalcs.remaining <= 0) {
+      alert('لا يمكن الدفع لأن المبلغ المتبقي صفر (العقد مسدد بالكامل)');
+      return;
+    }
     const amount = typeof payAmount === 'number' ? payAmount : 0;
     if (amount <= 0) {
       alert('يرجى إدخال مبلغ صحيح');
@@ -137,6 +141,10 @@ export function InstallmentsPayCustomer() {
   // Bulk payment handler
   const handleBulkPay = () => {
     if (!selectedContract || !contractCalcs) return;
+    if (contractCalcs.remaining <= 0) {
+      alert('لا يمكن الدفع لأن المبلغ المتبقي صفر (العقد مسدد بالكامل)');
+      return;
+    }
     const totalAmount = typeof bulkAmount === 'number' ? bulkAmount : 0;
     if (totalAmount <= 0) {
       alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
@@ -365,21 +373,29 @@ export function InstallmentsPayCustomer() {
                             </div>
                         </div>
 
-                        {/* Bulk Payment Section */}
-                        <div className="flex justify-center gap-4 mb-6">
-                          <button
-                            onClick={() => { setShowBulkPay(!showBulkPay); setBulkAmount(''); }}
-                            className={`font-bold py-2 px-6 shadow text-sm transition-colors border ${
-                              showBulkPay 
-                                ? 'bg-gray-300 text-gray-700 border-gray-400' 
-                                : 'bg-[#1565c0] hover:bg-[#0d47a1] text-white border-[#0d47a1]'
-                            }`}
-                          >
-                            💰 دفعة إجمالية (تسديد أكثر من قسط)
-                          </button>
-                        </div>
+                        {contractCalcs.remaining <= 0 && (
+                          <div className="bg-green-100 border-2 border-green-500 text-green-800 font-extrabold text-xl py-4 px-6 text-center my-6 rounded shadow-md">
+                            🎉 تم سداد هذا العقد بالكامل! لا توجد أقساط متبقية.
+                          </div>
+                        )}
 
-                        {showBulkPay && (
+                        {/* Bulk Payment Section */}
+                        {contractCalcs.remaining > 0 && (
+                          <div className="flex justify-center gap-4 mb-6">
+                            <button
+                              onClick={() => { setShowBulkPay(!showBulkPay); setBulkAmount(''); }}
+                              className={`font-bold py-2 px-6 shadow text-sm transition-colors border ${
+                                showBulkPay 
+                                  ? 'bg-gray-300 text-gray-700 border-gray-400' 
+                                  : 'bg-[#1565c0] hover:bg-[#0d47a1] text-white border-[#0d47a1]'
+                              }`}
+                            >
+                              💰 دفعة إجمالية (تسديد أكثر من قسط)
+                            </button>
+                          </div>
+                        )}
+
+                        {contractCalcs.remaining > 0 && showBulkPay && (
                           <div className="bg-[#e3f2fd] border-2 border-[#90caf9] p-5 mb-6 space-y-4">
                             <div className="flex items-center gap-2 border-b border-blue-200 pb-3">
                               <div className="w-1.5 h-5 bg-blue-600 rounded-full"></div>
@@ -479,7 +495,7 @@ export function InstallmentsPayCustomer() {
                                     {selectedContract.payments.map((p, idx) => {
                                         const dueDate = new Date(p.dueDate);
                                         const isLate = !p.isPaid && dueDate < today;
-                                        const isNextDue = !p.isPaid && contractCalcs.nextPayment?.id === p.id;
+                                        const isNextDue = !p.isPaid && contractCalcs.nextPayment?.id === p.id && contractCalcs.remaining > 0;
 
                                         return (
                                             <tr key={p.id} className={`border-b border-gray-200 ${isLate ? 'bg-[#ffebee]' : p.isPaid ? 'bg-green-50' : 'even:bg-gray-50'}`}>
