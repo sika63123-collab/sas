@@ -13,6 +13,28 @@ export function InstallmentsPayCustomer() {
   const [receiverWalletLast4, setReceiverWalletLast4] = useState('');
   const [searchResults, setSearchResults] = useState<InstallmentContract[]>([]);
 
+  // Bulk payment state
+  const [showBulkPay, setShowBulkPay] = useState(false);
+  const [bulkAmount, setBulkAmount] = useState<number | ''>('');
+  const [bulkMethod, setBulkMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [bulkWalletLast4, setBulkWalletLast4] = useState('');
+  const [bulkReceiverWalletLast4, setBulkReceiverWalletLast4] = useState('');
+
+  // Sync selectedContract with store whenever installmentContracts change (e.g. after payment)
+  useEffect(() => {
+    if (selectedContract) {
+      const updated = installmentContracts.find(c => c.id === selectedContract.id);
+      if (updated) {
+        setSelectedContract(updated);
+        // Auto-set next unpaid installment amount
+        const nextUnpaid = updated.payments.find(p => !p.isPaid);
+        if (nextUnpaid && (payAmount === '' || payAmount === 0)) {
+          setPayAmount(nextUnpaid.amount);
+        }
+      }
+    }
+  }, [installmentContracts]);
+
   // Handle pre-selected contract from Archive double click
   useEffect(() => {
     if (selectedContractIdForPayment) {
@@ -104,19 +126,88 @@ export function InstallmentsPayCustomer() {
       payInstallment(selectedContract.id, contractCalcs.nextPayment.id, amount, selectedMethod, selectedMethod !== 'cash' ? walletLast4 : undefined, selectedMethod !== 'cash' ? receiverWalletLast4 : undefined);
       alert('تم تسجيل الدفع بنجاح');
       
-      // Reset inputs
+      // Reset inputs — the useEffect above will sync selectedContract with updated store data
       setSelectedMethod('cash');
       setWalletLast4('');
       setReceiverWalletLast4('');
-
-      // Refresh selected contract from store
-      const updated = installmentContracts.find(c => c.id === selectedContract.id);
-      if (updated) {
-        const nextUnpaid = updated.payments.find(p => !p.isPaid && p.id !== contractCalcs.nextPayment!.id);
-        setPayAmount(nextUnpaid ? nextUnpaid.amount : '');
-      }
+      setPayAmount('');
     }
   };
+
+  // Bulk payment handler
+  const handleBulkPay = () => {
+    if (!selectedContract || !contractCalcs) return;
+    const totalAmount = typeof bulkAmount === 'number' ? bulkAmount : 0;
+    if (totalAmount <= 0) {
+      alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+      return;
+    }
+
+    if (bulkMethod !== 'cash') {
+      if (!bulkWalletLast4 || bulkWalletLast4.trim().length < 4) {
+        alert('يرجى إدخال آخر 4 أرقام لوسيلة الدفع (المرسلة)');
+        return;
+      }
+      if (!bulkReceiverWalletLast4 || bulkReceiverWalletLast4.trim().length < 4) {
+        alert('يرجى إدخال آخر 4 أرقام للمحفظة المستقبلة');
+        return;
+      }
+    }
+
+    const unpaidPayments = selectedContract.payments.filter(p => !p.isPaid);
+    if (unpaidPayments.length === 0) {
+      alert('جميع الأقساط مسددة بالفعل');
+      return;
+    }
+
+    // Calculate how many installments this covers
+    let remaining = totalAmount;
+    const paymentsPlan: { id: string; amount: number; index: number }[] = [];
+    for (const p of unpaidPayments) {
+      if (remaining <= 0) break;
+      const payAmt = Math.min(remaining, p.amount);
+      const idx = selectedContract.payments.findIndex(pp => pp.id === p.id) + 1;
+      paymentsPlan.push({ id: p.id, amount: payAmt, index: idx });
+      remaining -= payAmt;
+    }
+
+    const methodName = bulkMethod === 'cash' ? 'نقدي' : bulkMethod === 'visa' ? 'فيزا' : bulkMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش';
+    const installmentsList = paymentsPlan.map(p => `  • قسط #${p.index}: ${p.amount.toFixed(2)} ج.م`).join('\n');
+    const confirmMsg = `دفعة إجمالية بمبلغ ${totalAmount.toFixed(2)} ج.م (${methodName})\n\nسيتم تسديد ${paymentsPlan.length} قسط:\n${installmentsList}${remaining > 0 ? `\n\n⚠️ سيتبقى ${remaining.toFixed(2)} ج.م زيادة عن الأقساط المتاحة` : ''}\n\nتأكيد؟`;
+
+    if (window.confirm(confirmMsg)) {
+      for (const p of paymentsPlan) {
+        payInstallment(
+          selectedContract.id,
+          p.id,
+          p.amount,
+          bulkMethod,
+          bulkMethod !== 'cash' ? bulkWalletLast4 : undefined,
+          bulkMethod !== 'cash' ? bulkReceiverWalletLast4 : undefined
+        );
+      }
+      alert(`تم تسديد ${paymentsPlan.length} قسط بنجاح بإجمالي ${totalAmount.toFixed(2)} ج.م`);
+      setShowBulkPay(false);
+      setBulkAmount('');
+      setBulkMethod('cash');
+      setBulkWalletLast4('');
+      setBulkReceiverWalletLast4('');
+    }
+  };
+
+  // Preview for bulk payment
+  const bulkPayPreview = useMemo(() => {
+    if (!selectedContract || !showBulkPay || bulkAmount === '' || bulkAmount <= 0) return null;
+    const unpaid = selectedContract.payments.filter(p => !p.isPaid);
+    let rem = bulkAmount;
+    let count = 0;
+    for (const p of unpaid) {
+      if (rem <= 0) break;
+      rem -= p.amount;
+      count++;
+    }
+    return { count, excess: rem > 0 ? rem : 0 };
+  }, [selectedContract, showBulkPay, bulkAmount]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -273,6 +364,104 @@ export function InstallmentsPayCustomer() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Bulk Payment Section */}
+                        <div className="flex justify-center gap-4 mb-6">
+                          <button
+                            onClick={() => { setShowBulkPay(!showBulkPay); setBulkAmount(''); }}
+                            className={`font-bold py-2 px-6 shadow text-sm transition-colors border ${
+                              showBulkPay 
+                                ? 'bg-gray-300 text-gray-700 border-gray-400' 
+                                : 'bg-[#1565c0] hover:bg-[#0d47a1] text-white border-[#0d47a1]'
+                            }`}
+                          >
+                            💰 دفعة إجمالية (تسديد أكثر من قسط)
+                          </button>
+                        </div>
+
+                        {showBulkPay && (
+                          <div className="bg-[#e3f2fd] border-2 border-[#90caf9] p-5 mb-6 space-y-4">
+                            <div className="flex items-center gap-2 border-b border-blue-200 pb-3">
+                              <div className="w-1.5 h-5 bg-blue-600 rounded-full"></div>
+                              <h3 className="font-bold text-blue-900 text-base">تسديد دفعة إجمالية</h3>
+                              <span className="text-xs text-blue-600 font-medium mr-auto">أدخل المبلغ الإجمالي وسيتم توزيعه على الأقساط المتبقية بالترتيب</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-bold text-blue-900">المبلغ الإجمالي (ج.م):</label>
+                                <input
+                                  type="number"
+                                  className="h-10 border-2 border-blue-400 text-center font-bold text-lg outline-none shadow-inner bg-white"
+                                  placeholder="مثال: 3000"
+                                  value={bulkAmount}
+                                  onChange={e => setBulkAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-bold text-blue-900">طريقة الدفع:</label>
+                                <select
+                                  className="h-10 border border-gray-300 px-2 text-sm font-bold bg-white"
+                                  value={bulkMethod}
+                                  onChange={e => setBulkMethod(e.target.value as any)}
+                                >
+                                  <option value="cash">كاش</option>
+                                  <option value="visa">فيزا</option>
+                                  <option value="instapay">إنستا باي</option>
+                                  <option value="vodafone_cash">فودافون كاش</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {bulkMethod !== 'cash' && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-sm font-bold text-blue-900">المرسل: آخر 4 أرقام:</label>
+                                  <input
+                                    type="text"
+                                    className="h-10 border border-gray-300 text-center text-sm font-bold bg-white"
+                                    placeholder="آخر 4 أرقام"
+                                    value={bulkWalletLast4}
+                                    onChange={e => setBulkWalletLast4(e.target.value.replace(/\D/g, ''))}
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-sm font-bold text-blue-900">المستلم: آخر 4 أرقام:</label>
+                                  <input
+                                    type="text"
+                                    className="h-10 border border-gray-300 text-center text-sm font-bold bg-white"
+                                    placeholder="آخر 4 أرقام"
+                                    value={bulkReceiverWalletLast4}
+                                    onChange={e => setBulkReceiverWalletLast4(e.target.value.replace(/\D/g, ''))}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Preview */}
+                            {bulkPayPreview && (
+                              <div className={`p-3 border text-sm font-bold flex items-center gap-2 ${
+                                bulkPayPreview.excess > 0 
+                                  ? 'bg-amber-50 border-amber-300 text-amber-800' 
+                                  : 'bg-green-50 border-green-300 text-green-800'
+                              }`}>
+                                <span>📋</span>
+                                <span>سيتم تسديد <strong>{bulkPayPreview.count}</strong> قسط من أصل {contractCalcs.totalCount - contractCalcs.paidCount} متبقي</span>
+                                {bulkPayPreview.excess > 0 && (
+                                  <span className="mr-2 text-amber-600">| ⚠️ زيادة {bulkPayPreview.excess.toFixed(2)} ج.م لن يتم احتسابها</span>
+                                )}
+                              </div>
+                            )}
+
+                            <button
+                              onClick={handleBulkPay}
+                              disabled={bulkAmount === '' || bulkAmount <= 0}
+                              className="w-full bg-[#2e7d32] hover:bg-[#1b5e20] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 shadow text-base transition-colors"
+                            >
+                              ✅ تأكيد الدفعة الإجمالية
+                            </button>
+                          </div>
+                        )}
 
                         {/* Payments Table */}
                         <div className="border border-gray-300 overflow-auto max-h-[400px]">
