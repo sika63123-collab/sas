@@ -3,12 +3,12 @@ import { useAppStore } from '../store';
 import { InstallmentContract } from '../types';
 
 export function InstallmentsPayCustomer() {
-  const { installmentContracts, payInstallment, selectedContractIdForPayment, setSelectedContractIdForPayment } = useAppStore();
+  const { installmentContracts, payInstallment, selectedContractIdForPayment, setSelectedContractIdForPayment, shiftAccounts } = useAppStore();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContract, setSelectedContract] = useState<InstallmentContract | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
-  const [selectedMethod, setSelectedMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [selectedMethod, setSelectedMethod] = useState<string>('cash');
   const [walletLast4, setWalletLast4] = useState('');
   const [receiverWalletLast4, setReceiverWalletLast4] = useState('');
   const [searchResults, setSearchResults] = useState<InstallmentContract[]>([]);
@@ -16,7 +16,7 @@ export function InstallmentsPayCustomer() {
   // Bulk payment state
   const [showBulkPay, setShowBulkPay] = useState(false);
   const [bulkAmount, setBulkAmount] = useState<string>('');
-  const [bulkMethod, setBulkMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [bulkMethod, setBulkMethod] = useState<string>('cash');
   const [bulkWalletLast4, setBulkWalletLast4] = useState('');
   const [bulkReceiverWalletLast4, setBulkReceiverWalletLast4] = useState('');
 
@@ -129,7 +129,8 @@ export function InstallmentsPayCustomer() {
       }
     }
 
-    const methodName = selectedMethod === 'cash' ? 'نقدي' : selectedMethod === 'visa' ? 'فيزا' : selectedMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش';
+    const selectedAccount = shiftAccounts.find(a => a.id === selectedMethod);
+    const methodName = selectedAccount ? selectedAccount.name : (selectedMethod === 'cash' ? 'نقدي' : selectedMethod === 'visa' ? 'فيزا' : selectedMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش');
     const confirmMsg = `تأكيد دفع مبلغ ${amount.toFixed(2)} ج.م لقسط رقم ${contractCalcs.paidCount + 1} (${methodName})${selectedMethod !== 'cash' ? ` - من: *${walletLast4} إلى: *${receiverWalletLast4}` : ''}؟`;
 
     if (window.confirm(confirmMsg)) {
@@ -191,7 +192,8 @@ export function InstallmentsPayCustomer() {
       remaining -= payAmt;
     }
 
-    const methodName = bulkMethod === 'cash' ? 'نقدي' : bulkMethod === 'visa' ? 'فيزا' : bulkMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش';
+    const selectedBulkAccount = shiftAccounts.find(a => a.id === bulkMethod);
+    const methodName = selectedBulkAccount ? selectedBulkAccount.name : (bulkMethod === 'cash' ? 'نقدي' : bulkMethod === 'visa' ? 'فيزا' : bulkMethod === 'instapay' ? 'إنستا باي' : 'فودافون كاش');
     const installmentsList = paymentsPlan.map(p => `  • قسط #${p.index}: ${p.amount.toFixed(2)} ج.م`).join('\n');
     const confirmMsg = `دفعة إجمالية بمبلغ ${totalAmount.toFixed(2)} ج.م (${methodName})\n\nسيتم تسديد ${paymentsPlan.length} قسط:\n${installmentsList}${remaining > 0 ? `\n\n⚠️ سيتبقى ${remaining.toFixed(2)} ج.م زيادة عن الأقساط المتاحة` : ''}\n\nتأكيد؟`;
 
@@ -441,8 +443,9 @@ export function InstallmentsPayCustomer() {
                                 >
                                   <option value="cash">كاش</option>
                                   <option value="visa">فيزا</option>
-                                  <option value="instapay">إنستا باي</option>
-                                  <option value="vodafone_cash">فودافون كاش</option>
+                                  {shiftAccounts.map(a => (
+                                    <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
+                                  ))}
                                 </select>
                               </div>
                             </div>
@@ -552,7 +555,11 @@ export function InstallmentsPayCustomer() {
                                                         <div className="flex flex-col items-center">
                                                           <span className="text-green-600 font-bold">✓ تم الدفع</span>
                                                           <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-1.5 py-0.5 rounded mt-0.5">
-                                                            {p.paymentMethod === 'cash' ? 'كاش' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستاباي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'كاش'}
+                                                            {(() => {
+                                                              const acc = shiftAccounts.find(a => a.id === p.paymentMethod);
+                                                              if (acc) return acc.name;
+                                                              return p.paymentMethod === 'cash' ? 'نقدي' : p.paymentMethod === 'visa' ? 'فيزا' : p.paymentMethod === 'instapay' ? 'إنستا باي' : p.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'نقدي';
+                                                            })()}
                                                             {p.walletLast4 ? ` (*${p.walletLast4})` : ''}
                                                             {p.receiverWalletLast4 ? ` ➔ (*${p.receiverWalletLast4})` : ''}
                                                           </span>
@@ -567,8 +574,9 @@ export function InstallmentsPayCustomer() {
                                                             >
                                                               <option value="cash">كاش</option>
                                                               <option value="visa">فيزا</option>
-                                                              <option value="instapay">إنستا باي</option>
-                                                              <option value="vodafone_cash">فودافون كاش</option>
+                                                              {shiftAccounts.map(a => (
+                                                                <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
+                                                              ))}
                                                             </select>
                                                             {selectedMethod !== 'cash' && (
                                                               <div className="flex flex-col gap-1 w-full mt-1">

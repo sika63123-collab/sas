@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { InstallmentPayment } from '../types';
 
 export function InstallmentsAdd() {
-  const { addInstallmentContract, installmentContracts } = useAppStore();
+  const { addInstallmentContract, installmentContracts, shiftAccounts } = useAppStore();
   
   const [contractDate, setContractDate] = useState(new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('');
@@ -32,7 +32,7 @@ export function InstallmentsAdd() {
 
   const [purchasePrice, setPurchasePrice] = useState<number | ''>('');
   const [downPayment, setDownPayment] = useState<number | ''>('');
-  const [downPaymentMethod, setDownPaymentMethod] = useState<'cash' | 'visa' | 'instapay' | 'vodafone_cash'>('cash');
+  const [downPaymentMethod, setDownPaymentMethod] = useState<string>('cash');
   const [downPaymentWalletLast4, setDownPaymentWalletLast4] = useState('');
   const [downPaymentReceiverWalletLast4, setDownPaymentReceiverWalletLast4] = useState('');
   const [interestRate, setInterestRate] = useState<number | ''>('');
@@ -253,12 +253,13 @@ export function InstallmentsAdd() {
                                 <select 
                                     className="flex-1 h-8 border border-gray-300 shadow-inner px-2 outline-none text-right font-bold bg-white"
                                     value={downPaymentMethod} 
-                                    onChange={e => setDownPaymentMethod(e.target.value as any)}
+                                    onChange={e => setDownPaymentMethod(e.target.value)}
                                 >
                                     <option value="cash">كاش (نقدي)</option>
                                     <option value="visa">فيزا</option>
-                                    <option value="instapay">إنستا باي</option>
-                                    <option value="vodafone_cash">فودافون كاش</option>
+                                    {shiftAccounts.map((a: any) => (
+                                        <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
+                                    ))}
                                 </select>
                             </div>
                             {downPaymentMethod !== 'cash' && (

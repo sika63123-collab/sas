@@ -3,13 +3,14 @@ import { useAppStore } from '../store';
 import { FileText, CreditCard, Box, Calendar } from 'lucide-react';
 import ProfitMarginReport from './ProfitMarginReport';
 
-const getMethodName = (method: string) => {
-  switch(method) {
-    case 'visa': return 'فيزا';
-    case 'instapay': return 'انستا باي';
-    case 'vodafone_cash': return 'فودافون كاش';
-    default: return 'نقدي';
-  }
+const getMethodName = (method: string, accounts: any[]) => {
+  if (method === 'visa') return 'فيزا';
+  if (method === 'cash') return 'نقدي';
+  const acc = accounts.find(a => a.id === method);
+  if (acc) return acc.name;
+  if (method === 'instapay') return 'انستا باي';
+  if (method === 'vodafone_cash') return 'فودافون كاش';
+  return method || 'نقدي';
 };
 
 const getTypeName = (type: string) => {
@@ -31,7 +32,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
   const { 
     transactions, 
     expenses, 
-    installmentContracts
+    installmentContracts,
+    shiftAccounts
   } = useAppStore();
 
   const saleTransactions = transactions.filter(t => t.type === 'sale' || t.type === 'deposit_sale');
@@ -246,7 +248,7 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
       }
 
       // Determine amounts and description based on transaction type
-      const methodLabel = getMethodName(t.paymentMethod);
+      const methodLabel = getMethodName(t.paymentMethod, shiftAccounts);
       const walletsInfo = (t.senderWalletLast4 || t.receiverWalletLast4)
         ? ` (من: ${t.senderWalletLast4 ? `*${t.senderWalletLast4}` : '—'} | إلى: ${t.receiverWalletLast4 ? `*${t.receiverWalletLast4}` : '—'})`
         : '';
@@ -551,9 +553,9 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
                          </div>
                        </td>
                        <td className="px-6 py-4">
-                          <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
-                            {getMethodName(t.paymentMethod)}
-                          </span>
+                           <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
+                             {getMethodName(t.paymentMethod, shiftAccounts)}
+                           </span>
                        </td>
                        <td className="px-6 py-4">
                           <ul className="space-y-1">

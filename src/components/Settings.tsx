@@ -10,7 +10,7 @@ const defaultPermissions: UserPermissions = {
 };
 
 export function Settings() {
-  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData, clearData, shifts } = useAppStore();
+  const { users, addUser, updateUser, deleteUser, currentUser, products, transactions, installmentContracts, expenses, expenseTypes, restoreData, clearData, shifts, shiftAccounts, addShiftAccount, updateShiftAccount, removeShiftAccount } = useAppStore();
   
   const [editingCode, setEditingCode] = useState<string | null>(null);
   
@@ -19,6 +19,11 @@ export function Settings() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'user'>('user');
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
+
+  const [walletEditingId, setWalletEditingId] = useState<string | null>(null);
+  const [walletName, setWalletName] = useState('');
+  const [walletSubLabel, setWalletSubLabel] = useState('');
+  const [walletNumber, setWalletNumber] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +65,33 @@ export function Settings() {
       addUser({ code, name, role, password, permissions });
     }
     handleCancel();
+  };
+
+  const handleEditWallet = (a: any) => {
+    setWalletEditingId(a.id);
+    setWalletName(a.name);
+    setWalletSubLabel(a.subLabel || '');
+    setWalletNumber(a.walletNumber || '');
+  };
+
+  const handleCancelWallet = () => {
+    setWalletEditingId(null);
+    setWalletName('');
+    setWalletSubLabel('');
+    setWalletNumber('');
+  };
+
+  const handleSaveWallet = () => {
+    if (!walletName) {
+      alert("الرجاء إدخال اسم المحفظة");
+      return;
+    }
+    if (walletEditingId) {
+      updateShiftAccount(walletEditingId, { name: walletName, subLabel: walletSubLabel, walletNumber });
+    } else {
+      addShiftAccount({ name: walletName, subLabel: walletSubLabel, walletNumber });
+    }
+    handleCancelWallet();
   };
 
   const togglePermission = (key: keyof UserPermissions) => {
@@ -269,6 +301,80 @@ export function Settings() {
                                ×
                              </button>
                            )}
+                        </div>
+                     ))}
+                  </div>
+               </div>
+            </div>
+
+            {/* Middle Row: Wallets Management */}
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+               <div className="w-full lg:flex-1 bg-white p-6 shadow-sm border border-gray-300 min-h-[300px]">
+                  <h3 className="font-bold text-2xl mb-6 text-indigo-900 border-b-2 border-gray-100 pb-2 flex justify-between items-center">
+                     {walletEditingId ? 'تعديل محفظة إلكترونية' : 'إضافة محفظة إلكترونية جديدة'}
+                     {walletEditingId && <button onClick={handleCancelWallet} className="text-sm text-gray-500 hover:text-red-500">إلغاء التعديل</button>}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-6 mb-6">
+                     <div>
+                        <div className="flex justify-between mb-1">
+                            <span className="text-red-500 text-sm">*</span>
+                            <label className="font-bold text-sm text-gray-700">اسم المحفظة / المنصة</label>
+                        </div>
+                        <input className="w-full h-10 border border-gray-300 px-3 outline-none text-right font-medium" placeholder="مثل: فودافون كاش، انستا باي..." value={walletName} onChange={e => setWalletName(e.target.value)} />
+                     </div>
+                     <div>
+                        <div className="flex justify-between mb-1">
+                            <label className="font-bold text-sm text-gray-700">وصف إضافي (اختياري)</label>
+                        </div>
+                        <input className="w-full h-10 border border-gray-300 px-3 outline-none text-right font-medium" placeholder="مثل: محفظة 1" value={walletSubLabel} onChange={e => setWalletSubLabel(e.target.value)} />
+                     </div>
+                     <div>
+                        <div className="flex justify-between mb-1">
+                            <label className="font-bold text-sm text-gray-700">رقم المحفظة (اختياري)</label>
+                        </div>
+                        <input className="w-full h-10 border border-gray-300 px-3 outline-none text-right font-medium" placeholder="مثل: 01012345678" value={walletNumber} onChange={e => setWalletNumber(e.target.value)} />
+                     </div>
+                  </div>
+
+                  <button onClick={handleSaveWallet} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-2.5 shadow-md transition-colors text-sm rounded-sm">
+                     {walletEditingId ? 'تعديل المحفظة' : 'حفظ المحفظة'}
+                  </button>
+               </div>
+
+               <div className="w-full lg:w-[30%] bg-white p-6 shadow-sm border border-gray-300 min-h-[300px]">
+                  <div className="flex justify-between mb-4 border-b pb-2 items-center">
+                     <h3 className="font-bold text-xl text-indigo-900">المحافظ الإلكترونية</h3>
+                     <button onClick={handleCancelWallet} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 shadow-sm font-bold">
+                        محفظة جديدة +
+                     </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto">
+                     {shiftAccounts.map((a: any) => (
+                        <div key={a.id} className="border border-gray-200 p-3 flex justify-between items-center group hover:bg-indigo-50/50 relative">
+                           <div className="text-right">
+                              <div className="font-bold text-gray-800 text-sm">
+                                 {a.name}
+                              </div>
+                              <div className="text-gray-500 text-xs mt-1">
+                                 {a.subLabel && <span className="ml-2">{a.subLabel}</span>}
+                                 {a.walletNumber && <span>({a.walletNumber})</span>}
+                              </div>
+                           </div>
+                           <button onClick={() => handleEditWallet(a)} className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-xs font-bold px-4 py-1.5 rounded-sm">
+                              تعديل
+                           </button>
+                           <button
+                             onClick={() => {
+                               if (window.confirm('هل أنت متأكد من حذف هذه المحفظة؟ قد يؤثر ذلك على تقارير الأرصدة المرتبطة بها.')) {
+                                 removeShiftAccount(a.id);
+                               }
+                             }}
+                             className="absolute -top-2 -left-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                           >
+                             ×
+                           </button>
                         </div>
                      ))}
                   </div>

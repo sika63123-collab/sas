@@ -4,7 +4,7 @@ import { Product, CartItem, PaymentMethod, TransactionType } from '../types';
 import { CheckCircle, Search, X, Plus, Trash2 } from 'lucide-react';
 
 export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvoiceLoaded }: { initialType?: TransactionType; initialInvoiceId?: string | null | undefined; onInvoiceLoaded?: () => void; key?: any }) {
-  const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType, addPaymentTransaction } = useAppStore();
+  const { products, addTransaction, transactions, updateTransaction, expenses, expenseTypes, addExpense, addExpenseType, deleteExpenseType, addPaymentTransaction, shiftAccounts } = useAppStore();
   const cashierTransactions = transactions.filter(t => 
     t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'return' || t.type === 'deposit_return'
   );
@@ -290,7 +290,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       return;
     }
 
-    const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
+    const isEWallet = actualPaymentMethod !== 'cash' && actualPaymentMethod !== 'visa';
 
     if (isEWallet) {
       if (senderWallet.length !== 4 || receiverWallet.length !== 4) {
@@ -393,7 +393,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       alert('يجب ادخال رقم الحركة (الفاتورة الأصلية)');
       return;
     }
-    const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
+    const isEWallet = actualPaymentMethod !== 'cash' && actualPaymentMethod !== 'visa';
     if (isEWallet) {
       setShowCheckoutModal(true);
     } else {
@@ -515,7 +515,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
 
 
 
-  const isEWallet = actualPaymentMethod === 'instapay' || actualPaymentMethod === 'vodafone_cash';
+  const isEWallet = actualPaymentMethod !== 'cash' && actualPaymentMethod !== 'visa';
 
   // Soft modern Apple-style UI elements
   const inputTheme = "h-9 border border-gray-200 rounded-lg shadow-sm outline-none px-3 bg-white font-medium text-sm focus:ring-2 focus:ring-blue-100 transition-shadow";
@@ -687,8 +687,9 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
               >
                 <option value="cash">نقدية</option>
                 <option value="visa">فيزا</option>
-                <option value="instapay">انستا باي</option>
-                <option value="vodafone_cash">فودافون كاش</option>
+                {shiftAccounts.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
+                ))}
               </select>
             </div>
             {isEWallet && (

@@ -38,7 +38,7 @@ interface AppContextType {
   updateShiftAccount: (id: string, updates: Partial<ShiftAccount>) => void;
   addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
   removeShiftInventoryItem: (id: string) => void;
-  addCashExchange: (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string, exchangeRecordNumber?: string) => void;
+  addCashExchange: (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string) => void;
   shifts: CashShift[];
   activeShift: CashShift | undefined;
   openShift: (openingCash: number) => void;
@@ -115,10 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = getStorageItem('mobile_shop_shift_accounts');
     return saved ? JSON.parse(saved) : [
       { id: 'sa3', name: 'فودافون كاش', subLabel: 'محفظة 1' },
-      { id: 'sa4', name: 'انستا باي' },
-      { id: 'sa5', name: 'فوري' },
-      { id: 'sa6', name: 'امان' },
-      { id: 'sa7', name: 'ضامن' },
+      { id: 'sa4', name: 'انستا باي' }
     ];
   });
 
@@ -582,10 +579,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShiftInventoryItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const addCashExchange = (amount: number, targetMethod: 'vodafone_cash' | 'instapay', walletLast4: string, note?: string, exchangeRecordNumber?: string) => {
+  const addCashExchange = (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string) => {
     const exchangeId = Date.now().toString() + Math.random().toString(36).slice(2, 7);
     const now = new Date().toISOString();
-    const methodLabel = targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي';
+    // Resolve dynamic label if possible
+    const account = shiftAccounts.find(a => a.id === targetMethod || a.name === targetMethod);
+    const methodLabel = account ? account.name : (targetMethod === 'vodafone_cash' ? 'فودافون كاش' : (targetMethod === 'instapay' ? 'انستا باي' : targetMethod));
     const noteText = note ? ` - ${note}` : '';
 
     // حركة 1: كاش خارج من الدرج (OUT)

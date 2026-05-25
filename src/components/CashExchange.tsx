@@ -1,23 +1,28 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
-import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign } from 'lucide-react';
+import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign, Trash2, Plus } from 'lucide-react';
 import { Transaction } from '../types';
 
-type TargetMethod = 'vodafone_cash' | 'instapay';
+type TargetMethod = string;
 
 export default function BalancesScreen() {
-  const { addCashExchange, transactions, activeShift, expenses, shiftAccounts } = useAppStore();
+  const { addCashExchange, transactions, activeShift, expenses, shiftAccounts, deleteShiftAccount, addShiftAccount } = useAppStore();
   
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [amount, setAmount] = useState<string>('');
-  const [targetMethod, setTargetMethod] = useState<TargetMethod>('vodafone_cash');
+  const [targetMethod, setTargetMethod] = useState<TargetMethod>(shiftAccounts.length > 0 ? shiftAccounts[0].id : 'vodafone_cash');
   const [walletLast4, setWalletLast4] = useState('');
   const [exchangeRecordNumber, setExchangeRecordNumber] = useState('');
   const [note, setNote] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; recordNumber?: string } | null>(null);
 
-  const methodLabel = targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي';
+  const [showAddWallet, setShowAddWallet] = useState(false);
+  const [newWalletName, setNewWalletName] = useState('');
+  const [newWalletNumber, setNewWalletNumber] = useState('');
+
+  const selectedAccount = shiftAccounts.find(a => a.id === targetMethod);
+  const methodLabel = selectedAccount ? selectedAccount.name : (targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي');
 
   const handleSubmitExchange = () => {
     const numAmount = Number(amount);
@@ -151,13 +156,22 @@ export default function BalancesScreen() {
             متابعة أرصدة المحافظ الإلكترونية، النقدية، والمسحوبات للوردية الحالية
           </p>
         </div>
-        <button
-          onClick={() => setShowExchangeModal(true)}
-          className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"
-        >
-          <ArrowRightLeft className="h-5 w-5" />
-          تسييل / تبادل عهدة
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAddWallet(true)}
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-5 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
+          >
+            <Plus className="h-5 w-5" />
+            إضافة محفظة
+          </button>
+          <button
+            onClick={() => setShowExchangeModal(true)}
+            className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"
+          >
+            <ArrowRightLeft className="h-5 w-5" />
+            تسييل / تبادل عهدة
+          </button>
+        </div>
       </div>
 
       {/* Success Message */}
@@ -185,9 +199,20 @@ export default function BalancesScreen() {
           </h2>
           
           {walletsStats.map((w, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative">
+              <button 
+                onClick={() => {
+                  if (window.confirm(`هل أنت متأكد من حذف محفظة ${w.name}؟`)) {
+                    deleteShiftAccount(w.id);
+                  }
+                }}
+                className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="حذف المحفظة"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
               <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
-                <div>
+                <div className="pr-10 lg:pr-0 pl-10">
                   <h3 className="font-black text-lg text-gray-900">{w.name}</h3>
                   {(w.subLabel || w.walletNumber) && (
                     <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md">
@@ -279,6 +304,47 @@ export default function BalancesScreen() {
         </div>
       </div>
 
+      {/* Add Wallet Modal */}
+      {showAddWallet && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]">
+            <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                <Plus className="h-5 w-5" /> إضافة محفظة جديدة
+              </h2>
+              <button onClick={() => setShowAddWallet(false)} className="text-indigo-700 hover:bg-indigo-200 p-1 rounded-lg">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">اسم المحفظة <span className="text-red-500">*</span></label>
+                <input type="text" value={newWalletName} onChange={e => setNewWalletName(e.target.value)} placeholder="مثال: أورانج كاش" className="w-full h-11 border-2 border-gray-200 focus:border-indigo-500 rounded-xl px-4 font-bold outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">رقم المحفظة (اختياري)</label>
+                <input type="text" value={newWalletNumber} onChange={e => setNewWalletNumber(e.target.value)} placeholder="مثال: 01012345678" className="w-full h-11 border-2 border-gray-200 focus:border-indigo-500 rounded-xl px-4 font-bold outline-none" dir="ltr" />
+              </div>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button 
+                onClick={() => {
+                  if (!newWalletName.trim()) return alert('أدخل اسم المحفظة');
+                  addShiftAccount({
+                    id: 'sa_' + Date.now(),
+                    name: newWalletName.trim(),
+                    walletNumber: newWalletNumber.trim() || undefined,
+                  });
+                  setShowAddWallet(false);
+                  setNewWalletName('');
+                  setNewWalletNumber('');
+                }}
+                className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+              >إضافة المحفظة</button>
+              <button onClick={() => setShowAddWallet(false)} className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Exchange Modal */}
       {showExchangeModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -327,18 +393,15 @@ export default function BalancesScreen() {
                     الوجهة (المحفظة) <span className="text-red-500">*</span>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setTargetMethod('vodafone_cash')}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-bold text-sm transition-all ${targetMethod === 'vodafone_cash' ? 'border-red-500 bg-red-50 text-red-800' : 'border-gray-200 bg-white text-gray-600'}`}
-                    >
-                      <Wallet className="h-4 w-4" /> فودافون كاش
-                    </button>
-                    <button
-                      onClick={() => setTargetMethod('instapay')}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-bold text-sm transition-all ${targetMethod === 'instapay' ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-gray-200 bg-white text-gray-600'}`}
-                    >
-                      <Wallet className="h-4 w-4" /> انستا باي
-                    </button>
+                    {shiftAccounts.map(account => (
+                      <button
+                        key={account.id}
+                        onClick={() => setTargetMethod(account.id)}
+                        className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-bold text-sm transition-all ${targetMethod === account.id ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-200 bg-white text-gray-600'}`}
+                      >
+                        <Wallet className="h-4 w-4 shrink-0" /> <span className="truncate">{account.name} {account.subLabel ? `(${account.subLabel})` : ''}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
