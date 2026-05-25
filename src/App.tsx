@@ -132,7 +132,7 @@ function MainApp() {
                       {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
-                      {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">تسييل / تبادل عهدة</button>}
+                      {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">الأرصدة (تسييل العهدة)</button>}
                       <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
                    </div>
                  )}
