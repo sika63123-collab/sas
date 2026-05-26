@@ -6,7 +6,7 @@ import { Transaction } from '../types';
 type TargetMethod = string;
 
 export default function BalancesScreen() {
-  const { addCashExchange, transactions, activeShift, expenses, shiftAccounts, deleteShiftAccount, addShiftAccount } = useAppStore();
+  const { addCashExchange, transactions, activeShift, expenses, shiftAccounts, removeShiftAccount, addShiftAccount } = useAppStore();
   
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [amount, setAmount] = useState<string>('');
@@ -203,7 +203,7 @@ export default function BalancesScreen() {
               <button 
                 onClick={() => {
                   if (window.confirm(`هل أنت متأكد من حذف محفظة ${w.name}؟`)) {
-                    deleteShiftAccount(w.id);
+                    removeShiftAccount(w.id);
                   }
                 }}
                 className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
