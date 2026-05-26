@@ -43,7 +43,7 @@ type ViewMode =
 
 
 function MainApp() {
-  const { currentUser, logout, activeShift } = useAppStore();
+  const { currentUser, logout, activeShift, shiftAccounts } = useAppStore();
   const [activeView, setActiveView] = useState<ViewMode>('home');
 
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');
@@ -132,7 +132,38 @@ function MainApp() {
                       {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
-                      {(isAdmin || p.cashExchange) && <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">الأرصدة (تسييل العهدة)</button>}
+                      {(isAdmin || p.cashExchange) && (
+                        <div className="relative group/sub">
+                          <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 flex justify-between items-center">
+                            <span>فودافون كاش</span>
+                            <span className="text-[10px] text-gray-400 pr-2">◀</span>
+                          </button>
+                          <div className="absolute right-full top-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-l-sm hidden group-hover/sub:block font-normal">
+                            {shiftAccounts.length === 0 ? (
+                              <div className="px-4 py-2 text-sm text-gray-500 text-right">لا توجد محافظ</div>
+                            ) : (
+                              shiftAccounts.map(account => (
+                                <button 
+                                  key={account.id} 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (account.walletNumber) {
+                                      navigator.clipboard.writeText(account.walletNumber);
+                                      alert('تم نسخ رقم المحفظة: ' + account.walletNumber);
+                                    } else {
+                                      alert('لا يوجد رقم مسجل لهذه المحفظة');
+                                    }
+                                  }} 
+                                  className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
+                                >
+                                  <div className="font-bold text-sm">{account.name} {account.subLabel ? `(${account.subLabel})` : ''}</div>
+                                  {account.walletNumber && <div className="text-xs text-gray-500 mt-1" dir="ltr">{account.walletNumber}</div>}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
                    </div>
                  )}
