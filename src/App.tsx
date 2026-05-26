@@ -118,7 +118,7 @@ function MainApp() {
               الرئيسية
             </button>
 
-            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.cashExchange) && (
+            {(isAdmin || p.cashier || p.cashierReturn || p.depositSale || p.depositPay || p.depositReturn || p.cashExchange || p.shiftManagement) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('transaction')}
@@ -131,7 +131,9 @@ function MainApp() {
                    <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                       {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
-                      {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">فواتير العربون</button>}
+                      {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مبيعات عربون</button>}
+                      {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">فواتير العربون</button>}
+                      {(isAdmin || p.depositReturn) && <button onClick={() => selectView('cashier', 'deposit_return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع مبيعات عربون</button>}
                       {(isAdmin || p.cashExchange) && (
                         <div className="relative group/sub">
                           <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 flex justify-between items-center">
@@ -164,7 +166,7 @@ function MainApp() {
                           </div>
                         </div>
                       )}
-                      <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>
+                      {(isAdmin || p.shiftManagement) && <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>}
                    </div>
                  )}
               </div>
@@ -189,7 +191,7 @@ function MainApp() {
               </div>
            )}
 
-           {(isAdmin || p.storeQuantities || p.itemCard || p.addItem) && (
+           {(isAdmin || p.storeQuantities || p.itemCard || p.addItem || p.pricing) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('store')}
@@ -202,14 +204,14 @@ function MainApp() {
                   <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                      {(isAdmin || p.addItem) && <button onClick={() => selectView('inventory-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة اصناف</button>}
                      {(isAdmin || p.storeQuantities) && <button onClick={() => selectView('inventory')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كميات الاصناف</button>}
-                     {(isAdmin) && <button onClick={() => selectView('pricing')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">التسعير</button>}
+                     {(isAdmin || p.pricing) && <button onClick={() => selectView('pricing')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">التسعير</button>}
                      {(isAdmin || p.itemCard) && <button onClick={() => selectView('reports-item-card')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">كارت الصنف</button>}
                   </div>
                 )}
               </div>
            )}
 
-           {(isAdmin || p.installmentsAdd || p.installmentsPay || p.installmentsLate) && (
+           {(isAdmin || p.installmentsAdd || p.installmentsPay || p.installmentsLate || p.installmentsArchive) && (
               <div className="relative menubar-item h-full">
                 <button 
                   onClick={() => handleMenuClick('installments')}
@@ -223,11 +225,11 @@ function MainApp() {
                       {(isAdmin || p.installmentsAdd) && <button onClick={() => selectView('installments-add')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">اضافة عميل جديد</button>}
                       {(isAdmin || p.installmentsPay) && <button onClick={() => selectView('installments-pay-customer')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">تسديد قسط عميل</button>}
                       {(isAdmin || p.installmentsLate) && <button onClick={() => selectView('installments-late')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">عملاء متأخرون عن السداد</button>}
-                     {(isAdmin) && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">أرشيف العملاء</button>}
+                      {(isAdmin || p.installmentsArchive) && <button onClick={() => selectView('installments-archive')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">أرشيف العملاء</button>}
                   </div>
                 )}
               </div>
-           )}
+            )}
 
            {isAdmin && (
               <div className="relative menubar-item h-full">

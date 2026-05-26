@@ -5,12 +5,15 @@ export interface UserPermissions {
   depositSale: boolean;
   depositReturn: boolean;
   depositPay: boolean;
+  shiftManagement: boolean;
   storeQuantities: boolean;
   itemCard: boolean;
   addItem: boolean;
+  pricing: boolean;
   installmentsAdd: boolean;
   installmentsPay: boolean;
   installmentsLate: boolean;
+  installmentsArchive: boolean;
   settings: boolean;
   reports: boolean;
 }

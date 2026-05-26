@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
-import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign, Trash2, Plus, Eye, EyeOff } from 'lucide-react';
+import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign, Trash2, Plus, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { Transaction } from '../types';
 
 type TargetMethod = string;
@@ -21,9 +21,13 @@ export default function BalancesScreen() {
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletNumber, setNewWalletNumber] = useState('');
 
-  const [showWalletsDetails, setShowWalletsDetails] = useState(false);
+  const [expandedWallets, setExpandedWallets] = useState<Record<string, boolean>>({});
   const [showCashDetails, setShowCashDetails] = useState(false);
   const [showWithdrawalsDetails, setShowWithdrawalsDetails] = useState(false);
+
+  const toggleWallet = (walletId: string) => {
+    setExpandedWallets(prev => ({ ...prev, [walletId]: !prev[walletId] }));
+  };
 
   const selectedAccount = shiftAccounts.find(a => a.id === targetMethod);
   const methodLabel = selectedAccount ? selectedAccount.name : (targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي');
@@ -163,7 +167,7 @@ export default function BalancesScreen() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowAddWallet(true)}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-5 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
+            className="bg-white border-2 border-indigo-300 hover:bg-indigo-50 text-indigo-700 px-5 py-3 rounded-xl font-bold shadow-sm transition-colors flex items-center gap-2"
           >
             <Plus className="h-5 w-5" />
             إضافة محفظة
@@ -197,62 +201,100 @@ export default function BalancesScreen() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Wallets Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-2 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
               <Wallet className="h-6 w-6 text-indigo-600" /> المحافظ الإلكترونية
             </h2>
-            <button 
-              onClick={() => setShowWalletsDetails(!showWalletsDetails)}
-              className="text-sm font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-1.5"
+            <button
+              onClick={() => setShowAddWallet(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              {showWalletsDetails ? <><EyeOff className="h-4 w-4" /> إخفاء</> : <><Eye className="h-4 w-4" /> إظهار</>}
+              <Plus className="h-4 w-4" />
+              إضافة محفظة
             </button>
           </div>
           
-          {showWalletsDetails && walletsStats.map((w, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative">
-              <button 
-                onClick={() => {
-                  if (window.confirm(`هل أنت متأكد من حذف محفظة ${w.name}؟`)) {
-                    removeShiftAccount(w.id);
-                  }
-                }}
-                className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="حذف المحفظة"
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-              <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
-                <div className="pr-10 lg:pr-0 pl-10">
-                  <h3 className="font-black text-lg text-gray-900">{w.name}</h3>
-                  {(w.subLabel || w.walletNumber) && (
-                    <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md">
-                      رقمها: {w.walletNumber || w.subLabel}
-                    </span>
-                  )}
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-500 font-bold">رصيد افتتاحي</div>
-                  <div className="text-lg font-black text-gray-700">{w.openingBalance.toLocaleString()} ج.م</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
-                  <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><Download className="h-3 w-3"/> الوارد</div>
-                  <div className="font-black text-emerald-700">{w.incoming.toLocaleString()}</div>
-                </div>
-                <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
-                  <div className="text-[10px] text-amber-600 font-bold flex items-center gap-1"><Upload className="h-3 w-3"/> إضافات (تسييل)</div>
-                  <div className="font-black text-amber-700">{w.additions.toLocaleString()}</div>
-                </div>
-              </div>
+          {shiftAccounts.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center text-gray-400 font-bold">
+              لا توجد محافظ مضافة — اضغط "إضافة محفظة" لإضافة أول محفظة
+            </div>
+          )}
 
-              <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100 flex justify-between items-center">
-                <div className="text-sm font-bold text-indigo-800">الرصيد الحالي</div>
-                <div className="text-xl font-black text-indigo-700">{w.currentBalance.toLocaleString()} ج.م</div>
-              </div>
+          {walletsStats.map((w, idx) => (
+            <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+              {/* Wallet Header Row — always visible */}
+              <button
+                onClick={() => toggleWallet(w.id)}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown className={`h-5 w-5 text-indigo-500 transition-transform duration-300 ${expandedWallets[w.id] ? 'rotate-180' : ''}`} />
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-indigo-500" />
+                    <span className="font-black text-lg text-gray-900">{w.name}</span>
+                    {w.subLabel && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-bold">{w.subLabel}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-left">
+                    <div className="text-xs text-gray-400 font-bold">الرصيد الحالي</div>
+                    <div className={`text-lg font-black ${w.currentBalance >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>{w.currentBalance.toLocaleString()} ج.م</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Wallet Details — expanded */}
+              {expandedWallets[w.id] && (
+                <div className="border-t border-gray-100 p-4 animate-[fadeIn_0.2s_ease-out]">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      {w.walletNumber && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm text-gray-500 font-bold">رقم المحفظة:</span>
+                          <span className="text-sm font-black text-gray-800 bg-gray-100 px-3 py-1 rounded-lg" dir="ltr">{w.walletNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`هل أنت متأكد من حذف محفظة ${w.name}؟`)) {
+                          removeShiftAccount(w.id);
+                        }
+                      }}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="حذف المحفظة"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 flex flex-col items-center justify-center">
+                      <div className="text-[10px] text-gray-500 font-bold">رصيد افتتاحي</div>
+                      <div className="font-black text-gray-700 mt-1">{w.openingBalance.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100 flex flex-col items-center justify-center">
+                      <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><Download className="h-3 w-3"/> الوارد</div>
+                      <div className="font-black text-emerald-700 mt-1">{w.incoming.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg p-2 border border-amber-100 flex flex-col items-center justify-center">
+                      <div className="text-[10px] text-amber-600 font-bold flex items-center gap-1"><Upload className="h-3 w-3"/> إضافات (تسييل)</div>
+                      <div className="font-black text-amber-700 mt-1">{w.additions.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-rose-50 rounded-lg p-2 border border-rose-100 flex flex-col items-center justify-center">
+                      <div className="text-[10px] text-rose-600 font-bold flex items-center gap-1"><Upload className="h-3 w-3"/> مسحوبات</div>
+                      <div className="font-black text-rose-700 mt-1">{w.outgoing.toLocaleString()}</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100 flex justify-between items-center">
+                    <div className="text-sm font-bold text-indigo-800">الرصيد الحالي</div>
+                    <div className="text-xl font-black text-indigo-700">{w.currentBalance.toLocaleString()} ج.م</div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -3,9 +3,9 @@ import { useAppStore } from '../store';
 import { User, UserPermissions } from '../types';
 
 const defaultPermissions: UserPermissions = {
-  cashier: false, cashierReturn: false, cashExchange: false, depositSale: false, depositReturn: false, depositPay: false,
-  storeQuantities: false, itemCard: false, addItem: false,
-  installmentsAdd: false, installmentsPay: false, installmentsLate: false,
+  cashier: false, cashierReturn: false, cashExchange: false, depositSale: false, depositReturn: false, depositPay: false, shiftManagement: false,
+  storeQuantities: false, itemCard: false, addItem: false, pricing: false,
+  installmentsAdd: false, installmentsPay: false, installmentsLate: false, installmentsArchive: false,
   settings: false, reports: false
 };
 
@@ -221,6 +221,7 @@ export function Settings() {
                                 <Checkbox id="depositSale" label="مبيعات عربون" />
                                 <Checkbox id="depositPay" label="سداد وتسليم عربون" />
                                 <Checkbox id="depositReturn" label="مرتجع مبيعات عربون" />
+                                <Checkbox id="shiftManagement" label="إدارة الوردية والعهدة" />
                             </div>
                          </div>
 
@@ -233,6 +234,7 @@ export function Settings() {
                                 <Checkbox id="storeQuantities" label="كميات الاصناف" />
                                 <Checkbox id="itemCard" label="كارت الصنف" />
                                 <Checkbox id="addItem" label="اضافة صنف جديد" />
+                                <Checkbox id="pricing" label="التسعير" />
                             </div>
                          </div>
 
@@ -245,6 +247,7 @@ export function Settings() {
                                 <Checkbox id="installmentsAdd" label="اضافة عميل" />
                                 <Checkbox id="installmentsPay" label="تسديد قسط عميل" />
                                 <Checkbox id="installmentsLate" label="الاقساط المتأخرة" />
+                                <Checkbox id="installmentsArchive" label="أرشيف العملاء" />
                             </div>
                          </div>
 
