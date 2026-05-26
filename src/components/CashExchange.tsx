@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
-import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign, Trash2, Plus } from 'lucide-react';
+import { ArrowRightLeft, Wallet, Banknote, CheckCircle2, Hash, StickyNote, Activity, Download, Upload, CreditCard, DollarSign, Trash2, Plus, Eye, EyeOff } from 'lucide-react';
 import { Transaction } from '../types';
 
 type TargetMethod = string;
@@ -20,6 +20,10 @@ export default function BalancesScreen() {
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletNumber, setNewWalletNumber] = useState('');
+
+  const [showWalletsDetails, setShowWalletsDetails] = useState(false);
+  const [showCashDetails, setShowCashDetails] = useState(false);
+  const [showWithdrawalsDetails, setShowWithdrawalsDetails] = useState(false);
 
   const selectedAccount = shiftAccounts.find(a => a.id === targetMethod);
   const methodLabel = selectedAccount ? selectedAccount.name : (targetMethod === 'vodafone_cash' ? 'فودافون كاش' : 'انستا باي');
@@ -194,11 +198,19 @@ export default function BalancesScreen() {
         
         {/* Wallets Section */}
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
-            <Wallet className="h-6 w-6 text-indigo-600" /> المحافظ الإلكترونية
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <Wallet className="h-6 w-6 text-indigo-600" /> المحافظ الإلكترونية
+            </h2>
+            <button 
+              onClick={() => setShowWalletsDetails(!showWalletsDetails)}
+              className="text-sm font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-1.5"
+            >
+              {showWalletsDetails ? <><EyeOff className="h-4 w-4" /> إخفاء</> : <><Eye className="h-4 w-4" /> إظهار</>}
+            </button>
+          </div>
           
-          {walletsStats.map((w, idx) => (
+          {showWalletsDetails && walletsStats.map((w, idx) => (
             <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative">
               <button 
                 onClick={() => {
@@ -250,11 +262,20 @@ export default function BalancesScreen() {
           
           {/* Cash */}
           <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
-              <Banknote className="h-6 w-6 text-emerald-600" /> النقدية (الكاش)
-            </h2>
-            {cashStats ? (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Banknote className="h-6 w-6 text-emerald-600" /> النقدية (الكاش)
+              </h2>
+              <button 
+                onClick={() => setShowCashDetails(!showCashDetails)}
+                className="text-sm font-bold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
+              >
+                {showCashDetails ? <><EyeOff className="h-4 w-4" /> إخفاء</> : <><Eye className="h-4 w-4" /> إظهار</>}
+              </button>
+            </div>
+            {showCashDetails && (
+              cashStats ? (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 animate-[fadeIn_0.3s_ease-out]">
                 <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
                   <div className="text-sm text-gray-500 font-bold">الرصيد الافتتاحي للوردية</div>
                   <div className="text-xl font-black text-gray-700">{cashStats.openingBalance.toLocaleString()} ج.م</div>
@@ -282,15 +303,24 @@ export default function BalancesScreen() {
               </div>
             ) : (
               <div className="text-sm text-red-500 font-bold">الوردية مغلقة. لا توجد تفاصيل للنقدية الحالية.</div>
-            )}
+            ))}
           </div>
 
           {/* Withdrawals */}
           <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
-              <CreditCard className="h-6 w-6 text-rose-600" /> إجمالي المسحوبات والمصروفات
-            </h2>
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <CreditCard className="h-6 w-6 text-rose-600" /> إجمالي المسحوبات والمصروفات
+              </h2>
+              <button 
+                onClick={() => setShowWithdrawalsDetails(!showWithdrawalsDetails)}
+                className="text-sm font-bold bg-rose-50 text-rose-700 px-3 py-1.5 rounded-lg hover:bg-rose-100 transition-colors flex items-center gap-1.5"
+              >
+                {showWithdrawalsDetails ? <><EyeOff className="h-4 w-4" /> إخفاء</> : <><Eye className="h-4 w-4" /> إظهار</>}
+              </button>
+            </div>
+            {showWithdrawalsDetails && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm animate-[fadeIn_0.3s_ease-out]">
               <div className="text-center">
                 <div className="text-sm text-rose-600 font-bold mb-1">إجمالي المسحوبات خلال الوردية</div>
                 <div className="text-4xl font-black text-rose-700">
@@ -298,7 +328,8 @@ export default function BalancesScreen() {
                 </div>
                 <div className="text-xs text-rose-500 mt-2">شامل المصروفات، والمشتريات النقدية، والمسحوبات اليدوية</div>
               </div>
-            </div>
+              </div>
+            )}
           </div>
 
         </div>
