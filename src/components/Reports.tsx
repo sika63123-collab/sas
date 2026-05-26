@@ -24,6 +24,7 @@ const getTypeName = (type: string) => {
     case 'installment_sale': return { label: 'بيع تقسيط', color: 'text-indigo-600 bg-indigo-50' };
     case 'purchase': return { label: 'فاتورة مشتريات', color: 'text-emerald-600 bg-emerald-50' };
     case 'cash_exchange': return { label: 'تسييل عهدة', color: 'text-amber-600 bg-amber-50' };
+    case 'cash_exchange_reverse': return { label: 'استلام من محفظة', color: 'text-blue-600 bg-blue-50' };
     default: return { label: type, color: 'text-gray-600 bg-gray-50' };
   }
 };
@@ -50,10 +51,11 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
   const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
 
   // --- Cash Account Logic ---
-  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
-  const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashSales = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const cashReturns = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const cashExchangeOut = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange').reduce((sum, t) => sum + t.totalAmount, 0);
-  const netCash = cashSales - cashReturns;
+  const cashExchangeIn = dailyTransactions.filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange_reverse').reduce((sum, t) => sum + t.totalAmount, 0);
+  const netCash = cashSales + cashExchangeIn - cashReturns;
 
   // --- Expenses Logic ---
   const dailyExpenses = expenses.filter(e => {
@@ -109,6 +111,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
         invoiceNumber = purchaseIdx >= 0 ? String(purchaseIdx + 1) : t.id;
       } else if (t.type === 'cash_exchange') {
         invoiceNumber = t.exchangeRecordNumber || '—';
+      } else if (t.type === 'cash_exchange_reverse') {
+        invoiceNumber = t.exchangeRecordNumber || '—';
       } else {
         invoiceNumber = '—';
       }
@@ -162,6 +166,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
           outward = t.totalAmount;
           description = `منصرف كاش - تسييل عهدة (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
           break;
+        case 'cash_exchange_reverse':
+          inward = t.totalAmount;
+          description = `وارد كاش - استلام من محفظة (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
+          break;
         default:
           inward = t.totalAmount;
           description = `${getTypeName(t.type).label}: ${itemsList}`;
@@ -199,8 +207,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
 
   // --- Electronic Account Logic ---
   const electronicTransactions = dailyTransactions.filter(t => t.paymentMethod !== 'cash');
-  const elecSales = electronicTransactions.filter(t => t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
-  const elecReturns = electronicTransactions.filter(t => t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
+  const elecSales = electronicTransactions.filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale')).reduce((sum, t) => sum + getAmount(t), 0);
+  const elecReturns = electronicTransactions.filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return')).reduce((sum, t) => sum + getAmount(t), 0);
   const netElec = elecSales - elecReturns;
 
 
@@ -242,6 +250,8 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
         const returnIdx = returnTransactionsList.findIndex(tx => tx.id === t.id);
         invoiceNumber = returnIdx >= 0 ? String(returnIdx + 1) : t.id;
       } else if (t.type === 'cash_exchange') {
+        invoiceNumber = t.exchangeRecordNumber || '—';
+      } else if (t.type === 'cash_exchange_reverse') {
         invoiceNumber = t.exchangeRecordNumber || '—';
       } else {
         invoiceNumber = '—';
@@ -296,6 +306,10 @@ export default function Reports({ view = 'cash' }: { view?: 'visa' | 'cash' | 'i
         case 'cash_exchange':
           inward = t.totalAmount;
           description = `وارد ${methodLabel} - تسييل عهدة (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
+          break;
+        case 'cash_exchange_reverse':
+          outward = t.totalAmount;
+          description = `منصرف ${methodLabel} - استلام للكاش (محفظة: *${t.senderWalletLast4 || '—'})${t.customerName ? ` - ${t.customerName}` : ''}`;
           break;
         default:
           inward = t.totalAmount;

@@ -15,7 +15,9 @@ export default function BalancesScreen() {
   const [exchangeRecordNumber, setExchangeRecordNumber] = useState('');
   const [note, setNote] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; recordNumber?: string } | null>(null);
+  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; recordNumber?: string; direction: string } | null>(null);
+
+  const [exchangeDirection, setExchangeDirection] = useState<'cash_to_wallet' | 'wallet_to_cash'>('cash_to_wallet');
 
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
@@ -43,9 +45,10 @@ export default function BalancesScreen() {
       return;
     }
 
-    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined, exchangeRecordNumber || undefined);
+    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined, exchangeRecordNumber || undefined, exchangeDirection);
     
-    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4, recordNumber: exchangeRecordNumber || undefined });
+    const dirLabel = exchangeDirection === 'cash_to_wallet' ? `كاش → ${methodLabel}` : `${methodLabel} → كاش`;
+    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4, recordNumber: exchangeRecordNumber || undefined, direction: dirLabel });
     setShowSuccess(true);
     
     // Reset form
@@ -53,6 +56,7 @@ export default function BalancesScreen() {
     setWalletLast4('');
     setExchangeRecordNumber('');
     setNote('');
+    setExchangeDirection('cash_to_wallet');
     setShowExchangeModal(false);
     
     // Hide success after 4 seconds
@@ -77,32 +81,39 @@ export default function BalancesScreen() {
       const currTxs = filteredTxs.filter(t => t.timestamp >= shiftStart);
 
       const calcIn = (txs: Transaction[]) => txs
-        .filter(t => t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
+        .filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
         .reduce((sum, t) => sum + getAmount(t), 0);
         
       const calcOut = (txs: Transaction[]) => txs
-        .filter(t => t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return' || t.type === 'purchase'))
+        .filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return' || t.type === 'purchase'))
         .reduce((sum, t) => sum + getAmount(t), 0);
 
+      // كاش → محفظة: دخول للمحفظة
       const calcExchangeIn = (txs: Transaction[]) => txs
         .filter(t => t.type === 'cash_exchange')
         .reduce((sum, t) => sum + t.totalAmount, 0);
 
+      // محفظة → كاش: خروج من المحفظة
+      const calcExchangeOut = (txs: Transaction[]) => txs
+        .filter(t => t.type === 'cash_exchange_reverse')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
+
       const prevIn = calcIn(prevTxs) + calcExchangeIn(prevTxs);
-      const prevOut = calcOut(prevTxs);
+      const prevOut = calcOut(prevTxs) + calcExchangeOut(prevTxs);
       const openingBalance = prevIn - prevOut;
 
       const shiftIn = calcIn(currTxs);
-      const shiftExchange = calcExchangeIn(currTxs);
+      const shiftExchangeIn = calcExchangeIn(currTxs);
+      const shiftExchangeOut = calcExchangeOut(currTxs);
       const shiftOut = calcOut(currTxs);
 
       return {
         ...account,
         openingBalance,
         incoming: shiftIn,
-        additions: shiftExchange,
-        outgoing: shiftOut,
-        currentBalance: openingBalance + shiftIn + shiftExchange - shiftOut
+        additions: shiftExchangeIn,
+        outgoing: shiftOut + shiftExchangeOut,
+        currentBalance: openingBalance + shiftIn + shiftExchangeIn - shiftOut - shiftExchangeOut
       };
     });
   }, [transactions, shiftStart, shiftAccounts]);
@@ -113,13 +124,13 @@ export default function BalancesScreen() {
     const shiftExpenses = expenses.filter(e => e.timestamp >= shiftStart);
 
     const cashSales = currTxs
-      .filter(t => t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
+      .filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
       .reduce((sum, t) => sum + getAmount(t), 0);
       
     const manualInflow = activeShift.manualTransactions.filter(t => t.type === 'inflow').reduce((sum, t) => sum + t.amount, 0);
     
     const cashReturns = currTxs
-      .filter(t => t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return'))
+      .filter(t => t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return'))
       .reduce((sum, t) => sum + getAmount(t), 0);
       
     const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -127,19 +138,26 @@ export default function BalancesScreen() {
       .filter(t => t.type === 'purchase')
       .reduce((sum, t) => sum + t.totalAmount, 0);
       
+    // كاش خارج للمحافظ (تسييل)
     const cashExchangeOut = currTxs
       .filter(t => t.type === 'cash_exchange')
+      .reduce((sum, t) => sum + t.totalAmount, 0);
+
+    // كاش داخل من المحافظ (استلام)
+    const cashExchangeIn = currTxs
+      .filter(t => t.type === 'cash_exchange_reverse')
       .reduce((sum, t) => sum + t.totalAmount, 0);
       
     const manualOutflow = activeShift.manualTransactions.filter(t => t.type === 'outflow').reduce((sum, t) => sum + t.amount, 0);
 
     const withdrawals = totalExpenses + cashPurchases + manualOutflow;
-    const incoming = cashSales + manualInflow;
+    const incoming = cashSales + manualInflow + cashExchangeIn;
     const openingBalance = activeShift.openingCash;
     
     return {
       openingBalance,
       incoming,
+      cashExchangeIn,
       exchangeOut: cashExchangeOut,
       returns: cashReturns,
       withdrawals,
@@ -190,8 +208,8 @@ export default function BalancesScreen() {
             <span className="text-lg font-bold text-emerald-800">تم تنفيذ التسييل بنجاح ✓</span>
           </div>
           <div className="mr-10 space-y-1 text-sm text-emerald-700 font-semibold">
+            <div>الاتجاه: <span className="text-emerald-900 font-black">{lastExchange.direction}</span></div>
             <div>المبلغ: <span className="text-emerald-900 font-black">{lastExchange.amount.toLocaleString()} ج.م</span></div>
-            <div>الوجهة: <span className="text-emerald-900 font-black">{lastExchange.method}</span></div>
             <div>المحفظة: <span className="text-emerald-900 font-black">*{lastExchange.wallet}</span></div>
           </div>
         </div>
@@ -326,10 +344,16 @@ export default function BalancesScreen() {
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600 font-bold flex items-center gap-2"><Download className="h-4 w-4 text-emerald-500"/> مبيعات ووارد نقدية:</span>
-                    <span className="font-black text-emerald-600">+{cashStats.incoming.toLocaleString()}</span>
+                    <span className="font-black text-emerald-600">+{(cashStats.incoming - (cashStats.cashExchangeIn || 0)).toLocaleString()}</span>
                   </div>
+                  {(cashStats.cashExchangeIn || 0) > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600 font-bold flex items-center gap-2"><Download className="h-4 w-4 text-blue-500"/> وارد من المحافظ (استلام):</span>
+                      <span className="font-black text-blue-600">+{cashStats.cashExchangeIn.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600 font-bold flex items-center gap-2"><ArrowRightLeft className="h-4 w-4 text-amber-500"/> تحويلات למحافظ (تسييل):</span>
+                    <span className="text-gray-600 font-bold flex items-center gap-2"><ArrowRightLeft className="h-4 w-4 text-amber-500"/> تحويلات للمحافظ (تسييل):</span>
                     <span className="font-black text-amber-600">-{cashStats.exchangeOut.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
@@ -432,15 +456,59 @@ export default function BalancesScreen() {
             
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
               
+              {/* Direction Toggle */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setExchangeDirection('cash_to_wallet')}
+                  className={`py-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                    exchangeDirection === 'cash_to_wallet' 
+                      ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-sm' 
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  <Banknote className="h-4 w-4" />
+                  <span>كاش → محفظة</span>
+                  <Upload className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setExchangeDirection('wallet_to_cash')}
+                  className={`py-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                    exchangeDirection === 'wallet_to_cash' 
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm' 
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span>محفظة → كاش</span>
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
               {/* Visual Flow Indicator */}
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex items-center justify-center gap-3 text-xs font-bold">
-                <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-emerald-200">
-                  <Banknote className="h-4 w-4 text-emerald-600" /> <span className="text-emerald-800">كاش (الدرج)</span>
-                </div>
-                <ArrowRightLeft className="h-4 w-4 text-amber-600" />
-                <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-blue-200">
-                  <Wallet className="h-4 w-4 text-blue-600" /> <span className="text-blue-800">{methodLabel}</span>
-                </div>
+              <div className={`rounded-xl border p-3 flex items-center justify-center gap-3 text-xs font-bold ${
+                exchangeDirection === 'cash_to_wallet' ? 'bg-amber-50/50 border-amber-200' : 'bg-emerald-50/50 border-emerald-200'
+              }`}>
+                {exchangeDirection === 'cash_to_wallet' ? (
+                  <>
+                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-rose-200">
+                      <Banknote className="h-4 w-4 text-rose-600" /> <span className="text-rose-800">كاش (خروج من الدرج)</span>
+                    </div>
+                    <span className="text-amber-600 text-lg">→</span>
+                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-emerald-200">
+                      <Wallet className="h-4 w-4 text-emerald-600" /> <span className="text-emerald-800">{methodLabel} (دخول)</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-rose-200">
+                      <Wallet className="h-4 w-4 text-rose-600" /> <span className="text-rose-800">{methodLabel} (خروج)</span>
+                    </div>
+                    <span className="text-emerald-600 text-lg">→</span>
+                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-emerald-200">
+                      <Banknote className="h-4 w-4 text-emerald-600" /> <span className="text-emerald-800">كاش (دخول للدرج)</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Form Fields */}
@@ -529,11 +597,11 @@ export default function BalancesScreen() {
                 disabled={!amount || Number(amount) <= 0 || walletLast4.length !== 4}
                 className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                   amount && Number(amount) > 0 && walletLast4.length === 4
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-lg'
+                    ? (exchangeDirection === 'cash_to_wallet' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700') + ' text-white shadow-lg'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                <ArrowRightLeft className="h-4 w-4" /> تنفيذ التسييل
+                <ArrowRightLeft className="h-4 w-4" /> {exchangeDirection === 'cash_to_wallet' ? 'تنفيذ التسييل (كاش → محفظة)' : 'تنفيذ الاستلام (محفظة → كاش)'}
               </button>
               <button onClick={() => setShowExchangeModal(false)} className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 text-sm transition-all">
                 إلغاء

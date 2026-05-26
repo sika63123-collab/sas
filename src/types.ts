@@ -27,7 +27,7 @@ export interface User {
 }
 
 export type PaymentMethod = 'cash' | 'visa' | 'instapay' | 'vodafone_cash' | (string & {});
-export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'installment_sale' | 'purchase' | 'cash_exchange';
+export type TransactionType = 'sale' | 'return' | 'deposit_sale' | 'deposit_return' | 'deposit_payment' | 'installment_payment' | 'installment_sale' | 'purchase' | 'cash_exchange' | 'cash_exchange_reverse';
 
 // جدول حركات الدفع — كل دفعة عربون مرتبطة بفاتورة
 export interface PaymentTransaction {

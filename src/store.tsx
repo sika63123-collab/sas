@@ -38,7 +38,7 @@ interface AppContextType {
   updateShiftAccount: (id: string, updates: Partial<ShiftAccount>) => void;
   addShiftInventoryItem: (item: Omit<ShiftInventoryItem, 'id'>) => void;
   removeShiftInventoryItem: (id: string) => void;
-  addCashExchange: (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string) => void;
+  addCashExchange: (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string, direction?: 'cash_to_wallet' | 'wallet_to_cash') => void;
   shifts: CashShift[];
   activeShift: CashShift | undefined;
   openShift: (openingCash: number) => void;
@@ -231,11 +231,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const getAmount = (t: any) => (t.type === 'deposit_sale' || t.type === 'deposit_return' || t.type === 'installment_sale') ? (t.depositAmount || 0) : t.totalAmount;
 
       const cashSales = shiftTransactions
-        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
+        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
         .reduce((sum, t) => sum + getAmount(t), 0);
       const manualInflow = active.manualTransactions.filter(t => t.type === 'inflow').reduce((sum, t) => sum + t.amount, 0);
       const cashReturns = shiftTransactions
-        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return'))
+        .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return'))
         .reduce((sum, t) => sum + getAmount(t), 0);
       const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
       const cashPurchases = shiftTransactions
@@ -244,9 +244,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const cashExchangeOut = shiftTransactions
         .filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange')
         .reduce((sum, t) => sum + t.totalAmount, 0);
+      const cashExchangeIn = shiftTransactions
+        .filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange_reverse')
+        .reduce((sum, t) => sum + t.totalAmount, 0);
       const manualOutflow = active.manualTransactions.filter(t => t.type === 'outflow').reduce((sum, t) => sum + t.amount, 0);
 
-      const expectedCash = active.openingCash + cashSales + manualInflow - cashReturns - totalExpenses - cashPurchases - cashExchangeOut - manualOutflow;
+      const expectedCash = active.openingCash + cashSales + manualInflow + cashExchangeIn - cashReturns - totalExpenses - cashPurchases - cashExchangeOut - manualOutflow;
 
       // Use actual counted cash if provided, otherwise use expected
       const closingAmount = actualCash !== undefined ? actualCash : expectedCash;
@@ -579,7 +582,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShiftInventoryItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const addCashExchange = (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string) => {
+  const addCashExchange = (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string, direction: 'cash_to_wallet' | 'wallet_to_cash' = 'cash_to_wallet') => {
     const exchangeId = Date.now().toString() + Math.random().toString(36).slice(2, 7);
     const now = new Date().toISOString();
     // Resolve dynamic label if possible
@@ -587,35 +590,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const methodLabel = account ? account.name : (targetMethod === 'vodafone_cash' ? 'فودافون كاش' : (targetMethod === 'instapay' ? 'انستا باي' : targetMethod));
     const noteText = note ? ` - ${note}` : '';
 
-    // حركة 1: كاش خارج من الدرج (OUT)
-    const cashOutTransaction: Transaction = {
-      id: exchangeId + '_cash_out',
-      timestamp: now,
-      type: 'cash_exchange' as TransactionType,
-      items: [],
-      totalAmount: amount,
-      paymentMethod: 'cash',
-      senderWalletLast4: walletLast4,
-      linkedExchangeId: exchangeId,
-      customerName: `تسييل عهدة → ${methodLabel}${noteText}`,
-      exchangeRecordNumber,
-    };
+    if (direction === 'cash_to_wallet') {
+      // === كاش → محفظة ===
+      // حركة 1: كاش خارج من الدرج (OUT)
+      const cashOutTransaction: Transaction = {
+        id: exchangeId + '_cash_out',
+        timestamp: now,
+        type: 'cash_exchange' as TransactionType,
+        items: [],
+        totalAmount: amount,
+        paymentMethod: 'cash',
+        senderWalletLast4: walletLast4,
+        linkedExchangeId: exchangeId,
+        customerName: `تسييل عهدة → ${methodLabel}${noteText}`,
+        exchangeRecordNumber,
+      };
 
-    // حركة 2: وارد للمحفظة الإلكترونية (IN)
-    const walletInTransaction: Transaction = {
-      id: exchangeId + '_wallet_in',
-      timestamp: now,
-      type: 'cash_exchange' as TransactionType,
-      items: [],
-      totalAmount: amount,
-      paymentMethod: targetMethod,
-      senderWalletLast4: walletLast4,
-      linkedExchangeId: exchangeId,
-      customerName: `تسييل عهدة من الكاش${noteText}`,
-      exchangeRecordNumber,
-    };
+      // حركة 2: وارد للمحفظة الإلكترونية (IN)
+      const walletInTransaction: Transaction = {
+        id: exchangeId + '_wallet_in',
+        timestamp: now,
+        type: 'cash_exchange' as TransactionType,
+        items: [],
+        totalAmount: amount,
+        paymentMethod: targetMethod,
+        senderWalletLast4: walletLast4,
+        linkedExchangeId: exchangeId,
+        customerName: `تسييل عهدة من الكاش${noteText}`,
+        exchangeRecordNumber,
+      };
 
-    setTransactions(prev => [...prev, cashOutTransaction, walletInTransaction]);
+      setTransactions(prev => [...prev, cashOutTransaction, walletInTransaction]);
+    } else {
+      // === محفظة → كاش ===
+      // حركة 1: خروج من المحفظة (OUT)
+      const walletOutTransaction: Transaction = {
+        id: exchangeId + '_wallet_out',
+        timestamp: now,
+        type: 'cash_exchange_reverse' as TransactionType,
+        items: [],
+        totalAmount: amount,
+        paymentMethod: targetMethod,
+        senderWalletLast4: walletLast4,
+        linkedExchangeId: exchangeId,
+        customerName: `استلام من ${methodLabel} → كاش${noteText}`,
+        exchangeRecordNumber,
+      };
+
+      // حركة 2: دخول كاش للدرج (IN)
+      const cashInTransaction: Transaction = {
+        id: exchangeId + '_cash_in',
+        timestamp: now,
+        type: 'cash_exchange_reverse' as TransactionType,
+        items: [],
+        totalAmount: amount,
+        paymentMethod: 'cash',
+        senderWalletLast4: walletLast4,
+        linkedExchangeId: exchangeId,
+        customerName: `استلام كاش من ${methodLabel}${noteText}`,
+        exchangeRecordNumber,
+      };
+
+      setTransactions(prev => [...prev, walletOutTransaction, cashInTransaction]);
+    }
   };
 
   return (

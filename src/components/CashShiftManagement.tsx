@@ -46,7 +46,7 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
 
   // 1. Sales & Collections in cash (excludes returns and cash_exchange)
   const cashSales = shiftTransactions
-    .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
+    .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'sale' || t.type === 'deposit_sale' || t.type === 'deposit_payment' || t.type === 'installment_payment' || t.type === 'installment_sale'))
     .reduce((sum, t) => sum + getAmount(t), 0);
 
   // Breakdown of Cash Sales
@@ -61,7 +61,7 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
 
   // 3. Cash Returns
   const cashReturns = shiftTransactions
-    .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && (t.type === 'return' || t.type === 'deposit_return'))
+    .filter(t => t.paymentMethod === 'cash' && t.type !== 'cash_exchange' && t.type !== 'cash_exchange_reverse' && (t.type === 'return' || t.type === 'deposit_return'))
     .reduce((sum, t) => sum + getAmount(t), 0);
 
   // 4. Expenses (paid in cash)
@@ -77,11 +77,16 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
     .filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange')
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
-  // 7. Manual Outflows
+  // 7. Cash Exchanges In (استلام من محفظة - وارد للدرج)
+  const cashExchangeIn = shiftTransactions
+    .filter(t => t.paymentMethod === 'cash' && t.type === 'cash_exchange_reverse')
+    .reduce((sum, t) => sum + t.totalAmount, 0);
+
+  // 8. Manual Outflows
   const manualOutflow = shift.manualTransactions.filter(t => t.type === 'outflow').reduce((sum, t) => sum + t.amount, 0);
 
   // Total inflows and outflows
-  const totalInflows = cashSales + manualInflow;
+  const totalInflows = cashSales + manualInflow + cashExchangeIn;
   const totalOutflows = cashReturns + totalExpenses + cashPurchases + cashExchangeOut + manualOutflow;
 
   // Expected cash calculation
@@ -99,6 +104,7 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
     totalExpenses,
     cashPurchases,
     cashExchangeOut,
+    cashExchangeIn,
     manualOutflow,
     totalInflows,
     totalOutflows,
@@ -578,6 +584,17 @@ export default function CashShiftManagement() {
                     </div>
                     <span className="text-emerald-800 font-black text-sm">+{formatMoney(activeMetrics!.manualInflow)}</span>
                   </div>
+
+                  {/* Cash Exchange In (wallet → cash) */}
+                  {activeMetrics!.cashExchangeIn > 0 && (
+                    <div className="flex justify-between py-2.5 px-3 items-center border-t border-emerald-100/50">
+                      <div className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="text-blue-800">وارد من المحافظ (استلام)</span>
+                      </div>
+                      <span className="text-blue-800 font-black text-sm">+{formatMoney(activeMetrics!.cashExchangeIn)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

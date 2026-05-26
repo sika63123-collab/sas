@@ -131,9 +131,7 @@ function MainApp() {
                    <div className="absolute top-full right-0 w-48 bg-white border border-[#a0b8c4] shadow-lg py-1 z-50 rounded-b-sm font-normal">
                       {(isAdmin || p.cashier) && <button onClick={() => selectView('cashier', 'sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">الكاشير</button>}
                       {(isAdmin || p.cashierReturn) && <button onClick={() => selectView('cashier', 'return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع كاشير</button>}
-                      {(isAdmin || p.depositSale) && <button onClick={() => selectView('cashier', 'deposit_sale')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مبيعات عربون</button>}
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">فواتير العربون</button>}
-                      {(isAdmin || p.depositReturn) && <button onClick={() => selectView('cashier', 'deposit_return')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">مرتجع مبيعات عربون</button>}
                       {(isAdmin || p.cashExchange) && (
                         <div className="relative group/sub">
                           <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 flex justify-between items-center">
