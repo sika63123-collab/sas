@@ -12,12 +12,14 @@ export default function BalancesScreen() {
   const [amount, setAmount] = useState<string>('');
   const [targetMethod, setTargetMethod] = useState<TargetMethod>(shiftAccounts.length > 0 ? shiftAccounts[0].id : 'vodafone_cash');
   const [walletLast4, setWalletLast4] = useState('');
-  const [exchangeRecordNumber, setExchangeRecordNumber] = useState('');
   const [note, setNote] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; recordNumber?: string; direction: string } | null>(null);
+  const [lastExchange, setLastExchange] = useState<{ amount: number; method: string; wallet: string; direction: string } | null>(null);
 
-  const [exchangeDirection, setExchangeDirection] = useState<'cash_to_wallet' | 'wallet_to_cash'>('cash_to_wallet');
+  const [mainTab, setMainTab] = useState<'wallet' | 'cash'>('wallet');
+  const [cashSubTab, setCashSubTab] = useState<'receipt' | 'delivery'>('receipt');
+  
+  const exchangeDirection = (mainTab === 'cash' && cashSubTab === 'receipt') ? 'wallet_to_cash' : 'cash_to_wallet';
 
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [newWalletName, setNewWalletName] = useState('');
@@ -45,18 +47,22 @@ export default function BalancesScreen() {
       return;
     }
 
-    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined, exchangeRecordNumber || undefined, exchangeDirection);
+    addCashExchange(numAmount, targetMethod, walletLast4, note || undefined, undefined, exchangeDirection);
     
-    const dirLabel = exchangeDirection === 'cash_to_wallet' ? `كاش → ${methodLabel}` : `${methodLabel} → كاش`;
-    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4, recordNumber: exchangeRecordNumber || undefined, direction: dirLabel });
+    let dirLabel = 'استلام محفظة';
+    if (mainTab === 'cash') {
+      dirLabel = cashSubTab === 'receipt' ? 'استلام نقدية' : 'تسليم نقدية';
+    }
+    
+    setLastExchange({ amount: numAmount, method: methodLabel, wallet: walletLast4, direction: dirLabel });
     setShowSuccess(true);
     
     // Reset form
     setAmount('');
     setWalletLast4('');
-    setExchangeRecordNumber('');
     setNote('');
-    setExchangeDirection('cash_to_wallet');
+    setMainTab('wallet');
+    setCashSubTab('receipt');
     setShowExchangeModal(false);
     
     // Hide success after 4 seconds
@@ -195,7 +201,7 @@ export default function BalancesScreen() {
             className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"
           >
             <ArrowRightLeft className="h-5 w-5" />
-            تسييل / تبادل عهدة
+            فودافون كاش
           </button>
         </div>
       </div>
@@ -449,40 +455,66 @@ export default function BalancesScreen() {
             <div className="bg-amber-50 px-6 py-4 border-b border-amber-100 flex justify-between items-center">
               <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
                 <ArrowRightLeft className="h-5 w-5" />
-                تسييل / تبادل عهدة
+                فودافون كاش
               </h2>
               <button onClick={() => setShowExchangeModal(false)} className="text-amber-700 hover:bg-amber-200 p-1 rounded-lg">✕</button>
             </div>
             
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
               
-              {/* Direction Toggle */}
+              {/* Main Tab Toggle */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setExchangeDirection('cash_to_wallet')}
+                  onClick={() => setMainTab('wallet')}
                   className={`py-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                    exchangeDirection === 'cash_to_wallet' 
+                    mainTab === 'wallet' 
                       ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-sm' 
                       : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                   }`}
                 >
                   <Banknote className="h-4 w-4" />
-                  <span>كاش → محفظة</span>
+                  <span>استلام محفظة</span>
                   <Upload className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => setExchangeDirection('wallet_to_cash')}
+                  onClick={() => setMainTab('cash')}
                   className={`py-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                    exchangeDirection === 'wallet_to_cash' 
+                    mainTab === 'cash' 
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm' 
                       : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                   }`}
                 >
                   <Wallet className="h-4 w-4" />
-                  <span>محفظة → كاش</span>
+                  <span>نقدية</span>
                   <Download className="h-3.5 w-3.5" />
                 </button>
               </div>
+
+              {/* Cash Sub Tab Toggle */}
+              {mainTab === 'cash' && (
+                <div className="grid grid-cols-2 gap-2 mt-[-8px]">
+                  <button
+                    onClick={() => setCashSubTab('receipt')}
+                    className={`py-2 rounded-lg border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                      cashSubTab === 'receipt' 
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-800 shadow-sm' 
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>استلام نقدية</span>
+                  </button>
+                  <button
+                    onClick={() => setCashSubTab('delivery')}
+                    className={`py-2 rounded-lg border-2 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                      cashSubTab === 'delivery' 
+                        ? 'border-rose-400 bg-rose-50 text-rose-800 shadow-sm' 
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>تسليم نقدية</span>
+                  </button>
+                </div>
+              )}
 
               {/* Visual Flow Indicator */}
               <div className={`rounded-xl border p-3 flex items-center justify-center gap-3 text-xs font-bold ${
@@ -546,7 +578,7 @@ export default function BalancesScreen() {
                   </div>
                 </div>
 
-                <div>
+                <div className="col-span-2">
                   <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
                     آخر 4 أرقام <span className="text-red-500">*</span>
                   </label>
@@ -557,20 +589,6 @@ export default function BalancesScreen() {
                     onChange={(e) => { const val = e.target.value; if (/^\d*$/.test(val)) setWalletLast4(val); }}
                     placeholder="1234"
                     className="w-full h-12 border-2 border-gray-200 focus:border-amber-500 rounded-xl px-4 text-xl font-black text-center tracking-widest outline-none transition-all"
-                    dir="ltr"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
-                    رقم السجل
-                  </label>
-                  <input
-                    type="text"
-                    value={exchangeRecordNumber}
-                    onChange={(e) => setExchangeRecordNumber(e.target.value)}
-                    placeholder="اختياري"
-                    className="w-full h-12 border-2 border-gray-200 focus:border-amber-500 rounded-xl px-4 text-center font-bold outline-none transition-all"
                     dir="ltr"
                   />
                 </div>
@@ -601,7 +619,8 @@ export default function BalancesScreen() {
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                <ArrowRightLeft className="h-4 w-4" /> {exchangeDirection === 'cash_to_wallet' ? 'تنفيذ التسييل (كاش → محفظة)' : 'تنفيذ الاستلام (محفظة → كاش)'}
+                <ArrowRightLeft className="h-4 w-4" /> 
+                {mainTab === 'cash' ? (cashSubTab === 'receipt' ? 'تنفيذ استلام النقدية' : 'تنفيذ تسليم النقدية') : 'تنفيذ استلام المحفظة'}
               </button>
               <button onClick={() => setShowExchangeModal(false)} className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 text-sm transition-all">
                 إلغاء
