@@ -257,9 +257,7 @@ export function InstallmentsAdd() {
                                 >
                                     <option value="cash">كاش (نقدي)</option>
                                     <option value="visa">فيزا</option>
-                                    {shiftAccounts.map((a: any) => (
-                                        <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
-                                    ))}
+                                    <option value="vodafone_cash">فودافون كاش</option>
                                 </select>
                             </div>
                             {downPaymentMethod !== 'cash' && (

@@ -150,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shiftAccounts, setShiftAccounts] = useState<ShiftAccount[]>(() => {
     const saved = getStorageItem('mobile_shop_shift_accounts');
     return saved ? JSON.parse(saved) : [
-      { id: 'sa3', name: 'داخلي', subLabel: 'محفظة 1' },
+      { id: 'sa3', name: 'فودافون كاش', subLabel: 'محفظة 1' },
       { id: 'sa4', name: 'انستا باي' }
     ];
   });

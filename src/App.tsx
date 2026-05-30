@@ -134,7 +134,7 @@ function MainApp() {
                       {(isAdmin || p.depositPay) && <button onClick={() => selectView('installments-pay')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors">فواتير العربون</button>}
                       {(isAdmin || p.cashExchange) && (
                         <button onClick={() => selectView('cash-exchange')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100">
-                          داخلي
+                          فودافون كاش
                         </button>
                       )}
                       {(isAdmin || p.shiftManagement) && <button onClick={() => selectView('shift-management')} className="w-full text-right px-4 py-2 hover:bg-blue-50 transition-colors border-t border-gray-100 text-blue-700 font-bold">إدارة الوردية والعهدة</button>}

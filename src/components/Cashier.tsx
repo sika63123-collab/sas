@@ -687,9 +687,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
               >
                 <option value="cash">نقدية</option>
                 <option value="visa">فيزا</option>
-                {shiftAccounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
-                ))}
+                <option value="vodafone_cash">فودافون كاش</option>
               </select>
             </div>
             {isEWallet && (

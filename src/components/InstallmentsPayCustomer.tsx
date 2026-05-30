@@ -443,9 +443,7 @@ export function InstallmentsPayCustomer() {
                                 >
                                   <option value="cash">كاش</option>
                                   <option value="visa">فيزا</option>
-                                  {shiftAccounts.map(a => (
-                                    <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
-                                  ))}
+                                  <option value="vodafone_cash">فودافون كاش</option>
                                 </select>
                               </div>
                             </div>
@@ -574,9 +572,7 @@ export function InstallmentsPayCustomer() {
                                                             >
                                                               <option value="cash">كاش</option>
                                                               <option value="visa">فيزا</option>
-                                                              {shiftAccounts.map(a => (
-                                                                <option key={a.id} value={a.id}>{a.name}{a.subLabel ? ` (${a.subLabel})` : ''}</option>
-                                                              ))}
+                                                              <option value="vodafone_cash">فودافون كاش</option>
                                                             </select>
                                                             {selectedMethod !== 'cash' && (
                                                               <div className="flex flex-col gap-1 w-full mt-1">
