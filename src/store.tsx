@@ -1,6 +1,42 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift } from './types';
-import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem } from './lib/storage';
+import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem, isElectron, upsertRecord, deleteRecord, clearCollection } from './lib/storage';
+
+// Hook to sync collections efficiently to the document-store database
+function useCollectionSync<T>(collectionName: string, items: T[], idKey: keyof T = 'id' as keyof T) {
+  const prevItemsRef = useRef<T[]>(items);
+  
+  useEffect(() => {
+    if (!isElectron) {
+      // Browser mode: bulk save entire array to localStorage
+      setStorageItem(collectionName, JSON.stringify(items));
+    } else {
+      // Electron mode: Document-Store Incremental Sync (blazing fast)
+      const prev = prevItemsRef.current;
+      if (prev === items) return;
+      
+      const prevMap = new Map(prev.map(i => [i[idKey], i]));
+      const currentMap = new Map(items.map(i => [i[idKey], i]));
+      
+      // Upsert added/modified items
+      for (const item of items) {
+        const oldItem = prevMap.get(item[idKey]);
+        if (oldItem !== item) {
+          upsertRecord(collectionName, String(item[idKey]), JSON.stringify(item));
+        }
+      }
+      
+      // Delete removed items
+      for (const oldItem of prev) {
+        if (!currentMap.has(oldItem[idKey])) {
+          deleteRecord(collectionName, String(oldItem[idKey]));
+        }
+      }
+      
+      prevItemsRef.current = items;
+    }
+  }, [items, collectionName, idKey]);
+}
 
 interface AppContextType {
   products: Product[];
@@ -114,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shiftAccounts, setShiftAccounts] = useState<ShiftAccount[]>(() => {
     const saved = getStorageItem('mobile_shop_shift_accounts');
     return saved ? JSON.parse(saved) : [
-      { id: 'sa3', name: 'فودافون كاش', subLabel: 'محفظة 1' },
+      { id: 'sa3', name: 'داخلي', subLabel: 'محفظة 1' },
       { id: 'sa4', name: 'انستا باي' }
     ];
   });
@@ -132,46 +168,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  useCollectionSync('mobile_shop_products', products);
+  useCollectionSync('mobile_shop_transactions', transactions);
+  useCollectionSync('mobile_shop_installments', installmentContracts);
+  useCollectionSync('mobile_shop_users', users, 'code');
+  useCollectionSync('mobile_shop_expenses', expenses);
+  useCollectionSync('mobile_shop_payment_transactions', paymentTransactions);
+  useCollectionSync('mobile_shop_shift_accounts', shiftAccounts);
+  useCollectionSync('mobile_shop_shift_inventory', shiftInventoryItems);
+  useCollectionSync('mobile_shop_shifts', shifts);
 
-  useEffect(() => {
-    setStorageItem('mobile_shop_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_installments', JSON.stringify(installmentContracts));
-  }, [installmentContracts]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
+  // Keep bulk save for primitive arrays like expenseTypes
   useEffect(() => {
     setStorageItem('mobile_shop_expense_types', JSON.stringify(expenseTypes));
   }, [expenseTypes]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_payment_transactions', JSON.stringify(paymentTransactions));
-  }, [paymentTransactions]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_shift_accounts', JSON.stringify(shiftAccounts));
-  }, [shiftAccounts]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_shift_inventory', JSON.stringify(shiftInventoryItems));
-  }, [shiftInventoryItems]);
-
-  useEffect(() => {
-    setStorageItem('mobile_shop_shifts', JSON.stringify(shifts));
-  }, [shifts]);
 
 
   useEffect(() => {
@@ -350,6 +360,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPaymentTransactions([]);
     setShifts([]);
     
+    if (isElectron) {
+      clearCollection('mobile_shop_transactions');
+      clearCollection('mobile_shop_installments');
+      clearCollection('mobile_shop_expenses');
+      clearCollection('mobile_shop_payment_transactions');
+      clearCollection('mobile_shop_shifts');
+    }
+    
     const storageData: Record<string, string> = {
       'mobile_shop_transactions': JSON.stringify([]),
       'mobile_shop_installments': JSON.stringify([]),
@@ -386,7 +404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // تسجيل حركة الشراء وتغذية المخزن
       if (product.stock > 0) {
         const newTransaction: Transaction = {
-          id: Date.now().toString(),
+          id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
           timestamp: new Date().toISOString(),
           type: 'purchase',
           items: [{
@@ -405,7 +423,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProducts([...products, product]);
       if (product.stock > 0) {
         const newTransaction: Transaction = {
-          id: Date.now().toString(),
+          id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
           timestamp: new Date().toISOString(),
           type: 'purchase',
           items: [{
@@ -437,7 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addTransaction = (t: Omit<Transaction, 'id' | 'timestamp'>) => {
     const newTransaction: Transaction = {
       ...t,
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
       timestamp: new Date().toISOString(),
     };
     
