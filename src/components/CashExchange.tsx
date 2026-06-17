@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getStorageItem, setStorageItem } from '../lib/storage';
 import {
   Wallet as WalletIcon,
   Banknote,
@@ -44,6 +45,7 @@ interface LocalTransaction {
   note: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
+  affectsCash?: boolean;
   isOffset?: boolean;
   transferRef?: string;
   archived?: boolean;
@@ -141,13 +143,13 @@ export default function BalancesScreen() {
   // ======================== LOAD AND SAVE ========================
   useEffect(() => {
     // Load Dark Mode Preference
-    const dm = localStorage.getItem('mahfazty4_dark') === '1';
+    const dm = getStorageItem('mahfazty4_dark') === '1';
     if (dm) {
       document.body.classList.add('dark-mode');
     }
 
     // Load DB
-    const r = localStorage.getItem('mahfazty4');
+    const r = getStorageItem('mahfazty4');
     if (r) {
       try {
         const parsed = JSON.parse(r);
@@ -177,7 +179,7 @@ export default function BalancesScreen() {
       cashInitial: newCashInitial,
       showHiddenWallets: newShowHiddenWallets,
     };
-    localStorage.setItem('mahfazty4', JSON.stringify(data));
+    setStorageItem('mahfazty4', JSON.stringify(data));
   };
 
   // Helper State Setters that auto-save
@@ -252,8 +254,9 @@ export default function BalancesScreen() {
     transactions
       .filter(t => !t.isOffset)
       .forEach(t => {
-        if (t.type === 'receive') bal -= t.amount;
-        if (t.type === 'send') bal += t.amount;
+        const affectsCash = t.affectsCash !== false;
+        if (t.type === 'receive' && affectsCash) bal -= t.amount;
+        if (t.type === 'send' && affectsCash) bal += t.amount;
         if (t.type === 'cash_deposit') bal += t.amount;
         if (t.type === 'cash_withdraw') bal -= t.amount;
       });

@@ -2,6 +2,49 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem, isElectron, upsertRecord, deleteRecord, clearCollection } from './lib/storage';
 
+interface MahfaztyWallet {
+  id: string;
+  name: string;
+  phone?: string;
+  initialBalance: number;
+  limitReceive?: number;
+  limitSend?: number;
+  hidden?: boolean;
+}
+
+interface MahfaztyTransaction {
+  id: string;
+  walletId: string | null;
+  type: 'receive' | 'send' | 'cash_deposit' | 'cash_withdraw';
+  amount: number;
+  note: string;
+  date: string;
+  time: string;
+  affectsCash?: boolean;
+  isOffset?: boolean;
+  transferRef?: string;
+  archived?: boolean;
+}
+
+interface MahfaztyData {
+  wallets?: MahfaztyWallet[];
+  transactions?: MahfaztyTransaction[];
+  currentWalletId?: string | null;
+  cashInitial?: number;
+  showHiddenWallets?: boolean;
+}
+
+const walletTrackedTypes: TransactionType[] = ['sale', 'deposit_sale', 'deposit_payment', 'installment_sale', 'installment_payment'];
+
+const normalizeDigits = (value?: string) => (value || '').replace(/\D/g, '');
+
+const getTransactionCashInAmount = (transaction: Transaction | Omit<Transaction, 'id' | 'timestamp'>) => {
+  if (transaction.type === 'deposit_sale' || transaction.type === 'installment_sale') {
+    return Number(transaction.depositAmount) || 0;
+  }
+  return Number(transaction.totalAmount) || 0;
+};
+
 // Hook to sync collections efficiently to the document-store database
 function useCollectionSync<T>(collectionName: string, items: T[], idKey: keyof T = 'id' as keyof T) {
   const prevItemsRef = useRef<T[]>(items);
@@ -210,6 +253,101 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUsers(prev => prev.filter(u => u.code !== code));
 
   const activeShift = shifts.find(s => !s.isClosed);
+
+  const syncMahfaztyReceive = (transaction: Transaction) => {
+    if (!walletTrackedTypes.includes(transaction.type)) return;
+    if (transaction.paymentMethod === 'cash' || transaction.paymentMethod === 'visa') return;
+
+    const amount = getTransactionCashInAmount(transaction);
+    if (amount <= 0) return;
+
+    const receiverDigits = normalizeDigits(transaction.receiverWalletLast4);
+    if (receiverDigits.length < 2) return;
+
+    const saved = getStorageItem('mahfazty4');
+    if (!saved) return;
+
+    try {
+      const data: MahfaztyData = JSON.parse(saved);
+      const wallets = Array.isArray(data.wallets) ? data.wallets : [];
+      const mahfaztyTransactions = Array.isArray(data.transactions) ? data.transactions : [];
+      if (wallets.length === 0) return;
+
+      const paymentMethod = String(transaction.paymentMethod);
+      const account = shiftAccounts.find(a => a.id === paymentMethod || a.name === paymentMethod);
+      const methodLabel = account?.name || (paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : paymentMethod === 'instapay' ? 'انستا باي' : paymentMethod);
+      const receiverLast2 = receiverDigits.slice(-2);
+
+      const phoneMatches = wallets.filter(wallet => {
+        const walletDigits = normalizeDigits(wallet.phone);
+        if (!walletDigits) return false;
+        return walletDigits.endsWith(receiverDigits) || walletDigits.endsWith(receiverLast2);
+      });
+
+      const nameMatchesMethod = (wallet: MahfaztyWallet) => {
+        const walletName = wallet.name.trim().toLowerCase();
+        const accountName = (account?.name || '').trim().toLowerCase();
+        const accountSubLabel = (account?.subLabel || '').trim().toLowerCase();
+        const method = methodLabel.trim().toLowerCase();
+        return Boolean(
+          (accountName && (walletName.includes(accountName) || accountName.includes(walletName))) ||
+          (accountSubLabel && walletName.includes(accountSubLabel)) ||
+          (method && (walletName.includes(method) || method.includes(walletName)))
+        );
+      };
+
+      const exactPhoneMatch = phoneMatches.find(wallet => normalizeDigits(wallet.phone).endsWith(receiverDigits));
+      const namedPhoneMatch = phoneMatches.find(nameMatchesMethod);
+      const accountNumberMatchesReceiver = account?.walletNumber && normalizeDigits(account.walletNumber).endsWith(receiverDigits);
+      const namedAccountMatch = accountNumberMatchesReceiver ? wallets.find(nameMatchesMethod) : undefined;
+      const targetWallet = exactPhoneMatch || namedPhoneMatch || namedAccountMatch || phoneMatches[0];
+      if (!targetWallet) return;
+
+      const linkedId = `shop_${transaction.id}`;
+      if (mahfaztyTransactions.some(t => t.id === linkedId || t.transferRef === linkedId)) return;
+
+      const dateObj = new Date(transaction.timestamp);
+      const date = Number.isNaN(dateObj.getTime()) ? new Date().toISOString().slice(0, 10) : dateObj.toISOString().slice(0, 10);
+      const time = Number.isNaN(dateObj.getTime())
+        ? new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        : dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const customer = transaction.customerName ? ` - ${transaction.customerName}` : '';
+      const note = `${methodLabel} - ${getTransactionLabel(transaction.type)}${customer}`;
+
+      const walletTransaction: MahfaztyTransaction = {
+        id: linkedId,
+        walletId: targetWallet.id,
+        type: 'receive',
+        amount,
+        note,
+        date,
+        time,
+        affectsCash: false,
+        transferRef: linkedId,
+      };
+
+      setStorageItem('mahfazty4', JSON.stringify({
+        wallets,
+        transactions: [...mahfaztyTransactions, walletTransaction],
+        currentWalletId: data.currentWalletId || targetWallet.id,
+        cashInitial: Number(data.cashInitial) || 0,
+        showHiddenWallets: !!data.showHiddenWallets,
+      }));
+    } catch (error) {
+      console.error('Failed to sync transaction to mahfazty4', error);
+    }
+  };
+
+  const getTransactionLabel = (type: TransactionType) => {
+    switch (type) {
+      case 'sale': return 'فاتورة بيع';
+      case 'deposit_sale': return 'عربون بيع';
+      case 'deposit_payment': return 'دفعة عربون';
+      case 'installment_sale': return 'مقدم تقسيط';
+      case 'installment_payment': return 'تحصيل قسط';
+      default: return 'حركة وارد';
+    }
+  };
 
   const openShift = (openingCash: number) => {
     if (shifts.some(s => !s.isClosed)) {
@@ -460,6 +598,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     setTransactions(prev => [...prev, newTransaction]);
+    syncMahfaztyReceive(newTransaction);
 
     // Update stock based on transaction type (skip for payment records)
     if (t.type !== 'deposit_payment' && t.type !== 'installment_payment') {
@@ -523,13 +662,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const payInstallment = (contractId: string, paymentId: string, paidAmount: number, paymentMethod: PaymentMethod, walletLast4?: string, receiverWalletLast4?: string) => {
-    let customerName = '';
-    let customerPhone = '';
+    const contractToPay = installmentContracts.find(contract => contract.id === contractId);
+    const paymentToPay = contractToPay?.payments.find(payment => payment.id === paymentId && !payment.isPaid);
+    if (!contractToPay || !paymentToPay) return;
     
     setInstallmentContracts(prev => prev.map(contract => {
       if (contract.id === contractId) {
-        customerName = contract.customerName;
-        customerPhone = contract.customerPhone;
         return {
           ...contract,
           payments: contract.payments.map(payment => {
@@ -544,18 +682,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
 
     // Add transaction for shift reporting
-    if (customerName) {
-      addTransaction({
-        type: 'installment_payment',
-        totalAmount: paidAmount,
-        paymentMethod: paymentMethod,
-        items: [],
-        customerName: customerName,
-        customerPhone: customerPhone,
-        senderWalletLast4: walletLast4,
-        receiverWalletLast4: receiverWalletLast4,
-      });
-    }
+    addTransaction({
+      type: 'installment_payment',
+      totalAmount: paidAmount,
+      paymentMethod: paymentMethod,
+      items: [],
+      customerName: contractToPay.customerName,
+      customerPhone: contractToPay.customerPhone,
+      senderWalletLast4: walletLast4,
+      receiverWalletLast4: receiverWalletLast4,
+    });
   };
 
   const addExpense = (e: Omit<Expense, 'id' | 'timestamp' | 'expenseNumber'>) => {
