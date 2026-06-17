@@ -1,18 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wallet as WalletIcon,
   Banknote,
   Plus,
   ArrowRightLeft,
-  Download,
-  Upload,
   Calendar,
   History as HistoryIcon,
   BarChart2,
   FileText,
   Printer,
-  Moon,
-  Sun,
   X,
   Edit,
   Trash2,
@@ -60,8 +56,6 @@ export default function BalancesScreen() {
   const [currentWalletId, setCurrentWalletId] = useState<string | null>(null);
   const [cashInitial, setCashInitial] = useState<number>(0);
   const [showHiddenWallets, setShowHiddenWallets] = useState<boolean>(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-
   // ======================== UI STATE ========================
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -144,13 +138,10 @@ export default function BalancesScreen() {
   const [editTxDate, setEditTxDate] = useState('');
   const [editTxTime, setEditTxTime] = useState('');
 
-  const importInputRef = useRef<HTMLInputElement>(null);
-
   // ======================== LOAD AND SAVE ========================
   useEffect(() => {
     // Load Dark Mode Preference
     const dm = localStorage.getItem('mahfazty4_dark') === '1';
-    setIsDarkMode(dm);
     if (dm) {
       document.body.classList.add('dark-mode');
     }
@@ -691,58 +682,7 @@ export default function BalancesScreen() {
     });
   };
 
-  // ======================== IMPORT & EXPORT ========================
-  const handleExportData = () => {
-    const data = { wallets, transactions, currentWalletId, cashInitial, showHiddenWallets };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `mahfazty-${today()}.json`;
-    a.click();
-    showToast('تم تصدير البيانات بنجاح');
-  };
-
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try {
-        const data = JSON.parse(ev.target?.result as string);
-        if (!data.wallets || !data.transactions) {
-          showToast('ملف غير صالح للاستيراد', 'error');
-          return;
-        }
-        triggerConfirm(`استيراد عدد ${data.transactions.length} عملية و ${data.wallets.length} محفظة؟ سيتم استبدال البيانات الحالية.`, () => {
-          setWallets(data.wallets);
-          setTransactions(data.transactions);
-          setCashInitial(data.cashInitial || 0);
-          setCurrentWalletId(data.currentWalletId || (data.wallets.length > 0 ? data.wallets[0].id : null));
-          setShowHiddenWallets(!!data.showHiddenWallets);
-
-          saveToLocalStorage(
-            data.wallets,
-            data.transactions,
-            data.currentWalletId || (data.wallets.length > 0 ? data.wallets[0].id : null),
-            data.cashInitial || 0,
-            !!data.showHiddenWallets
-          );
-          showToast('تم استيراد البيانات بنجاح');
-        });
-      } catch (err) {
-        showToast('فشل قراءة الملف أو استيراده', 'error');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   // ======================== ARCHIVE ACTIONS ========================
-  const handleOpenArchiveModal = () => {
-    setArchiveDate('');
-    setIsArchiveModalOpen(true);
-  };
-
   const executeArchive = () => {
     if (!archiveDate) {
       showToast('اختر التاريخ المطلوب', 'error');
@@ -789,18 +729,6 @@ export default function BalancesScreen() {
       setDailyDayName(dayNames[d.getDay()] || '');
     }
   }, [dailyDate]);
-
-  // ======================== DARK MODE TOGGLE ========================
-  const handleToggleDarkMode = () => {
-    const nextVal = !isDarkMode;
-    setIsDarkMode(nextVal);
-    localStorage.setItem('mahfazty4_dark', nextVal ? '1' : '0');
-    if (nextVal) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  };
 
   // ======================== FILTER COMPUTATIONS ========================
   // History Transactions for selected wallet
@@ -1098,58 +1026,6 @@ export default function BalancesScreen() {
             <div className="text-base font-black mt-0.5">{fm(calcCash())} ج.م</div>
           </div>
 
-          <div className="flex items-center gap-1.5 mr-auto md:mr-0">
-            <button
-              onClick={() => {
-                setAfWallet('all');
-                setAfType('all');
-                setAfFrom('');
-                setAfTo('');
-                setAfSearch('');
-                setAfArchived(false);
-                setIsAllModalOpen(true);
-              }}
-              className="bg-white/15 hover:bg-white/25 p-2 rounded-lg transition-colors"
-              title="📋 كل العمليات"
-            >
-              <FileText className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleExportData}
-              className="bg-white/15 hover:bg-white/25 p-2 rounded-lg transition-colors"
-              title="💾 تصدير النسخة الاحتياطية"
-            >
-              <Download className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => importInputRef.current?.click()}
-              className="bg-white/15 hover:bg-white/25 p-2 rounded-lg transition-colors"
-              title="📂 استيراد النسخة الاحتياطية"
-            >
-              <Upload className="w-5 h-5" />
-            </button>
-            <input
-              type="file"
-              ref={importInputRef}
-              accept=".json"
-              onChange={handleImportData}
-              className="hidden"
-            />
-            <button
-              onClick={handleOpenArchiveModal}
-              className="bg-white/15 hover:bg-white/25 p-2 rounded-lg transition-colors"
-              title="📦 الأرشفة"
-            >
-              <Archive className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleToggleDarkMode}
-              className="bg-white/15 hover:bg-white/25 p-2 rounded-lg transition-colors"
-              title="الوضع المظلم"
-            >
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-          </div>
         </div>
       </header>
 
