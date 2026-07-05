@@ -137,6 +137,24 @@ export interface ShiftInventoryItem {
   name: string;
 }
 
+// مكينة دفع (فوري، إلخ)
+export interface ShiftMachine {
+  id: number;
+  name: string;
+  opening: string;  // رصيد افتتاحي
+  closing: string;  // رصيد ختامي
+}
+
+// إضافة أثناء الوردية (snapshot لأرصدة المكينات)
+export interface ShiftAddition {
+  time: string;
+  machines: { id: number; name: string; opening: string; added: string }[];
+  notes: string;
+}
+
+// جرد الخزنة بالفئات
+export type DenomCount = Record<number, string>;
+
 export interface ManualCashTransaction {
   id: string;
   type: 'inflow' | 'outflow'; // inflow = إيداع يدوي، outflow = سحب يدوي
@@ -153,4 +171,13 @@ export interface CashShift {
   openingCash: number;       // الرصيد الافتتاحي للدرج
   closingCashActual?: number;// الرصيد الفعلي بعد العد عند الإغلاق
   manualTransactions: ManualCashTransaction[]; // الإيداعات والمسحوبات اليدوية
+  // --- حقول نظام إقفال الوردية ---
+  shiftType?: 'صباحي' | 'مسائي';
+  cashierName?: string;
+  machines?: ShiftMachine[];
+  openingDenoms?: DenomCount;   // جرد الخزنة عند البدء
+  closingDenoms?: DenomCount;   // جرد الخزنة عند التقفيل
+  additions?: ShiftAddition[];  // الإضافات أثناء الوردية
+  openingNotes?: string;
+  closingNotes?: string;
 }

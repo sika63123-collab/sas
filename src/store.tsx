@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift, ShiftMachine, ShiftAddition, DenomCount } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem, isElectron, upsertRecord, deleteRecord, clearCollection } from './lib/storage';
 
 interface MahfaztyWallet {
@@ -128,9 +128,13 @@ interface AppContextType {
   addCashExchange: (amount: number, targetMethod: string, walletLast4: string, note?: string, exchangeRecordNumber?: string, direction?: 'cash_to_wallet' | 'wallet_to_cash') => void;
   shifts: CashShift[];
   activeShift: CashShift | undefined;
-  openShift: (openingCash: number) => void;
-  closeShift: (actualCash?: number) => void;
+  openShift: (openingCash: number, extra?: { shiftType?: 'صباحي' | 'مسائي'; cashierName?: string; machines?: ShiftMachine[]; openingDenoms?: DenomCount; openingNotes?: string }) => void;
+  closeShift: (actualCash?: number, extra?: { machines?: ShiftMachine[]; closingDenoms?: DenomCount; closingNotes?: string }) => void;
   addManualCashTransaction: (type: 'inflow' | 'outflow', amount: number, notes: string) => void;
+  addShiftAddition: (addition: ShiftAddition) => void;
+  updateShiftAddition: (index: number, addition: ShiftAddition) => void;
+  deleteShiftAddition: (index: number) => void;
+  updateActiveShiftMachines: (machines: ShiftMachine[]) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -360,7 +364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const openShift = (openingCash: number) => {
+  const openShift = (openingCash: number, extra?: { shiftType?: 'صباحي' | 'مسائي'; cashierName?: string; machines?: ShiftMachine[]; openingDenoms?: DenomCount; openingNotes?: string }) => {
     if (shifts.some(s => !s.isClosed)) {
       alert('يوجد وردية مفتوحة بالفعل، يجب إغلاقها أولاً!');
       return;
@@ -370,12 +374,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openedAt: new Date().toISOString(),
       isClosed: false,
       openingCash,
-      manualTransactions: []
+      manualTransactions: [],
+      shiftType: extra?.shiftType,
+      cashierName: extra?.cashierName,
+      machines: extra?.machines,
+      openingDenoms: extra?.openingDenoms,
+      openingNotes: extra?.openingNotes,
+      additions: [],
     };
     setShifts(prev => [...prev, newShift]);
   };
 
-  const closeShift = (actualCash?: number) => {
+  const closeShift = (actualCash?: number, extra?: { machines?: ShiftMachine[]; closingDenoms?: DenomCount; closingNotes?: string }) => {
     setShifts(prev => {
       const active = prev.find(s => !s.isClosed);
       if (!active) return prev;
@@ -419,12 +429,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...s,
             closedAt: nowStr,
             isClosed: true,
-            closingCashActual: closingAmount
+            closingCashActual: closingAmount,
+            machines: extra?.machines || s.machines,
+            closingDenoms: extra?.closingDenoms,
+            closingNotes: extra?.closingNotes,
           };
         }
         return s;
       });
     });
+  };
+
+  const addShiftAddition = (addition: ShiftAddition) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed) {
+        return { ...s, additions: [...(s.additions || []), addition] };
+      }
+      return s;
+    }));
+  };
+
+  const updateShiftAddition = (index: number, addition: ShiftAddition) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed && s.additions) {
+        const newAdditions = [...s.additions];
+        if (index >= 0 && index < newAdditions.length) {
+          newAdditions[index] = addition;
+        }
+        return { ...s, additions: newAdditions };
+      }
+      return s;
+    }));
+  };
+
+  const deleteShiftAddition = (index: number) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed && s.additions) {
+        const newAdditions = s.additions.filter((_, i) => i !== index);
+        return { ...s, additions: newAdditions };
+      }
+      return s;
+    }));
+  };
+
+  const updateActiveShiftMachines = (machines: ShiftMachine[]) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed) {
+        return { ...s, machines };
+      }
+      return s;
+    }));
   };
 
   const addManualCashTransaction = (type: 'inflow' | 'outflow', amount: number, notes: string) => {
@@ -863,6 +917,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openShift,
       closeShift,
       addManualCashTransaction,
+      addShiftAddition,
+      updateShiftAddition,
+      deleteShiftAddition,
+      updateActiveShiftMachines,
     }}>
       {children}
     </AppContext.Provider>
