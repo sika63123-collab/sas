@@ -714,22 +714,117 @@ export default function CashShiftManagement() {
             )}
           </AnimatePresence>
 
-          {/* Machines Status (if any) */}
-          {activeShift.machines && activeShift.machines.length > 0 && (
-            <div className="bg-white p-4 border border-slate-200/80 shadow-sm rounded-2xl space-y-3">
-              <h3 className="font-extrabold text-xs text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                <Monitor className="h-4 w-4 text-blue-500 shrink-0" /> المكينات ({activeShift.machines.length})
-              </h3>
-              <div className="space-y-1.5">
-                {activeShift.machines.map(m => (
-                  <div key={m.id} className="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2 text-xs">
-                    <span className="font-bold text-slate-700">{m.name || '—'}</span>
-                    <span className="font-black text-blue-800">{fmt(toNum(m.opening))} ج.م</span>
+          {/* Machines Balances Panel */}
+          {activeShift.machines && activeShift.machines.length > 0 && (() => {
+            const totalOpening = activeShift.machines.reduce((s, m) => s + toNum(m.opening), 0);
+            const totalClosing = activeShift.machines.reduce((s, m) => s + toNum(m.closing), 0);
+            const hasAnyClosing = activeShift.machines.some(m => m.closing !== '' && m.closing !== null && m.closing !== undefined);
+            const totalNet = hasAnyClosing ? totalClosing - totalOpening : 0;
+
+            return (
+              <div className="bg-white border border-slate-200/80 shadow-md rounded-2xl overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white px-4 py-3 flex items-center justify-between">
+                  <h3 className="font-extrabold text-xs flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-blue-200" /> أرصدة المكينات
+                  </h3>
+                  <span className="bg-white/15 text-blue-100 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                    {activeShift.machines.length} مكينة
+                  </span>
+                </div>
+
+                {/* Table */}
+                <div className="p-4 space-y-2">
+                  {/* Column Headers */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-[10px] font-extrabold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-100 px-1">
+                    <span>المكينة</span>
+                    <span className="w-[72px] text-center">افتتاحي</span>
+                    <span className="w-[80px] text-center">ختامي</span>
+                    <span className="w-[72px] text-center">الصافي</span>
                   </div>
-                ))}
+
+                  {/* Machine Rows */}
+                  {activeShift.machines.map((m, i) => {
+                    const opening = toNum(m.opening);
+                    const closing = toNum(m.closing);
+                    const hasClosing = m.closing !== '' && m.closing !== null && m.closing !== undefined;
+                    const net = hasClosing ? closing - opening : 0;
+
+                    return (
+                      <div key={m.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center bg-slate-50 hover:bg-slate-100/70 rounded-lg px-2.5 py-2 transition-colors">
+                        {/* Machine Name */}
+                        <span className="font-bold text-xs text-slate-700 truncate">{m.name || '—'}</span>
+                        
+                        {/* Opening */}
+                        <span className="w-[72px] text-center text-[11px] font-bold text-blue-700 bg-blue-50 rounded-md py-1 px-1">
+                          {fmt(opening)}
+                        </span>
+                        
+                        {/* Closing (Editable) */}
+                        <input
+                          type="number"
+                          value={m.closing || ''}
+                          placeholder="0.00"
+                          onChange={e => {
+                            const updated = [...(activeShift.machines || [])];
+                            updated[i] = { ...updated[i], closing: e.target.value };
+                            updateActiveShiftMachines(updated);
+                          }}
+                          className="w-[80px] h-8 border-2 border-slate-200 focus:border-indigo-400 rounded-lg text-center font-bold text-xs outline-none bg-white focus:bg-indigo-50/30 transition-all"
+                        />
+                        
+                        {/* Net */}
+                        <span className={`w-[72px] text-center text-[11px] font-extrabold rounded-md py-1 px-1 ${
+                          !hasClosing ? 'text-slate-300 bg-slate-50' :
+                          net > 0.01 ? 'text-emerald-700 bg-emerald-50' :
+                          net < -0.01 ? 'text-rose-700 bg-rose-50' :
+                          'text-slate-500 bg-slate-50'
+                        }`}>
+                          {hasClosing ? fmt(net) : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Totals Row */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center bg-indigo-50 rounded-xl px-2.5 py-2.5 border-t-2 border-indigo-200 mt-1">
+                    <span className="font-black text-xs text-indigo-900">الإجمالي</span>
+                    <span className="w-[72px] text-center text-[11px] font-black text-blue-900">
+                      {fmt(totalOpening)}
+                    </span>
+                    <span className="w-[80px] text-center text-[11px] font-black text-indigo-900">
+                      {hasAnyClosing ? fmt(totalClosing) : '—'}
+                    </span>
+                    <span className={`w-[72px] text-center text-[11px] font-black rounded-md py-1 ${
+                      !hasAnyClosing ? 'text-slate-400' :
+                      totalNet > 0.01 ? 'text-emerald-700' :
+                      totalNet < -0.01 ? 'text-rose-700' :
+                      'text-slate-600'
+                    }`}>
+                      {hasAnyClosing ? fmt(totalNet) : '—'}
+                    </span>
+                  </div>
+
+                  {/* Net Summary Badge */}
+                  {hasAnyClosing && (
+                    <div className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-extrabold mt-1 ${
+                      totalNet > 0.01 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+                      totalNet < -0.01 ? 'bg-rose-50 text-rose-800 border border-rose-200' :
+                      'bg-slate-50 text-slate-600 border border-slate-200'
+                    }`}>
+                      {totalNet > 0.01 ? (
+                        <><TrendingUp className="h-3.5 w-3.5" /> مبيعات المكينات: +{formatMoney(totalNet)}</>
+                      ) : totalNet < -0.01 ? (
+                        <><TrendingDown className="h-3.5 w-3.5" /> عجز المكينات: {formatMoney(totalNet)}</>
+                      ) : (
+                        <><CheckCircle2 className="h-3.5 w-3.5" /> لا يوجد فرق في أرصدة المكينات</>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Manual Transactions Ledger */}
           <div className="bg-white p-4 border border-slate-200/80 shadow-sm rounded-2xl space-y-3">
@@ -923,21 +1018,54 @@ export default function CashShiftManagement() {
                     <h4 className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
                       <Monitor className="h-3.5 w-3.5 text-blue-500" /> أرصدة المكينات الختامية
                     </h4>
-                    {closeMachines.map((m, i) => (
-                      <div key={m.id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                        <span className="flex-1 text-xs font-bold text-slate-700">{m.name || '—'}</span>
-                        <span className="text-[10px] text-blue-500 font-medium">افتتاحي: {fmt(toNum(m.opening))}</span>
-                        <input type="number" value={m.closing} placeholder="0.00"
-                          onChange={e => {
-                            const arr = [...closeMachines];
-                            arr[i] = { ...arr[i], closing: e.target.value };
-                            setCloseMachines(arr);
-                          }}
-                          className="w-24 h-8 border-2 border-slate-200 focus:border-blue-400 rounded-lg text-center font-bold text-xs outline-none bg-white"
-                        />
-                      </div>
-                    ))}
-                    <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2 border border-blue-100">
+
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1">
+                      <span>المكينة</span>
+                      <span className="w-[60px] text-center">افتتاحي</span>
+                      <span className="w-[80px] text-center">ختامي</span>
+                      <span className="w-[60px] text-center">الصافي</span>
+                    </div>
+
+                    {closeMachines.map((m, i) => {
+                      const opening = toNum(m.opening);
+                      const closing = toNum(m.closing);
+                      const hasClosing = m.closing !== '' && m.closing !== null && m.closing !== undefined;
+                      const net = hasClosing ? closing - opening : 0;
+                      
+                      return (
+                        <div key={m.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center bg-slate-50 hover:bg-slate-100/70 rounded-lg px-2.5 py-2 transition-colors">
+                          <span className="font-bold text-xs text-slate-700 truncate">{m.name || '—'}</span>
+                          
+                          {/* Opening */}
+                          <span className="w-[60px] text-center text-[11px] font-bold text-blue-700 bg-blue-50/50 rounded py-1 px-1">
+                            {fmt(opening)}
+                          </span>
+                          
+                          <input type="number" value={m.closing} placeholder="0.00"
+                            onChange={e => {
+                              const arr = [...closeMachines];
+                              arr[i] = { ...arr[i], closing: e.target.value };
+                              setCloseMachines(arr);
+                            }}
+                            className="w-[80px] h-8 border-2 border-slate-200 focus:border-blue-400 rounded-lg text-center font-bold text-xs outline-none bg-white transition-all"
+                          />
+
+                          {/* Net */}
+                          <span className={`w-[60px] text-center text-[11px] font-extrabold rounded py-1 px-1 ${
+                            !hasClosing ? 'text-slate-400 bg-slate-50' :
+                            net > 0.01 ? 'text-emerald-700 bg-emerald-50' :
+                            net < -0.01 ? 'text-rose-700 bg-rose-50' :
+                            'text-slate-500 bg-slate-50'
+                          }`}>
+                            {hasClosing ? fmt(net) : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Totals Row */}
+                    <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2 border border-blue-100 mt-1">
                       <span className="text-[11px] font-bold text-blue-700">إجمالي ختامي</span>
                       <span className="font-black text-sm text-blue-900">{fmt(closeMachines.reduce((s, m) => s + toNum(m.closing), 0))}</span>
                     </div>
