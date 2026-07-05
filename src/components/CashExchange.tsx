@@ -46,6 +46,7 @@ interface LocalTransaction {
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   affectsCash?: boolean;
+  sourceInvoiceNumber?: string;
   isOffset?: boolean;
   transferRef?: string;
   archived?: boolean;
@@ -235,6 +236,11 @@ export default function BalancesScreen() {
     return `${p[2]}/${p[1]}/${p[0]}`;
   };
   const fdt = (date: string, time: string) => fd(date) + (time ? ` ${time}` : '');
+  const getSourceInvoiceNumber = (t: LocalTransaction) => {
+    if (t.sourceInvoiceNumber) return t.sourceInvoiceNumber;
+    const match = t.note?.match(/فاتورة رقم\s*([^\s-]+)/);
+    return match?.[1] || '-';
+  };
 
   // ======================== CALCULATIONS ========================
   const calcWallet = (wid: string) => {
@@ -2264,6 +2270,7 @@ export default function BalancesScreen() {
                         <thead>
                           <tr className="bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700 text-gray-500">
                             <th className="p-2 font-bold">المحفظة</th>
+                            <th className="p-2 font-bold text-center">رقم الفاتورة</th>
                             <th className="p-2 font-bold text-center">نوع العملية</th>
                             <th className="p-2 font-bold text-center">المبلغ</th>
                             <th className="p-2 font-bold">البيان</th>
@@ -2274,6 +2281,9 @@ export default function BalancesScreen() {
                             <tr key={t.id} className="border-b border-gray-100 dark:border-slate-700/50">
                               <td className="p-2 font-semibold">
                                 {t.walletId === null ? '💵 العهدة' : wallets.find(x => x.id === t.walletId)?.name || ''}
+                              </td>
+                              <td className="p-2 text-center font-black text-gray-700 dark:text-gray-200">
+                                {getSourceInvoiceNumber(t)}
                               </td>
                               <td className="p-2 text-center">
                                 <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${

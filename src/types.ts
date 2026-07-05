@@ -77,6 +77,7 @@ export interface Transaction {
   paymentDate?: string;
   linkedExchangeId?: string;
   exchangeRecordNumber?: string;
+  invoiceNumber?: string;
 }
 
 export interface InstallmentPayment {

@@ -330,7 +330,8 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
           paymentMethod: actualPaymentMethod,
           ...(isEWallet && { senderWalletLast4: senderWallet, receiverWalletLast4: receiverWallet }),
           customerName: existingTx.customerName,
-          paymentDate: paymentDate
+          paymentDate: paymentDate,
+          invoiceNumber: String(viewingIndex + 1)
         });
 
         // تسجيل الدفعة في جدول حركات الدفع التفصيلي
@@ -370,6 +371,7 @@ export default function Cashier({ initialType = 'sale', initialInvoiceId, onInvo
       })),
       totalAmount,
       paymentMethod: actualPaymentMethod,
+      invoiceNumber: String(displayInvoiceNumber),
       ...(isEWallet && !isReturn && { senderWalletLast4: senderWallet, receiverWalletLast4: receiverWallet }),
       ...(isReturn && returnInvoiceNo ? { returnInvoiceNumber: returnInvoiceNo } : {}),
       ...(showCustomerData && {

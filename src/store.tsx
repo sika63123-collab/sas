@@ -21,6 +21,7 @@ interface MahfaztyTransaction {
   date: string;
   time: string;
   affectsCash?: boolean;
+  sourceInvoiceNumber?: string;
   isOffset?: boolean;
   transferRef?: string;
   archived?: boolean;
@@ -43,6 +44,13 @@ const getTransactionCashInAmount = (transaction: Transaction | Omit<Transaction,
     return Number(transaction.depositAmount) || 0;
   }
   return Number(transaction.totalAmount) || 0;
+};
+
+const getTransactionInvoiceNumber = (transaction: Transaction) => {
+  if (transaction.invoiceNumber) return transaction.invoiceNumber;
+  const paymentItemName = transaction.items?.[0]?.name || '';
+  const match = paymentItemName.match(/فاتورة رقم\s*([^\s-]+)/);
+  return match?.[1] || '';
 };
 
 // Hook to sync collections efficiently to the document-store database
@@ -312,7 +320,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         : dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       const customer = transaction.customerName ? ` - ${transaction.customerName}` : '';
-      const note = `${methodLabel} - ${getTransactionLabel(transaction.type)}${customer}`;
+      const invoiceNumber = getTransactionInvoiceNumber(transaction);
+      const invoiceText = invoiceNumber ? ` - فاتورة رقم ${invoiceNumber}` : '';
+      const note = `${methodLabel} - ${getTransactionLabel(transaction.type)}${invoiceText}${customer}`;
 
       const walletTransaction: MahfaztyTransaction = {
         id: linkedId,
@@ -323,6 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         date,
         time,
         affectsCash: false,
+        sourceInvoiceNumber: invoiceNumber || undefined,
         transferRef: linkedId,
       };
 
