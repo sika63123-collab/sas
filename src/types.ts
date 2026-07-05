@@ -152,6 +152,15 @@ export interface ShiftAddition {
   notes: string;
 }
 
+// إضافة مبلغ لمكينة محددة أثناء الوردية (مثل فلوس المندوب)
+export interface MachineAddition {
+  id: string;
+  machineId: number;
+  amount: number;
+  note: string;
+  time: string;
+}
+
 // جرد الخزنة بالفئات
 export type DenomCount = Record<number, string>;
 
@@ -178,6 +187,7 @@ export interface CashShift {
   openingDenoms?: DenomCount;   // جرد الخزنة عند البدء
   closingDenoms?: DenomCount;   // جرد الخزنة عند التقفيل
   additions?: ShiftAddition[];  // الإضافات أثناء الوردية
+  machineAdditions?: MachineAddition[];  // إضافات مبالغ للمكينات أثناء الوردية
   openingNotes?: string;
   closingNotes?: string;
 }

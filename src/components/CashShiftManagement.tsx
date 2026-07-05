@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { CashShift, Transaction, Expense, ShiftMachine, ShiftAddition, DenomCount } from '../types';
+import { CashShift, Transaction, Expense, ShiftMachine, ShiftAddition, MachineAddition, DenomCount } from '../types';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -199,6 +199,7 @@ export default function CashShiftManagement() {
   const { 
     shifts, activeShift, openShift, closeShift, addManualCashTransaction, 
     addShiftAddition, updateShiftAddition, deleteShiftAddition, updateActiveShiftMachines,
+    addMachineAddition, deleteMachineAddition,
     transactions, expenses, currentUser 
   } = useAppStore();
 
@@ -210,9 +211,27 @@ export default function CashShiftManagement() {
   const [shiftType, setShiftType] = useState<'صباحي' | 'مسائي'>('صباحي');
   const [cashierName, setCashierName] = useState('');
   const [openingNotes, setOpeningNotes] = useState('');
-  const [setupMachines, setSetupMachines] = useState<ShiftMachine[]>([{ id: 1, name: 'فوري', opening: '', closing: '' }]);
+  const [setupMachines, setSetupMachines] = useState<ShiftMachine[]>(() => {
+    // ترحيل تلقائي: سحب الأرصدة الختامية من آخر وردية مقفلة
+    const closed = shifts.filter(s => s.isClosed);
+    const last = closed.length > 0 ? closed[closed.length - 1] : null;
+    if (last?.machines && last.machines.length > 0) {
+      return last.machines.map(m => ({
+        id: m.id,
+        name: m.name,
+        opening: m.closing || m.opening, // الختامي يبقى الافتتاحي الجديد
+        closing: '',
+      }));
+    }
+    return [{ id: 1, name: 'فوري', opening: '', closing: '' }];
+  });
   const [nextMachineId, setNextMachineId] = useState(2);
   const [openingDenoms, setOpeningDenoms] = useState<DenomCount>(() => {
+    const closed = shifts.filter(s => s.isClosed);
+    const last = closed.length > 0 ? closed[closed.length - 1] : null;
+    if (last?.closingDenoms) {
+      return { ...last.closingDenoms };
+    }
     const d: DenomCount = {};
     DENOMINATIONS.forEach(den => d[den.value] = '');
     return d;
@@ -238,6 +257,11 @@ export default function CashShiftManagement() {
   const [additionEditIdx, setAdditionEditIdx] = useState(-1);
   const [additionMachines, setAdditionMachines] = useState<{ id: number; name: string; opening: string; added: string }[]>([]);
   const [additionNotes, setAdditionNotes] = useState('');
+
+  // ─── Inline Machine Addition State ──────────────────────────────
+  const [inlineAddMachineId, setInlineAddMachineId] = useState<number | null>(null);
+  const [inlineAddAmount, setInlineAddAmount] = useState('');
+  const [inlineAddNote, setInlineAddNote] = useState('');
 
   // ─── Receipt Modals ──────────────────────────────────────────────
   const [showShiftReceipt, setShowShiftReceipt] = useState(false);
@@ -726,15 +750,64 @@ export default function CashShiftManagement() {
                 </span>
               </div>
               <div className="p-4 space-y-1.5">
-                {activeShift.machines.map(m => (
-                  <div key={m.id} className="flex justify-between items-center bg-slate-50 hover:bg-slate-100/70 rounded-lg px-3 py-2.5 transition-colors">
-                    <span className="font-bold text-xs text-slate-700">{m.name || '—'}</span>
-                    <span className="font-black text-xs text-blue-800 bg-blue-50 rounded-md py-1 px-2.5">{fmt(toNum(m.opening))} ج.م</span>
+                {activeShift.machines.map(m => {
+                  const mAdditions = (activeShift.machineAdditions || []).filter(a => a.machineId === m.id);
+                  const mAdditionsTotal = mAdditions.reduce((s, a) => s + a.amount, 0);
+
+                  return (
+                  <div key={m.id} className="flex flex-col bg-slate-50 hover:bg-slate-100/70 rounded-lg px-3 py-2.5 transition-colors gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-xs text-slate-700">{m.name || '—'}</span>
+                      <div className="flex items-center gap-2">
+                        {inlineAddMachineId === m.id ? (
+                          <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                            <input type="number" placeholder="المبلغ" value={inlineAddAmount} onChange={e => setInlineAddAmount(e.target.value)} className="w-16 h-7 text-xs border-none bg-slate-50 rounded px-1 text-center font-bold focus:ring-1 focus:ring-blue-400 outline-none" autoFocus />
+                            <input type="text" placeholder="ملاحظة" value={inlineAddNote} onChange={e => setInlineAddNote(e.target.value)} className="w-24 h-7 text-xs border-none bg-slate-50 rounded px-2 font-medium focus:ring-1 focus:ring-blue-400 outline-none" />
+                            <button onClick={() => {
+                              if (inlineAddAmount && !isNaN(Number(inlineAddAmount))) {
+                                addMachineAddition(m.id, Number(inlineAddAmount), inlineAddNote || 'إضافة رصيد');
+                                setInlineAddMachineId(null);
+                                setInlineAddAmount('');
+                                setInlineAddNote('');
+                              }
+                            }} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded p-1 transition-colors"><CheckCircle2 className="w-4 h-4" /></button>
+                            <button onClick={() => setInlineAddMachineId(null)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded p-1 transition-colors"><X className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="font-black text-xs text-blue-800 bg-blue-50 rounded-md py-1 px-2.5 shadow-sm border border-blue-100/50">{fmt(toNum(m.opening) + mAdditionsTotal)} ج.م</span>
+                            <button onClick={() => setInlineAddMachineId(m.id)} className="bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 rounded-full p-1.5 transition-all active:scale-95" title="إضافة رصيد (فلوس المندوب)">
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {mAdditions.length > 0 && (
+                      <div className="text-[10px] bg-white border border-slate-100 rounded-lg p-2 space-y-1.5 shadow-inner">
+                        {mAdditions.map(a => (
+                          <div key={a.id} className="flex justify-between items-center text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              <ArrowUpRight className="w-3 h-3 text-emerald-500 shrink-0" />
+                              <span className="font-bold">{a.note}</span>
+                              <span className="text-slate-400 font-medium ml-1">({a.time})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <span className="font-extrabold text-emerald-600">+{fmt(a.amount)}</span>
+                               <button onClick={() => deleteMachineAddition(a.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-                <div className="flex justify-between items-center bg-indigo-50 rounded-xl px-3 py-2.5 border-t-2 border-indigo-200 mt-1">
-                  <span className="font-black text-xs text-indigo-900">إجمالي الأرصدة</span>
-                  <span className="font-black text-sm text-indigo-900">{fmt(activeShift.machines.reduce((s, m) => s + toNum(m.opening), 0))} ج.م</span>
+                )})}
+                <div className="flex justify-between items-center bg-indigo-50 rounded-xl px-3 py-2.5 border-t-2 border-indigo-200 mt-2">
+                  <span className="font-black text-xs text-indigo-900">إجمالي الأرصدة (بالإضافات)</span>
+                  <span className="font-black text-sm text-indigo-900">{fmt(activeShift.machines.reduce((s, m) => {
+                    const mAdds = (activeShift.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
+                    return s + toNum(m.opening) + mAdds;
+                  }, 0))} ج.م</span>
                 </div>
               </div>
             </div>
@@ -928,7 +1001,12 @@ export default function CashShiftManagement() {
 
                 {/* Close Machines */}
                 {closeMachines.length > 0 && (() => {
-                  const totalOpening = closeMachines.reduce((s, m) => s + toNum(m.opening), 0);
+                  const getMachineOpeningWithAdditions = (mId: number, baseOpening: number) => {
+                    const mAdds = (activeShift?.machineAdditions || []).filter(a => a.machineId === mId).reduce((sum, a) => sum + a.amount, 0);
+                    return baseOpening + mAdds;
+                  };
+                  
+                  const totalOpening = closeMachines.reduce((s, m) => s + getMachineOpeningWithAdditions(m.id, toNum(m.opening)), 0);
                   const totalClosing = closeMachines.reduce((s, m) => s + toNum(m.closing), 0);
                   const hasAnyClosing = closeMachines.some(m => m.closing !== '' && m.closing !== null && m.closing !== undefined);
                   const machineNetTotal = hasAnyClosing ? totalOpening - totalClosing : 0;
@@ -942,23 +1020,25 @@ export default function CashShiftManagement() {
                       {/* Table Header */}
                       <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1">
                         <span>المكينة</span>
-                        <span className="w-[60px] text-center">افتتاحي</span>
+                        <span className="w-[60px] text-center">افتتاحي+</span>
                         <span className="w-[80px] text-center">ختامي</span>
                         <span className="w-[68px] text-center">صافي المبيعات</span>
                       </div>
 
                       {closeMachines.map((m, i) => {
-                        const opening = toNum(m.opening);
+                        const baseOpening = toNum(m.opening);
+                        const openingWithAdds = getMachineOpeningWithAdditions(m.id, baseOpening);
                         const closing = toNum(m.closing);
                         const hasClosing = m.closing !== '' && m.closing !== null && m.closing !== undefined;
-                        const net = hasClosing ? opening - closing : 0;
+                        const net = hasClosing ? openingWithAdds - closing : 0;
+                        const hasAdds = openingWithAdds > baseOpening;
                         
                         return (
                           <div key={m.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center bg-slate-50 hover:bg-slate-100/70 rounded-lg px-2.5 py-2 transition-colors">
                             <span className="font-bold text-xs text-slate-700 truncate">{m.name || '—'}</span>
                             
-                            <span className="w-[60px] text-center text-[11px] font-bold text-blue-700 bg-blue-50/50 rounded py-1 px-1">
-                              {fmt(opening)}
+                            <span className={`w-[60px] text-center text-[11px] font-bold rounded py-1 px-1 ${hasAdds ? 'text-emerald-700 bg-emerald-50/80 border border-emerald-100' : 'text-blue-700 bg-blue-50/50'}`} title={hasAdds ? `الأساسي: ${fmt(baseOpening)} + إضافات: ${fmt(openingWithAdds - baseOpening)}` : ''}>
+                              {fmt(openingWithAdds)}
                             </span>
                             
                             <input type="number" value={m.closing} placeholder="0.00"
@@ -1007,7 +1087,10 @@ export default function CashShiftManagement() {
                 {(() => {
                   const denomTotal = getDenomTotal(closingDenoms);
                   const hasAnyDenom = DENOMINATIONS.some(d => toNum(closingDenoms[d.value]) > 0);
-                  const machineNetTotal = closeMachines.reduce((s, m) => s + (toNum(m.opening) - toNum(m.closing)), 0);
+                  const machineNetTotal = closeMachines.reduce((s, m) => {
+                    const mAdds = (activeShift?.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
+                    return s + (toNum(m.opening) + mAdds - toNum(m.closing));
+                  }, 0);
                   const hasAnyMachineClosing = closeMachines.some(m => m.closing !== '' && m.closing !== null && m.closing !== undefined);
                   const totalExpected = activeMetrics.expectedCash + (hasAnyMachineClosing ? machineNetTotal : 0);
 
@@ -1137,12 +1220,15 @@ export default function CashShiftManagement() {
                 {activeShift.machines && activeShift.machines.length > 0 && (
                   <div className="space-y-1.5">
                     <span className="font-extrabold text-slate-700 text-[11px]">🖥️ المكينات:</span>
-                    {activeShift.machines.map(m => (
+                    {activeShift.machines.map(m => {
+                      const mAdds = (activeShift.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
+                      const displayOpening = toNum(m.opening) + mAdds;
+                      return (
                       <div key={m.id} className="flex justify-between bg-slate-50 rounded-lg px-3 py-1.5">
                         <span className="font-bold text-slate-600">{m.name}</span>
-                        <span className="font-extrabold text-slate-800">{fmt(toNum(m.opening))}</span>
+                        <span className="font-extrabold text-slate-800">{fmt(displayOpening)}</span>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
                 {activeShift.openingDenoms && (

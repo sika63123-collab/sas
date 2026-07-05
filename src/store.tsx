@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift, ShiftMachine, ShiftAddition, DenomCount } from './types';
+import { Product, Transaction, InstallmentContract, User, Expense, PaymentMethod, PaymentTransaction, ShiftAccount, ShiftInventoryItem, TransactionType, ManualCashTransaction, CashShift, ShiftMachine, ShiftAddition, MachineAddition, DenomCount } from './types';
 import { getStorageItem, setStorageItem, restoreAllStorage, getSessionItem, setSessionItem, removeSessionItem, isElectron, upsertRecord, deleteRecord, clearCollection } from './lib/storage';
 
 interface MahfaztyWallet {
@@ -135,6 +135,8 @@ interface AppContextType {
   updateShiftAddition: (index: number, addition: ShiftAddition) => void;
   deleteShiftAddition: (index: number) => void;
   updateActiveShiftMachines: (machines: ShiftMachine[]) => void;
+  addMachineAddition: (machineId: number, amount: number, note: string) => void;
+  deleteMachineAddition: (additionId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -476,6 +478,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShifts(prev => prev.map(s => {
       if (!s.isClosed) {
         return { ...s, machines };
+      }
+      return s;
+    }));
+  };
+
+  const addMachineAddition = (machineId: number, amount: number, note: string) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed) {
+        const newAddition: MachineAddition = {
+          id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+          machineId,
+          amount,
+          note,
+          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        };
+        return { ...s, machineAdditions: [...(s.machineAdditions || []), newAddition] };
+      }
+      return s;
+    }));
+  };
+
+  const deleteMachineAddition = (additionId: string) => {
+    setShifts(prev => prev.map(s => {
+      if (!s.isClosed && s.machineAdditions) {
+        return { ...s, machineAdditions: s.machineAdditions.filter(a => a.id !== additionId) };
       }
       return s;
     }));
@@ -921,6 +948,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateShiftAddition,
       deleteShiftAddition,
       updateActiveShiftMachines,
+      addMachineAddition,
+      deleteMachineAddition,
     }}>
       {children}
     </AppContext.Provider>
