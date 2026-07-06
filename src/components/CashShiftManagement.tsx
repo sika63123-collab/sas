@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { CashShift, Transaction, Expense, ShiftMachine, ShiftAddition, MachineAddition, DenomCount } from '../types';
+import { CashShift, Transaction, Expense, ShiftMachine, ShiftAddition, MachineAddition } from '../types';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -43,16 +43,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Constants ────────────────────────────────────────────────────────────
-const DENOMINATIONS = [
-  { label: "٢٠٠ جنيه", value: 200 },
-  { label: "١٠٠ جنيه", value: 100 },
-  { label: "٥٠ جنيه",  value: 50  },
-  { label: "٢٠ جنيه",  value: 20  },
-  { label: "١٠ جنيه",  value: 10  },
-  { label: "٥ جنيه",   value: 5   },
-  { label: "١ جنيه",   value: 1   },
-];
-
 const fmt = (n: number) => Number(n).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const toNum = (v: string | number | undefined | null) => { const n = parseFloat(String(v || '').replace(/,/g, "")); return isNaN(n) ? 0 : n; };
 
@@ -62,6 +52,7 @@ const formatDate = (isoStr: string) => {
   return d.toLocaleDateString('ar-EG', { weekday: 'short', month: 'numeric', day: 'numeric' }) + ' - ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 };
 const formatTime = (isoStr: string) => new Date(isoStr).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+const getDateKey = (isoStr: string) => isoStr.split('T')[0];
 
 // ─── Shift Calculations (kept from original) ─────────────────────────────
 export const getShiftCalculations = (shift: CashShift, transactions: Transaction[], expenses: Expense[]) => {
@@ -102,49 +93,6 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
     totalInflows, totalOutflows, expectedCash
   };
 };
-
-// ─── Denomination Table Component ─────────────────────────────────────
-function DenomTable({ denoms, onChange, readOnly }: { denoms: DenomCount; onChange?: (d: DenomCount) => void; readOnly?: boolean }) {
-  const total = DENOMINATIONS.reduce((sum, d) => sum + toNum(denoms[d.value]) * d.value, 0);
-  return (
-    <div className="space-y-1">
-      {DENOMINATIONS.map(d => {
-        const qty = toNum(denoms[d.value]);
-        const sub = qty * d.value;
-        return (
-          <div key={d.value} className="flex items-center gap-2 text-xs">
-            <span className="w-20 font-bold text-slate-600 text-right">{d.label}</span>
-            {readOnly ? (
-              <span className="w-16 text-center font-extrabold text-slate-800">{qty || 0}</span>
-            ) : (
-              <input
-                type="number" min="0"
-                value={denoms[d.value] || ''}
-                onChange={e => {
-                  if (onChange) {
-                    onChange({ ...denoms, [d.value]: e.target.value });
-                  }
-                }}
-                className="w-16 text-center h-8 border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none font-bold text-slate-800 bg-slate-50 focus:bg-white transition-all"
-                placeholder="0"
-              />
-            )}
-            <span className="flex-1 text-left font-bold text-slate-500">{fmt(sub)}</span>
-          </div>
-        );
-      })}
-      <div className="flex items-center gap-2 text-xs border-t-2 border-indigo-200 pt-2 mt-2">
-        <span className="w-20 font-extrabold text-indigo-800 text-right">الإجمالي</span>
-        <span className="w-16"></span>
-        <span className="flex-1 text-left font-black text-indigo-900 text-sm">{fmt(total)} ج.م</span>
-      </div>
-    </div>
-  );
-}
-
-function getDenomTotal(denoms: DenomCount): number {
-  return DENOMINATIONS.reduce((sum, d) => sum + toNum(denoms[d.value]) * d.value, 0);
-}
 
 // ─── Print Helper ─────────────────────────────────────────────────────
 function printContent(el: HTMLElement) {
@@ -226,21 +174,19 @@ export default function CashShiftManagement() {
     return [{ id: 1, name: 'فوري', opening: '', closing: '' }];
   });
   const [nextMachineId, setNextMachineId] = useState(2);
-  const [openingDenoms, setOpeningDenoms] = useState<DenomCount>(() => {
+  const [openingCashAmount, setOpeningCashAmount] = useState(() => {
     const closed = shifts.filter(s => s.isClosed);
     const last = closed.length > 0 ? closed[closed.length - 1] : null;
-    if (last?.closingDenoms) {
-      return { ...last.closingDenoms };
+    if (last?.closingCashActual !== undefined && last?.closingCashActual !== null) {
+      return String(last.closingCashActual);
     }
-    const d: DenomCount = {};
-    DENOMINATIONS.forEach(den => d[den.value] = '');
-    return d;
+    return '';
   });
 
   // ─── Close Shift Modal State ─────────────────────────────────────
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeMachines, setCloseMachines] = useState<ShiftMachine[]>([]);
-  const [closingDenoms, setClosingDenoms] = useState<DenomCount>({});
+  const [closingCashAmount, setClosingCashAmount] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
 
   // ─── Dashboard State ────────────────────────────────────────────
@@ -278,21 +224,12 @@ export default function CashShiftManagement() {
     }
   }, [currentUser]);
 
-  // Set inherited opening cash into denoms
-  useEffect(() => {
-    if (inheritedOpeningCash !== null && inheritedOpeningCash !== undefined && !activeShift) {
-      // We can't auto-fill denoms from just a number, but user can override
-    }
-  }, [inheritedOpeningCash]);
-
   // ─── Active shift calculations ──────────────────────────────────
   const activeMetrics = activeShift ? getShiftCalculations(activeShift, transactions, expenses) : null;
 
   // ─── Handlers ───────────────────────────────────────────────────
   const handleOpenShift = () => {
-    const denomTotal = getDenomTotal(openingDenoms);
-    const hasAnyDenom = DENOMINATIONS.some(d => toNum(openingDenoms[d.value]) > 0);
-    const openingCash = hasAnyDenom ? denomTotal : (inheritedOpeningCash || 0);
+    const openingCash = toNum(openingCashAmount) || (inheritedOpeningCash || 0);
 
     if (!cashierName.trim()) {
       alert('⚠️ الرجاء إدخال اسم الكاشير');
@@ -303,7 +240,6 @@ export default function CashShiftManagement() {
       shiftType,
       cashierName: cashierName.trim(),
       machines: setupMachines.map(m => ({ ...m })),
-      openingDenoms: hasAnyDenom ? { ...openingDenoms } : undefined,
       openingNotes: openingNotes.trim() || undefined,
     });
 
@@ -315,24 +251,21 @@ export default function CashShiftManagement() {
     if (!activeShift || !activeMetrics) return;
     const machines = (activeShift.machines || []).map(m => ({ ...m, closing: m.closing || '' }));
     setCloseMachines(machines);
-    const d: DenomCount = {};
-    DENOMINATIONS.forEach(den => d[den.value] = '');
-    setClosingDenoms(d);
+    setClosingCashAmount('');
     setClosingNotes('');
     setShowCloseModal(true);
   };
 
   const handleConfirmClose = () => {
     if (!activeShift || !activeMetrics) return;
-    const denomTotal = getDenomTotal(closingDenoms);
-    const hasAnyDenom = DENOMINATIONS.some(d => toNum(closingDenoms[d.value]) > 0);
-    const actualCash = hasAnyDenom ? denomTotal : activeMetrics.expectedCash;
+    const enteredAmount = toNum(closingCashAmount);
+    const hasEnteredAmount = closingCashAmount.trim() !== '';
+    const actualCash = hasEnteredAmount ? enteredAmount : activeMetrics.expectedCash;
 
     if (!confirm(`🔒 هل أنت متأكد من تقفيل الوردية؟\nسيتم حفظ البيانات.`)) return;
 
     closeShift(actualCash, {
       machines: closeMachines,
-      closingDenoms: hasAnyDenom ? { ...closingDenoms } : undefined,
       closingNotes: closingNotes.trim() || undefined,
     });
 
@@ -402,7 +335,6 @@ export default function CashShiftManagement() {
   // ═══ RENDER: Opening Shift Screen (no active shift) ═════════════
   // ═══════════════════════════════════════════════════════════════════
   if (!activeShift) {
-    const denomTotal = getDenomTotal(openingDenoms);
     const machinesTotal = setupMachines.reduce((s, m) => s + toNum(m.opening), 0);
 
     return (
@@ -436,7 +368,7 @@ export default function CashShiftManagement() {
               <div>
                 <h4 className="font-extrabold text-emerald-900 text-[13px]">رصيد الوردية السابقة</h4>
                 <p className="text-[11px] text-emerald-700/90 font-medium mt-1">
-                  رصيد التقفيل السابق ({formatMoney(inheritedOpeningCash)}) — يمكنك تعديله من الجرد بالفئات أدناه
+                  رصيد التقفيل السابق ({formatMoney(inheritedOpeningCash)}) — تم ترحيله تلقائياً في جرد الخزنة أدناه ويمكنك تعديله
                 </p>
               </div>
             </motion.div>
@@ -531,14 +463,30 @@ export default function CashShiftManagement() {
             </div>
           </motion.div>
 
-          {/* Denomination Count */}
+          {/* Cash Inventory - Total Amount */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3"
           >
             <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Wallet className="h-4 w-4 text-emerald-500" /> جرد الخزنة — بدء الوردية
             </h3>
-            <DenomTable denoms={openingDenoms} onChange={setOpeningDenoms} />
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-slate-600">المبلغ الإجمالي بالخزنة (ج.م)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={openingCashAmount}
+                onChange={e => { if (e.target.value === '' || /^[0-9]*\.?[0-9]*$/.test(e.target.value)) setOpeningCashAmount(e.target.value); }}
+                placeholder="أدخل المبلغ الإجمالي..."
+                className="w-full h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-xl px-4 font-black text-xl text-center outline-none transition-all bg-emerald-50/30 focus:bg-white"
+              />
+              {toNum(openingCashAmount) > 0 && (
+                <div className="flex justify-between items-center bg-emerald-50 rounded-xl px-4 py-2.5 border border-emerald-100">
+                  <span className="text-xs font-bold text-emerald-700">💰 رصيد الخزنة الافتتاحي</span>
+                  <span className="font-black text-sm text-emerald-900">{fmt(toNum(openingCashAmount))} ج.م</span>
+                </div>
+              )}
+            </div>
           </motion.div>
 
           {/* Submit Button */}
@@ -1075,18 +1023,25 @@ export default function CashShiftManagement() {
                   );
                 })()}
 
-                {/* Close Denoms (جرد الدرج) */}
+                {/* Cash Inventory - Total Amount */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
-                    <Wallet className="h-3.5 w-3.5 text-emerald-500" /> جرد الدرج — التقفيل
+                    <Wallet className="h-3.5 w-3.5 text-emerald-500" /> جرد الخزنة — التقفيل
                   </h4>
-                  <DenomTable denoms={closingDenoms} onChange={setClosingDenoms} />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={closingCashAmount}
+                    onChange={e => { if (e.target.value === '' || /^[0-9]*\.?[0-9]*$/.test(e.target.value)) setClosingCashAmount(e.target.value); }}
+                    placeholder="أدخل المبلغ الإجمالي الموجود بالخزنة..."
+                    className="w-full h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-xl px-4 font-black text-xl text-center outline-none transition-all bg-emerald-50/30 focus:bg-white"
+                  />
                 </div>
 
                 {/* ═══ Combined Summary: Machine Sales + Drawer ═══ */}
                 {(() => {
-                  const denomTotal = getDenomTotal(closingDenoms);
-                  const hasAnyDenom = DENOMINATIONS.some(d => toNum(closingDenoms[d.value]) > 0);
+                  const enteredAmount = toNum(closingCashAmount);
+                  const hasEnteredAmount = closingCashAmount.trim() !== '';
                   const machineNetTotal = closeMachines.reduce((s, m) => {
                     const mAdds = (activeShift?.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
                     return s + (toNum(m.opening) + mAdds - toNum(m.closing));
@@ -1094,7 +1049,7 @@ export default function CashShiftManagement() {
                   const hasAnyMachineClosing = closeMachines.some(m => m.closing !== '' && m.closing !== null && m.closing !== undefined);
                   const totalExpected = activeMetrics.expectedCash + (hasAnyMachineClosing ? machineNetTotal : 0);
 
-                  if (!hasAnyDenom && !hasAnyMachineClosing) return null;
+                  if (!hasEnteredAmount && !hasAnyMachineClosing) return null;
 
                   return (
                     <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 border border-slate-200">
@@ -1123,16 +1078,16 @@ export default function CashShiftManagement() {
                       </div>
 
                       {/* Actual Drawer */}
-                      {hasAnyDenom && (
+                      {hasEnteredAmount && (
                         <>
                           <div className="flex justify-between items-center text-[11px] font-bold text-slate-600">
-                            <span>الموجود فعلياً بالدرج (الجرد)</span>
-                            <span className="text-slate-800 font-extrabold">{formatMoney(denomTotal)}</span>
+                            <span>الموجود فعلياً بالخزنة</span>
+                            <span className="text-slate-800 font-extrabold">{formatMoney(enteredAmount)}</span>
                           </div>
 
                           {/* Difference */}
                           {(() => {
-                            const diff = denomTotal - totalExpected;
+                            const diff = enteredAmount - totalExpected;
                             return (
                               <div className={`border rounded-xl p-3 flex items-center justify-between text-xs font-extrabold ${
                                 Math.abs(diff) < 0.01 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
@@ -1143,9 +1098,9 @@ export default function CashShiftManagement() {
                                   {Math.abs(diff) < 0.01 ? (
                                     <><CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" /><span>✅ مضبوط — لا يوجد فرق</span></>
                                   ) : diff > 0 ? (
-                                    <><AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" /><span>زيادة في الدرج</span></>
+                                    <><AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" /><span>زيادة في الخزنة</span></>
                                   ) : (
-                                    <><AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" /><span>عجز في الدرج</span></>
+                                    <><AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" /><span>عجز في الخزنة</span></>
                                   )}
                                 </div>
                                 {Math.abs(diff) >= 0.01 && (
@@ -1231,12 +1186,7 @@ export default function CashShiftManagement() {
                     )})}
                   </div>
                 )}
-                {activeShift.openingDenoms && (
-                  <div className="space-y-1.5">
-                    <span className="font-extrabold text-slate-700 text-[11px]">💵 جرد الخزنة:</span>
-                    <DenomTable denoms={activeShift.openingDenoms} readOnly />
-                  </div>
-                )}
+
                 {activeShift.openingNotes && (
                   <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100 text-amber-800 font-bold">
                     📝 {activeShift.openingNotes}
@@ -1358,6 +1308,125 @@ function PastShiftsSection({ closedShifts, transactions, expenses, showPastShift
               <button onClick={() => exportCSV(closedShifts, transactions, expenses)}
                 className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl text-xs shadow-md cursor-pointer flex items-center justify-center gap-2"
               ><Download className="h-3.5 w-3.5" /> تصدير CSV</button>
+
+              {/* ═══ Daily Summary Section ═══ */}
+              {(() => {
+                // Group shifts by date
+                const shiftsByDate: Record<string, CashShift[]> = {};
+                closedShifts.forEach(s => {
+                  const dateKey = getDateKey(s.openedAt);
+                  if (!shiftsByDate[dateKey]) shiftsByDate[dateKey] = [];
+                  shiftsByDate[dateKey].push(s);
+                });
+
+                // Only show dates that have at least one shift
+                const dates = Object.keys(shiftsByDate).sort().reverse();
+                if (dates.length === 0) return null;
+
+                return (
+                  <div className="space-y-2">
+                    {dates.map(dateKey => {
+                      const dayShifts = shiftsByDate[dateKey];
+                      if (dayShifts.length === 0) return null;
+
+                      const morningShift = dayShifts.find(s => s.shiftType === 'صباحي');
+                      const eveningShift = dayShifts.find(s => s.shiftType === 'مسائي');
+
+                      // Calculate combined metrics
+                      let totalCashSales = 0;
+                      let totalInflows = 0;
+                      let totalOutflows = 0;
+                      let totalManualInflow = 0;
+                      let totalManualOutflow = 0;
+                      let totalExpenses = 0;
+
+                      dayShifts.forEach(s => {
+                        const m = getShiftCalculations(s, transactions, expenses);
+                        totalCashSales += m.cashSales;
+                        totalInflows += m.totalInflows;
+                        totalOutflows += m.totalOutflows;
+                        totalManualInflow += m.manualInflow;
+                        totalManualOutflow += m.manualOutflow;
+                        totalExpenses += m.totalExpenses;
+                      });
+
+                      const firstShift = morningShift || dayShifts[0];
+                      const lastShift = eveningShift || dayShifts[dayShifts.length - 1];
+                      const dayOpeningCash = firstShift.openingCash;
+                      const dayClosingCash = lastShift.closingCashActual || 0;
+                      const dayDate = new Date(dateKey + 'T00:00:00');
+                      const dayLabel = dayDate.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+                      return (
+                        <div key={dateKey} className="bg-gradient-to-r from-indigo-50/80 to-blue-50/50 border border-indigo-200/70 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+                              📊 ملخص يوم {dayLabel}
+                            </span>
+                            <div className="flex gap-1">
+                              {morningShift && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">🌅 صباحي</span>}
+                              {eveningShift && <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold">🌙 مسائي</span>}
+                              {!morningShift && !eveningShift && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">{dayShifts.length} وردية</span>}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                            <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-indigo-100/50">
+                              <span className="text-slate-500 block font-bold">الرصيد الافتتاحي</span>
+                              <span className="font-black text-blue-900">{formatMoney(dayOpeningCash)}</span>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-indigo-100/50">
+                              <span className="text-slate-500 block font-bold">الرصيد الختامي</span>
+                              <span className="font-black text-indigo-900">{formatMoney(dayClosingCash)}</span>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-emerald-100/50">
+                              <span className="text-emerald-600 block font-bold">إجمالي المبيعات النقدية</span>
+                              <span className="font-black text-emerald-800">{formatMoney(totalCashSales)}</span>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-rose-100/50">
+                              <span className="text-rose-600 block font-bold">إجمالي المصروفات</span>
+                              <span className="font-black text-rose-800">{formatMoney(totalExpenses)}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-[10px] font-bold px-1">
+                            <span className="text-emerald-700">+ إجمالي الوارد: {formatMoney(totalInflows)}</span>
+                            <span className="text-rose-700">- إجمالي المنصرف: {formatMoney(totalOutflows)}</span>
+                          </div>
+
+                          {/* Shift handover info */}
+                          {morningShift && eveningShift && (
+                            <div className="bg-white/60 border border-blue-100 rounded-lg px-2.5 py-2 text-[10px]">
+                              <span className="font-extrabold text-blue-800 block mb-1">🔄 تسليم الوردية</span>
+                              <div className="flex justify-between text-slate-600 font-bold">
+                                <span>ختامي الصباحي ({morningShift.cashierName || '—'})</span>
+                                <span className="text-blue-800 font-extrabold">{formatMoney(morningShift.closingCashActual || 0)}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-600 font-bold">
+                                <span>افتتاحي المسائي ({eveningShift.cashierName || '—'})</span>
+                                <span className="text-blue-800 font-extrabold">{formatMoney(eveningShift.openingCash)}</span>
+                              </div>
+                              {(() => {
+                                const handoverDiff = eveningShift.openingCash - (morningShift.closingCashActual || 0);
+                                if (Math.abs(handoverDiff) > 0.01) {
+                                  return (
+                                    <div className={`flex justify-between font-extrabold mt-0.5 ${handoverDiff > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                      <span>{handoverDiff > 0 ? 'إضافة عند التسليم' : 'فرق عند التسليم'}</span>
+                                      <span>{handoverDiff > 0 ? '+' : ''}{formatMoney(handoverDiff)}</span>
+                                    </div>
+                                  );
+                                }
+                                return <div className="text-emerald-600 font-extrabold mt-0.5">✅ تسليم مطابق</div>;
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {closedShifts.length === 0 ? (
                 <p className="text-xs text-slate-400 font-bold text-center py-8">لا توجد ورديات سابقة</p>
@@ -1547,13 +1616,7 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
                 )}
               </div>
 
-              {/* Denomination details */}
-              {shift.closingDenoms && (
-                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-                  <span className="font-extrabold text-slate-700 text-[11px]">💵 جرد الخزنة</span>
-                  <DenomTable denoms={shift.closingDenoms} readOnly />
-                </div>
-              )}
+
 
               {/* Notes */}
               {shift.closingNotes && (
