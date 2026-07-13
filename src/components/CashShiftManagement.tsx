@@ -238,6 +238,33 @@ export default function CashShiftManagement() {
     }
   }, [currentUser]);
 
+  // ─── ترحيل تلقائي: تحديث الفورم لما وردية تتقفل ───────────────
+  const prevActiveShiftRef = useRef(activeShift);
+  useEffect(() => {
+    // اكتشاف لحظة التقفيل: الوردية كانت نشطة والآن مفيش وردية نشطة
+    if (prevActiveShiftRef.current && !activeShift) {
+      const closed = shifts.filter(s => s.isClosed);
+      const last = closed.length > 0 ? closed[closed.length - 1] : null;
+
+      // ترحيل رصيد الخزنة الختامي → افتتاحي الوردية الجديدة
+      if (last?.closingCashActual !== undefined && last?.closingCashActual !== null) {
+        setOpeningCashAmount(String(last.closingCashActual));
+      }
+
+      // ترحيل أرصدة المكينات الختامية → افتتاحي المكينات الجديدة
+      if (last?.machines && last.machines.length > 0) {
+        setSetupMachines(last.machines.map(m => ({
+          id: m.id,
+          name: m.name,
+          opening: m.closing || m.opening, // الختامي يبقى الافتتاحي
+          closing: '',
+        })));
+        setNextMachineId(Math.max(...last.machines.map(m => m.id)) + 1);
+      }
+    }
+    prevActiveShiftRef.current = activeShift;
+  }, [activeShift, shifts]);
+
   // ─── Active shift calculations ──────────────────────────────────
   const activeMetrics = activeShift ? getShiftCalculations(activeShift, transactions, expenses) : null;
 
