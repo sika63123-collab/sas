@@ -94,6 +94,18 @@ export const getShiftCalculations = (shift: CashShift, transactions: Transaction
   };
 };
 
+// ─── Machine Net Sales (with additions) ───────────────────────────────
+const getMachineNetSales = (shift: CashShift): number => {
+  if (!shift.machines || shift.machines.length === 0) return 0;
+  return shift.machines.reduce((total, m) => {
+    const additions = (shift.machineAdditions || [])
+      .filter(a => a.machineId === m.id)
+      .reduce((sum, a) => sum + a.amount, 0);
+    const totalAvailable = toNum(m.opening) + additions;
+    return total + (totalAvailable - toNum(m.closing));
+  }, 0);
+};
+
 // ─── Print Helper ─────────────────────────────────────────────────────
 function printContent(el: HTMLElement) {
   const clone = el.cloneNode(true) as HTMLElement;
@@ -127,9 +139,11 @@ function exportCSV(closedShifts: CashShift[], transactions: Transaction[], expen
   let csv = 'التاريخ,وقت التقفيل,نوع الوردية,الكاشير,الافتتاحي,المبيعات النقدية,إجمالي الوارد,إجمالي المنصرف,المتوقع,الفعلي,الفرق,ملاحظات\n';
   closedShifts.forEach(s => {
     const m = getShiftCalculations(s, transactions, expenses);
-    const diff = (s.closingCashActual || 0) - m.expectedCash;
+    const machineNet = getMachineNetSales(s);
+    const totalExpected = m.expectedCash + machineNet;
+    const diff = (s.closingCashActual || 0) - totalExpected;
     const notes = (s.closingNotes || '').replace(/,/g, ' ');
-    csv += `${new Date(s.openedAt).toLocaleDateString('ar-EG')},${s.closedAt ? formatTime(s.closedAt) : ''},${s.shiftType || 'صباحي'},${s.cashierName || '—'},${s.openingCash},${m.cashSales},${m.totalInflows},${m.totalOutflows},${m.expectedCash},${s.closingCashActual || 0},${diff},${notes}\n`;
+    csv += `${new Date(s.openedAt).toLocaleDateString('ar-EG')},${s.closedAt ? formatTime(s.closedAt) : ''},${s.shiftType || 'صباحي'},${s.cashierName || '—'},${s.openingCash},${m.cashSales},${m.totalInflows},${m.totalOutflows},${totalExpected},${s.closingCashActual || 0},${diff},${notes}\n`;
   });
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -1434,7 +1448,8 @@ function PastShiftsSection({ closedShifts, transactions, expenses, showPastShift
                 closedShifts.slice().reverse().map(shift => {
                   const metrics = getShiftCalculations(shift, transactions, expenses);
                   const actual = shift.closingCashActual || 0;
-                  const diff = actual - metrics.expectedCash;
+                  const machineNet = getMachineNetSales(shift);
+                  const diff = actual - (metrics.expectedCash + machineNet);
                   const isExpanded = expandedPastShiftId === shift.id;
 
                   return (
@@ -1488,12 +1503,13 @@ function PastShiftsSection({ closedShifts, transactions, expenses, showPastShift
                                 <div className="space-y-1 pt-1 border-t border-slate-200">
                                   <span className="text-[10px] text-slate-500 font-extrabold">🖥️ المكينات:</span>
                                   {shift.machines.map(m => {
-                                    const machNet = toNum(m.opening) - toNum(m.closing);
+                                    const mAdds = (shift.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
+                                    const machNet = (toNum(m.opening) + mAdds) - toNum(m.closing);
                                     return (
                                       <div key={m.id} className="flex justify-between text-[10px]">
                                         <span>{m.name}</span>
                                         <span className="flex items-center gap-1.5">
-                                          <span className="text-slate-400">{fmt(toNum(m.opening))} → {fmt(toNum(m.closing))}</span>
+                                          <span className="text-slate-400">{fmt(toNum(m.opening) + mAdds)} → {fmt(toNum(m.closing))}</span>
                                           <span className={`font-extrabold ${machNet > 0.01 ? 'text-emerald-600' : machNet < -0.01 ? 'text-rose-600' : 'text-slate-400'}`}>({fmt(machNet)})</span>
                                         </span>
                                       </div>
@@ -1501,7 +1517,7 @@ function PastShiftsSection({ closedShifts, transactions, expenses, showPastShift
                                   })}
                                   <div className="flex justify-between text-[10px] font-extrabold text-emerald-700 border-t border-slate-200 pt-1">
                                     <span>إجمالي مبيعات المكن</span>
-                                    <span>{fmt(shift.machines.reduce((s, m) => s + (toNum(m.opening) - toNum(m.closing)), 0))}</span>
+                                    <span>{fmt(getMachineNetSales(shift))}</span>
                                   </div>
                                 </div>
                               )}
@@ -1540,7 +1556,8 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
 
   const metrics = getShiftCalculations(shift, transactions, expenses);
   const actual = shift.closingCashActual || 0;
-  const diff = actual - metrics.expectedCash;
+  const machineNet = getMachineNetSales(shift);
+  const diff = actual - (metrics.expectedCash + machineNet);
 
   return (
     <AnimatePresence>
@@ -1568,7 +1585,7 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
 
               {/* Machines */}
               {shift.machines && shift.machines.length > 0 && (() => {
-                const machineNetTotal = shift.machines.reduce((s, m) => s + (toNum(m.opening) - toNum(m.closing)), 0);
+                const machineNetTotal = getMachineNetSales(shift);
                 return (
                   <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
                     <span className="font-extrabold text-slate-700 text-[11px]">🖥️ المكينات</span>
@@ -1578,11 +1595,12 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
                       </tr></thead>
                       <tbody>
                         {shift.machines.map(m => {
-                          const net = toNum(m.opening) - toNum(m.closing);
+                          const mAdds = (shift.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
+                          const net = (toNum(m.opening) + mAdds) - toNum(m.closing);
                           return (
                             <tr key={m.id} className="border-b border-slate-100">
                               <td className="py-1.5 text-right font-bold text-slate-700">{m.name}</td>
-                              <td className="py-1.5 text-center text-slate-600">{fmt(toNum(m.opening))}</td>
+                              <td className="py-1.5 text-center text-slate-600">{fmt(toNum(m.opening) + mAdds)}</td>
                               <td className="py-1.5 text-center text-slate-600">{fmt(toNum(m.closing))}</td>
                               <td className={`py-1.5 text-center font-extrabold ${net > 0.01 ? 'text-emerald-600' : net < -0.01 ? 'text-rose-600' : 'text-slate-400'}`}>{fmt(net)}</td>
                             </tr>
