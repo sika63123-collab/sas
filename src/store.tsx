@@ -371,11 +371,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       alert('يوجد وردية مفتوحة بالفعل، يجب إغلاقها أولاً!');
       return;
     }
+
+    // ── ترحيل تلقائي: سحب آخر رصيد ختامي فعلي من آخر وردية مقفلة ──
+    const closedShifts = shifts.filter(s => s.isClosed);
+    const lastClosed = closedShifts.length > 0 ? closedShifts[closedShifts.length - 1] : null;
+    const inheritedCash = lastClosed?.closingCashActual;
+
+    // استخدم الرصيد المُمرَّر من الـ UI، وإذا كان 0 أو غير محدد استخدم الرصيد المرحَّل
+    const resolvedOpeningCash = openingCash || (inheritedCash ?? 0);
+
     const newShift: CashShift = {
       id: Date.now().toString(),
       openedAt: new Date().toISOString(),
       isClosed: false,
-      openingCash,
+      openingCash: resolvedOpeningCash,
       manualTransactions: [],
       shiftType: extra?.shiftType,
       cashierName: extra?.cashierName,
