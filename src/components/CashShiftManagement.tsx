@@ -1180,9 +1180,20 @@ export default function CashShiftManagement() {
         )}
       </AnimatePresence>
 
-      {/* Shift Receipt Modal */}
+      {/* Shift Receipt Modal — إيصال استلام وردية مع مقارنة بالوردية السابقة */}
       <AnimatePresence>
-        {showShiftReceipt && activeShift && (
+        {showShiftReceipt && activeShift && (() => {
+          // جلب بيانات آخر وردية مقفلة للمقارنة
+          const prevShift = closedShifts.length > 0 ? closedShifts[closedShifts.length - 1] : null;
+          const prevCashClosing = prevShift?.closingCashActual;
+          const hasPrevShift = prevShift !== null;
+
+          // حساب فرق الخزنة
+          const cashDiff = hasPrevShift && prevCashClosing !== undefined && prevCashClosing !== null
+            ? activeShift.openingCash - prevCashClosing
+            : null;
+
+          return (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             onClick={() => setShowShiftReceipt(false)}
@@ -1193,8 +1204,12 @@ export default function CashShiftManagement() {
             >
               <div className="bg-gradient-to-r from-blue-800 to-indigo-900 text-white px-5 py-4 text-center">
                 <h2 className="text-base font-black flex items-center justify-center gap-2">🚀 إيصال استلام وردية</h2>
+                {hasPrevShift && (
+                  <p className="text-[10px] text-blue-200 font-medium mt-1">مقارنة مع تقفيل {prevShift.shiftType || 'الوردية'} السابقة ({prevShift.cashierName || '—'})</p>
+                )}
               </div>
               <div ref={receiptRef} className="p-5 space-y-3 text-xs">
+                {/* بيانات أساسية */}
                 <div className="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2">
                   <span className="font-bold text-slate-600">📅 التاريخ</span>
                   <span className="font-extrabold text-slate-800">{formatDate(activeShift.openedAt)}</span>
@@ -1209,24 +1224,120 @@ export default function CashShiftManagement() {
                     <span className="font-extrabold text-slate-800">{activeShift.shiftType === 'صباحي' ? '🌅' : '🌙'} {activeShift.shiftType}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
-                  <span className="font-bold text-blue-700">💰 الرصيد الافتتاحي</span>
-                  <span className="font-black text-blue-900 text-sm">{formatMoney(activeShift.openingCash)}</span>
+
+                {/* ═══ مقارنة الخزنة ═══ */}
+                <div className="bg-blue-50/60 rounded-xl p-3 border border-blue-100 space-y-2">
+                  <span className="font-extrabold text-blue-800 text-[11px] flex items-center gap-1.5">💰 جرد الخزنة</span>
+                  {hasPrevShift && prevCashClosing !== undefined && prevCashClosing !== null && (
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="font-bold text-slate-500">ختامي الوردية السابقة</span>
+                      <span className="font-extrabold text-slate-600">{formatMoney(prevCashClosing)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="font-bold text-blue-700">الفعلي عند الاستلام</span>
+                    <span className="font-black text-blue-900 text-sm">{formatMoney(activeShift.openingCash)}</span>
+                  </div>
+                  {cashDiff !== null && (
+                    <div className={`flex justify-between items-center rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold ${
+                      Math.abs(cashDiff) < 0.01 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      cashDiff > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                      'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}>
+                      <span>{Math.abs(cashDiff) < 0.01 ? '✅ مطابق' : cashDiff > 0 ? '⬆️ زيادة' : '⬇️ عجز'}</span>
+                      {Math.abs(cashDiff) >= 0.01 && <span>{cashDiff > 0 ? '+' : ''}{formatMoney(cashDiff)}</span>}
+                    </div>
+                  )}
                 </div>
+
+                {/* ═══ مقارنة المكينات ═══ */}
                 {activeShift.machines && activeShift.machines.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="font-extrabold text-slate-700 text-[11px]">🖥️ المكينات:</span>
-                    {activeShift.machines.map(m => {
-                      const mAdds = (activeShift.machineAdditions || []).filter(a => a.machineId === m.id).reduce((sum, a) => sum + a.amount, 0);
-                      const displayOpening = toNum(m.opening) + mAdds;
-                      return (
-                      <div key={m.id} className="flex justify-between bg-slate-50 rounded-lg px-3 py-1.5">
-                        <span className="font-bold text-slate-600">{m.name}</span>
-                        <span className="font-extrabold text-slate-800">{fmt(displayOpening)}</span>
+                  <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200 space-y-2">
+                    <span className="font-extrabold text-slate-700 text-[11px] flex items-center gap-1.5">🖥️ أرصدة المكينات</span>
+                    
+                    {/* Header */}
+                    {hasPrevShift && prevShift.machines && prevShift.machines.length > 0 && (
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1.5 items-center text-[9px] font-extrabold text-slate-400 uppercase tracking-wider px-1">
+                        <span>المكينة</span>
+                        <span className="w-[65px] text-center">ختامي سابق</span>
+                        <span className="w-[65px] text-center">فعلي حالي</span>
+                        <span className="w-[60px] text-center">الفرق</span>
                       </div>
-                    )})}
+                    )}
+
+                    {activeShift.machines.map(m => {
+                      const currentOpening = toNum(m.opening);
+                      // البحث عن نفس المكينة في الوردية السابقة
+                      const prevMachine = prevShift?.machines?.find(pm => pm.id === m.id || pm.name === m.name);
+                      const prevClosing = prevMachine ? toNum(prevMachine.closing) : null;
+                      const machineDiff = prevClosing !== null ? currentOpening - prevClosing : null;
+
+                      if (hasPrevShift && prevShift.machines && prevShift.machines.length > 0) {
+                        return (
+                          <div key={m.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-1.5 items-center bg-white rounded-lg px-2.5 py-2 border border-slate-100">
+                            <span className="font-bold text-xs text-slate-700 truncate">{m.name || '—'}</span>
+                            <span className="w-[65px] text-center text-[11px] font-bold text-slate-500">
+                              {prevClosing !== null ? fmt(prevClosing) : '—'}
+                            </span>
+                            <span className="w-[65px] text-center text-[11px] font-extrabold text-blue-800">
+                              {fmt(currentOpening)}
+                            </span>
+                            <span className={`w-[60px] text-center text-[10px] font-extrabold rounded py-0.5 px-1 ${
+                              machineDiff === null ? 'text-slate-400' :
+                              Math.abs(machineDiff) < 0.01 ? 'text-emerald-600 bg-emerald-50' :
+                              machineDiff > 0 ? 'text-amber-700 bg-amber-50' :
+                              'text-rose-700 bg-rose-50'
+                            }`}>
+                              {machineDiff === null ? '—' :
+                               Math.abs(machineDiff) < 0.01 ? '✅' :
+                               `${machineDiff > 0 ? '+' : ''}${fmt(machineDiff)}`}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      // لو مفيش وردية سابقة — عرض بسيط
+                      return (
+                        <div key={m.id} className="flex justify-between bg-white rounded-lg px-3 py-1.5 border border-slate-100">
+                          <span className="font-bold text-slate-600">{m.name}</span>
+                          <span className="font-extrabold text-slate-800">{fmt(currentOpening)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
+
+                {/* ═══ ملخص صافي الاستلام ═══ */}
+                {hasPrevShift && (() => {
+                  const totalPrevClosing = (prevCashClosing || 0) + (prevShift.machines || []).reduce((s, m) => s + toNum(m.closing), 0);
+                  const totalCurrentOpening = activeShift.openingCash + (activeShift.machines || []).reduce((s, m) => s + toNum(m.opening), 0);
+                  const totalDiff = totalCurrentOpening - totalPrevClosing;
+
+                  return (
+                    <div className={`rounded-xl p-3.5 border-2 space-y-1.5 ${
+                      Math.abs(totalDiff) < 0.01 ? 'bg-emerald-50/60 border-emerald-200' :
+                      totalDiff > 0 ? 'bg-amber-50/60 border-amber-200' :
+                      'bg-rose-50/60 border-rose-200'
+                    }`}>
+                      <div className="flex justify-between items-center text-[11px] font-bold text-slate-600">
+                        <span>إجمالي ختامي الوردية السابقة</span>
+                        <span>{formatMoney(totalPrevClosing)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] font-bold text-slate-600">
+                        <span>إجمالي الفعلي عند الاستلام</span>
+                        <span>{formatMoney(totalCurrentOpening)}</span>
+                      </div>
+                      <div className={`flex justify-between items-center text-xs font-black rounded-lg px-2 py-1.5 ${
+                        Math.abs(totalDiff) < 0.01 ? 'text-emerald-800 bg-emerald-100/60' :
+                        totalDiff > 0 ? 'text-amber-800 bg-amber-100/60' :
+                        'text-rose-800 bg-rose-100/60'
+                      }`}>
+                        <span>{Math.abs(totalDiff) < 0.01 ? '✅ الإجمالي مطابق' : totalDiff > 0 ? '⬆️ إجمالي الزيادة' : '⬇️ إجمالي العجز'}</span>
+                        {Math.abs(totalDiff) >= 0.01 && <span>{totalDiff > 0 ? '+' : ''}{formatMoney(totalDiff)}</span>}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {activeShift.openingNotes && (
                   <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100 text-amber-800 font-bold">
@@ -1242,7 +1353,8 @@ export default function CashShiftManagement() {
               </div>
             </motion.div>
           </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* Addition Modal */}
@@ -1586,6 +1698,11 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
   const machineNet = getMachineNetSales(shift);
   const diff = actual - (metrics.expectedCash + machineNet);
 
+  // جلب كل ورديات نفس اليوم للملخص اليومي
+  const shiftDateKey = getDateKey(shift.openedAt);
+  const sameDayShifts = shifts.filter(s => s.isClosed && getDateKey(s.openedAt) === shiftDateKey);
+  const hasDailySummary = sameDayShifts.length > 1;
+
   return (
     <AnimatePresence>
       {show && (
@@ -1661,7 +1778,109 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
                 )}
               </div>
 
+              {/* ═══ ملخص اليوم الكامل — يظهر لو في أكتر من شيفت في نفس اليوم ═══ */}
+              {hasDailySummary && (() => {
+                const dayDate = new Date(shiftDateKey + 'T00:00:00');
+                const dayLabel = dayDate.toLocaleDateString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric' });
 
+                let grandCashSales = 0;
+                let grandInflows = 0;
+                let grandOutflows = 0;
+                let grandExpenses = 0;
+                let grandMachineNet = 0;
+
+                const shiftSummaries = sameDayShifts.map(s => {
+                  const m = getShiftCalculations(s, transactions, expenses);
+                  const sMachineNet = getMachineNetSales(s);
+                  grandCashSales += m.cashSales;
+                  grandInflows += m.totalInflows;
+                  grandOutflows += m.totalOutflows;
+                  grandExpenses += m.totalExpenses;
+                  grandMachineNet += sMachineNet;
+                  return { shift: s, metrics: m, machineNet: sMachineNet };
+                });
+
+                const firstShift = sameDayShifts[0];
+                const lastShift = sameDayShifts[sameDayShifts.length - 1];
+                const dayOpening = firstShift.openingCash;
+                const dayClosing = lastShift.closingCashActual || 0;
+
+                return (
+                  <div className="bg-gradient-to-br from-indigo-50/80 to-blue-50/60 rounded-xl p-3.5 border-2 border-indigo-200 space-y-3">
+                    <div className="text-center border-b border-indigo-200 pb-2">
+                      <span className="text-xs font-black text-indigo-900 flex items-center justify-center gap-1.5">
+                        📊 ملخص اليوم الكامل — {dayLabel}
+                      </span>
+                      <span className="text-[10px] text-indigo-500 font-bold">{sameDayShifts.length} ورديات</span>
+                    </div>
+
+                    {/* ملخص كل شيفت */}
+                    <div className="space-y-2">
+                      {shiftSummaries.map(({ shift: s, metrics: m, machineNet: mn }) => (
+                        <div key={s.id} className="bg-white/80 rounded-lg p-2.5 border border-indigo-100/60 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-extrabold text-indigo-800 flex items-center gap-1">
+                              {s.shiftType === 'صباحي' ? '🌅' : s.shiftType === 'مسائي' ? '🌙' : '📋'} {s.shiftType || 'وردية'} — {s.cashierName || '—'}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              {formatTime(s.openedAt)} → {s.closedAt ? formatTime(s.closedAt) : '—'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                            <div className="text-center">
+                              <span className="text-slate-400 block font-medium">مبيعات نقدية</span>
+                              <span className="font-extrabold text-emerald-700">{formatMoney(m.cashSales)}</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-slate-400 block font-medium">مبيعات مكن</span>
+                              <span className="font-extrabold text-blue-700">{formatMoney(mn)}</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-slate-400 block font-medium">الفعلي</span>
+                              <span className="font-extrabold text-indigo-800">{formatMoney(s.closingCashActual || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* التوتال اليومي */}
+                    <div className="bg-indigo-100/60 rounded-lg p-3 space-y-1.5 border border-indigo-200">
+                      <span className="text-[10px] font-black text-indigo-900 block">💰 التوتال اليومي</span>
+                      <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold">
+                        <div className="flex justify-between text-slate-600">
+                          <span>افتتاحي اليوم</span>
+                          <span>{formatMoney(dayOpening)}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span>ختامي اليوم</span>
+                          <span>{formatMoney(dayClosing)}</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700">
+                          <span>إجمالي المبيعات النقدية</span>
+                          <span>{formatMoney(grandCashSales)}</span>
+                        </div>
+                        <div className="flex justify-between text-blue-700">
+                          <span>إجمالي مبيعات المكن</span>
+                          <span>{formatMoney(grandMachineNet)}</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700">
+                          <span>إجمالي الوارد</span>
+                          <span>{formatMoney(grandInflows)}</span>
+                        </div>
+                        <div className="flex justify-between text-rose-700">
+                          <span>إجمالي المنصرف</span>
+                          <span>{formatMoney(grandOutflows)}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center bg-indigo-200/60 rounded-lg px-2.5 py-2 text-xs font-black text-indigo-900 mt-1 border border-indigo-300/50">
+                        <span>🏆 صافي اليوم الكامل</span>
+                        <span className="text-sm">{formatMoney(dayClosing)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Notes */}
               {shift.closingNotes && (
