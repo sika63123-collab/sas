@@ -1908,18 +1908,25 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
 
               {/* Statement Summary */}
               <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-[11px] font-bold text-slate-600">
-                <div className="flex justify-between"><span>الافتتاحي</span><span>{formatMoney(shift.openingCash)}</span></div>
-                <div className="flex justify-between text-emerald-700"><span>+ وارد</span><span>{formatMoney(metrics.totalInflows)}</span></div>
-                <div className="flex justify-between text-rose-700"><span>- منصرف</span><span>{formatMoney(metrics.totalOutflows)}</span></div>
-                <div className="flex justify-between text-indigo-700 border-t border-slate-200 pt-1.5 font-extrabold"><span>المتوقع</span><span>{formatMoney(metrics.expectedCash)}</span></div>
-                <div className="flex justify-between font-black text-slate-900 bg-white p-2 rounded-lg border border-slate-200">
-                  <span>الفعلي عند التقفيل</span><span className="text-indigo-900 text-sm">{formatMoney(actual)}</span>
+                <div className="flex justify-between"><span>الرصيد الافتتاحي</span><span>{formatMoney(shift.openingCash)}</span></div>
+                <div className="flex justify-between text-emerald-700"><span>إجمالي الوارد</span><span>{formatMoney(metrics.totalInflows)}</span></div>
+                <div className="flex justify-between text-rose-700"><span>إجمالي المنصرف</span><span>{formatMoney(metrics.totalOutflows)}</span></div>
+                <div className="flex justify-between text-blue-700 border-t border-slate-200 pt-1.5">
+                  <span>صافي حركات الوردية</span>
+                  <span className="font-extrabold" dir="ltr">{metrics.totalInflows - metrics.totalOutflows > 0 ? '+' : ''}{formatMoney(metrics.totalInflows - metrics.totalOutflows)}</span>
                 </div>
-                {Math.abs(diff) > 0.01 && (
-                  <div className={`flex justify-between p-2 rounded-lg font-extrabold ${diff > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
-                    <span>{diff > 0 ? 'فائض' : 'عجز'}</span><span>{diff > 0 ? '+' : ''}{formatMoney(diff)}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-indigo-700 border-t border-slate-200 pt-1.5 font-extrabold"><span>إجمالي الدرج المتوقع</span><span>{formatMoney(metrics.expectedCash)}</span></div>
+                <div className="flex justify-between font-black text-slate-900 bg-white p-2 rounded-lg border border-slate-200 mt-1">
+                  <span>إجمالي الدرج الفعلي (تقفيل)</span><span className="text-indigo-900 text-sm">{formatMoney(actual)}</span>
+                </div>
+                {Math.abs(actual - metrics.expectedCash) >= 0.01 && (() => {
+                  const shiftDiff = actual - metrics.expectedCash;
+                  return (
+                    <div className={`flex justify-between p-2 rounded-lg font-extrabold ${shiftDiff > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                      <span>{shiftDiff > 0 ? 'زيادة' : 'عجز'}</span><span dir="ltr">{shiftDiff > 0 ? '+' : ''}{formatMoney(shiftDiff)}</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* ═══ ملخص اليوم الكامل — يظهر لو في أكتر من شيفت في نفس اليوم ═══ */}
@@ -2075,7 +2082,7 @@ function DayCloseReportModal({ show, onClose, shifts, transactions, expenses }: 
     const metrics = getShiftCalculations(shift, transactions, expenses);
     const machineNet = getMachineNetSales(shift);
     const actual = shift.closingCashActual || 0;
-    const totalExpected = metrics.expectedCash + machineNet;
+    const totalExpected = metrics.expectedCash; // الدرج الفعلي يقارن بالمتوقع النقدي فقط
     const diff = actual - totalExpected;
     return { metrics, machineNet, actual, totalExpected, diff };
   };
@@ -2094,17 +2101,18 @@ function DayCloseReportModal({ show, onClose, shifts, transactions, expenses }: 
   let grandMachineNet = 0;
   let grandManualInflow = 0;
   let grandManualOutflow = 0;
+  let grandVariance = 0;
 
   todayShifts.forEach(s => {
-    const m = getShiftCalculations(s, transactions, expenses);
-    const mn = getMachineNetSales(s);
-    grandCashSales += m.cashSales;
-    grandInflows += m.totalInflows;
-    grandOutflows += m.totalOutflows;
-    grandExpenses += m.totalExpenses;
-    grandMachineNet += mn;
-    grandManualInflow += m.manualInflow;
-    grandManualOutflow += m.manualOutflow;
+    const sum = getShiftSummary(s);
+    grandCashSales += sum.metrics.cashSales;
+    grandInflows += sum.metrics.totalInflows;
+    grandOutflows += sum.metrics.totalOutflows;
+    grandExpenses += sum.metrics.totalExpenses;
+    grandMachineNet += sum.machineNet;
+    grandManualInflow += sum.metrics.manualInflow;
+    grandManualOutflow += sum.metrics.manualOutflow;
+    grandVariance += sum.diff;
   });
 
   const dayDate = new Date(todayKey + 'T00:00:00');
@@ -2129,39 +2137,27 @@ function DayCloseReportModal({ show, onClose, shifts, transactions, expenses }: 
       <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
         <span>👤 {shift.cashierName || '—'}</span>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-slate-400 block font-medium">الافتتاحي</span>
-          <span className="font-black text-blue-900">{formatMoney(shift.openingCash)}</span>
+      <div className="space-y-1.5 text-[10px] font-bold text-slate-600 bg-white/60 rounded-lg p-2 border border-slate-100">
+        <div className="flex justify-between"><span>الرصيد الافتتاحي</span><span className="font-extrabold">{formatMoney(shift.openingCash)}</span></div>
+        <div className="flex justify-between text-blue-700">
+          <span>صافي حركات الوردية</span>
+          <span className="font-extrabold" dir="ltr">{(summary.metrics.totalInflows - summary.metrics.totalOutflows) > 0 ? '+' : ''}{formatMoney(summary.metrics.totalInflows - summary.metrics.totalOutflows)}</span>
         </div>
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-slate-400 block font-medium">الختامي الفعلي</span>
-          <span className="font-black text-indigo-900">{formatMoney(summary.actual)}</span>
-        </div>
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-emerald-600 block font-medium">مبيعات نقدية</span>
-          <span className="font-black text-emerald-800">{formatMoney(summary.metrics.cashSales)}</span>
-        </div>
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-blue-600 block font-medium">مبيعات مكن</span>
-          <span className="font-black text-blue-800">{formatMoney(summary.machineNet)}</span>
-        </div>
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-emerald-600 block font-medium">إجمالي الوارد</span>
-          <span className="font-extrabold text-emerald-700">+{formatMoney(summary.metrics.totalInflows)}</span>
-        </div>
-        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
-          <span className="text-rose-600 block font-medium">إجمالي المنصرف</span>
-          <span className="font-extrabold text-rose-700">-{formatMoney(summary.metrics.totalOutflows)}</span>
+        <div className="flex justify-between text-indigo-800 border-t border-slate-200 pt-1.5 mt-1">
+          <span>إجمالي الدرج المتوقع</span><span className="font-extrabold">{formatMoney(summary.totalExpected)}</span>
         </div>
       </div>
-      {Math.abs(summary.diff) > 0.01 && (
+      <div className="flex justify-between items-center bg-white/90 rounded-lg px-2.5 py-2 border border-slate-200">
+        <span className="text-[10px] font-black text-slate-800">الدرج الفعلي (تقفيل)</span>
+        <span className="font-black text-indigo-900 text-xs">{formatMoney(summary.actual)}</span>
+      </div>
+      {Math.abs(summary.diff) >= 0.01 && (
         <div className={`flex justify-between items-center rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${
-          summary.diff > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+          summary.diff > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
           'bg-rose-50 text-rose-700 border border-rose-200'
         }`}>
-          <span>{summary.diff > 0 ? '⬆️ فائض' : '⬇️ عجز'}</span>
-          <span>{summary.diff > 0 ? '+' : ''}{formatMoney(summary.diff)}</span>
+          <span>{summary.diff > 0 ? 'زيادة' : 'عجز'}</span>
+          <span dir="ltr">{summary.diff > 0 ? '+' : ''}{formatMoney(summary.diff)}</span>
         </div>
       )}
     </div>
@@ -2279,46 +2275,34 @@ function DayCloseReportModal({ show, onClose, shifts, transactions, expenses }: 
 
                 <div className="space-y-1.5 text-[11px] font-bold">
                   <div className="flex justify-between text-emerald-700">
-                    <span>💰 إجمالي المبيعات النقدية</span>
-                    <span className="font-extrabold">{formatMoney(grandCashSales)}</span>
-                  </div>
-                  <div className="flex justify-between text-blue-700">
-                    <span>🖥️ إجمالي مبيعات المكن</span>
-                    <span className="font-extrabold">{formatMoney(grandMachineNet)}</span>
-                  </div>
-                  <div className="flex justify-between text-emerald-600">
-                    <span>+ إجمالي الوارد</span>
+                    <span>إجمالي وارد اليوم (مبيعات ومقبوضات)</span>
                     <span className="font-extrabold">{formatMoney(grandInflows)}</span>
                   </div>
                   <div className="flex justify-between text-rose-600">
-                    <span>- إجمالي المنصرف</span>
+                    <span>إجمالي منصرف اليوم (مرتجعات ومصروفات)</span>
                     <span className="font-extrabold">{formatMoney(grandOutflows)}</span>
                   </div>
-                  <div className="flex justify-between text-rose-700">
-                    <span>- إجمالي المصروفات</span>
-                    <span className="font-extrabold">{formatMoney(grandExpenses)}</span>
+                  <div className="flex justify-between text-blue-700 border-t border-emerald-200/50 pt-1.5">
+                    <span>إجمالي صافي حركات اليوم</span>
+                    <span className="font-extrabold" dir="ltr">{(grandInflows - grandOutflows) > 0 ? '+' : ''}{formatMoney(grandInflows - grandOutflows)}</span>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-emerald-100/70 rounded-xl px-4 py-3 text-sm font-black text-emerald-900 border border-emerald-300/50">
-                  <span>🏆 صافي اليوم الكامل</span>
+                <div className="flex justify-between items-center bg-emerald-100/70 rounded-xl px-4 py-3 text-sm font-black text-emerald-900 border border-emerald-300/50 mt-2">
+                  <span>🏆 إجمالي الدرج لليوم (آخر تقفيل)</span>
                   <span className="text-base">{formatMoney(dayClosing)}</span>
                 </div>
 
-                {/* فرق اليوم */}
-                {(() => {
-                  const netDiff = dayClosing - dayOpening;
-                  return (
-                    <div className={`flex justify-between items-center rounded-lg px-3 py-2 text-[11px] font-extrabold border ${
-                      netDiff > 0.01 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      netDiff < -0.01 ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                      'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}>
-                      <span>{netDiff > 0.01 ? '📈 صافي ربح اليوم' : netDiff < -0.01 ? '📉 صافي خسارة اليوم' : '⚖️ لا فرق'}</span>
-                      <span>{netDiff > 0 ? '+' : ''}{formatMoney(netDiff)}</span>
-                    </div>
-                  );
-                })()}
+                {/* فرق اليوم المجمع */}
+                {Math.abs(grandVariance) >= 0.01 && (
+                  <div className={`flex justify-between items-center rounded-lg px-3 py-2 text-[11px] font-extrabold border ${
+                    grandVariance > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
+                    <span>{grandVariance > 0 ? '📈 إجمالي الزيادة لليوم' : '📉 إجمالي العجز لليوم'}</span>
+                    <span dir="ltr">{grandVariance > 0 ? '+' : ''}{formatMoney(grandVariance)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
