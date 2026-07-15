@@ -212,6 +212,10 @@ export default function CashShiftManagement() {
   const [showPastShifts, setShowPastShifts] = useState(false);
   const [expandedPastShiftId, setExpandedPastShiftId] = useState<string | null>(null);
 
+  // ─── Cash Validation & Day Close State ──────────────────────────
+  const [cashValidationError, setCashValidationError] = useState(false);
+  const [showDayCloseReport, setShowDayCloseReport] = useState(false);
+
   // ─── Addition Modal State ────────────────────────────────────────
   const [showAdditionModal, setShowAdditionModal] = useState(false);
   const [additionEditIdx, setAdditionEditIdx] = useState(-1);
@@ -238,23 +242,30 @@ export default function CashShiftManagement() {
     }
   }, [currentUser]);
 
-  // ─── فتح الوردية الصباحية تلقائياً عند فتح البرنامج ────────────
-  const autoOpenDoneRef = useRef(false);
+  // ─── حساب الوردية الصباحية لنفس اليوم (للوردية المسائية) ──────
+  const todayKey = new Date().toISOString().split('T')[0];
+  const todayMorningShift = closedShifts.find(s => s.shiftType === 'صباحي' && s.openedAt.split('T')[0] === todayKey);
+
+  // عند اختيار "مسائي" وترحيل بيانات الصباحية المقفلة
   useEffect(() => {
-    if (autoOpenDoneRef.current) return;
-    if (activeShift) return; // وردية مفتوحة بالفعل
-    if (!currentUser) return; // لم يتم تسجيل الدخول بعد
-
-    autoOpenDoneRef.current = true;
-
-    const openingCash = toNum(openingCashAmount) || (inheritedOpeningCash || 0);
-
-    openShift(openingCash, {
-      shiftType: 'صباحي',
-      cashierName: currentUser.name,
-      machines: setupMachines.map(m => ({ ...m })),
-    });
-  }, [currentUser, activeShift]);
+    if (activeShift) return; // لا نعدّل لو فيه وردية مفتوحة
+    if (shiftType === 'مسائي' && todayMorningShift) {
+      // ترحيل رصيد الخزنة الختامي من الصباحية
+      if (todayMorningShift.closingCashActual !== undefined && todayMorningShift.closingCashActual !== null) {
+        setOpeningCashAmount(String(todayMorningShift.closingCashActual));
+      }
+      // ترحيل أرصدة المكينات
+      if (todayMorningShift.machines && todayMorningShift.machines.length > 0) {
+        setSetupMachines(todayMorningShift.machines.map(m => ({
+          id: m.id,
+          name: m.name,
+          opening: m.closing || m.opening,
+          closing: '',
+        })));
+        setNextMachineId(Math.max(...todayMorningShift.machines.map(m => m.id)) + 1);
+      }
+    }
+  }, [shiftType]);
 
   // ─── ترحيل تلقائي: تحديث الفورم لما وردية تتقفل ───────────────
   const prevActiveShiftRef = useRef(activeShift);
@@ -288,12 +299,20 @@ export default function CashShiftManagement() {
 
   // ─── Handlers ───────────────────────────────────────────────────
   const handleOpenShift = () => {
-    const openingCash = toNum(openingCashAmount) || (inheritedOpeningCash || 0);
-
     if (!cashierName.trim()) {
       alert('⚠️ الرجاء إدخال اسم الكاشير');
       return;
     }
+
+    // ═══ إلزامية التفقيط: لازم اليوزر يدخل مبلغ الخزنة ═══
+    if (!openingCashAmount.trim() || toNum(openingCashAmount) <= 0) {
+      setCashValidationError(true);
+      alert('⚠️ التفقيط إلزامي — الرجاء إدخال المبلغ الفعلي الموجود بالخزنة قبل بدء الوردية');
+      return;
+    }
+    setCashValidationError(false);
+
+    const openingCash = toNum(openingCashAmount);
 
     openShift(openingCash, {
       shiftType,
@@ -320,8 +339,11 @@ export default function CashShiftManagement() {
     const enteredAmount = toNum(closingCashAmount);
     const hasEnteredAmount = closingCashAmount.trim() !== '';
     const actualCash = hasEnteredAmount ? enteredAmount : activeMetrics.expectedCash;
+    const isEvening = activeShift.shiftType === 'مسائي';
 
     if (!confirm(`🔒 هل أنت متأكد من تقفيل الوردية؟\nسيتم حفظ البيانات.`)) return;
+
+    const closingShiftId = activeShift.id;
 
     closeShift(actualCash, {
       machines: closeMachines,
@@ -331,8 +353,12 @@ export default function CashShiftManagement() {
     setShowCloseModal(false);
     // Show close receipt
     setTimeout(() => {
-      setCloseReceiptShiftId(activeShift.id);
+      setCloseReceiptShiftId(closingShiftId);
       setShowCloseReceipt(true);
+      // إذا كانت وردية مسائية — اعرض تقرير تقفيل اليوم تلقائياً
+      if (isEvening) {
+        setTimeout(() => setShowDayCloseReport(true), 300);
+      }
     }, 100);
   };
 
@@ -413,13 +439,13 @@ export default function CashShiftManagement() {
               <div className="mx-auto w-14 h-14 bg-white/10 text-blue-300 rounded-2xl flex items-center justify-center shadow-inner mb-3">
                 <Unlock className="h-7 w-7 animate-pulse" />
               </div>
-              <h2 className="text-xl font-black">بدء وردية جديدة</h2>
-              <p className="text-xs text-blue-200 font-bold mt-1">سجّل بيانات الوردية والمكينات وجرد الخزنة لبدء العمل</p>
+              <h2 className="text-xl font-black">استلام الوردية {shiftType === 'مسائي' ? 'المسائية' : 'الصباحية'}</h2>
+              <p className="text-xs text-blue-200 font-bold mt-1">سجّل بيانات الوردية وقم بتفقيط الخزنة لبدء العمل</p>
             </div>
           </motion.div>
 
           {/* Inherited balance notice */}
-          {inheritedOpeningCash !== null && (
+          {inheritedOpeningCash !== null && shiftType !== 'مسائي' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-4 text-xs font-bold flex items-start gap-3"
             >
@@ -430,6 +456,56 @@ export default function CashShiftManagement() {
                   رصيد التقفيل السابق ({formatMoney(inheritedOpeningCash)}) — تم ترحيله تلقائياً في جرد الخزنة أدناه ويمكنك تعديله
                 </p>
               </div>
+            </motion.div>
+          )}
+
+          {/* ═══ بيانات الوردية الصباحية المقفلة (عند اختيار مسائي) ═══ */}
+          {shiftType === 'مسائي' && (
+            <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+              className={`rounded-2xl p-4 text-xs font-bold flex items-start gap-3 border-2 ${
+                todayMorningShift
+                  ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 text-indigo-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}
+            >
+              {todayMorningShift ? (
+                <>
+                  <Moon className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h4 className="font-extrabold text-indigo-900 text-[13px]">🌙 استلام الوردية المسائية</h4>
+                    <p className="text-[11px] text-indigo-700/90 font-medium">
+                      تم سحب بيانات الوردية الصباحية المقفلة تلقائياً
+                    </p>
+                    <div className="bg-white/80 rounded-xl p-3 space-y-1.5 border border-indigo-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-indigo-600">👤 كاشير الصباحية</span>
+                        <span className="font-extrabold text-indigo-900">{todayMorningShift.cashierName || '—'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-indigo-600">🕒 وقت التقفيل</span>
+                        <span className="font-extrabold text-indigo-900">{todayMorningShift.closedAt ? formatTime(todayMorningShift.closedAt) : '—'}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-indigo-100 pt-1.5">
+                        <span className="text-indigo-700 font-extrabold">💰 الرصيد الختامي المرحّل</span>
+                        <span className="font-black text-sm text-indigo-900">{formatMoney(todayMorningShift.closingCashActual || 0)}</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-indigo-500/80 font-medium">
+                      قم بتفقيط الخزنة فعلياً وتأكد من تطابق المبلغ مع الرصيد المرحّل
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-extrabold text-amber-900 text-[13px]">⚠️ لا توجد وردية صباحية مقفلة اليوم</h4>
+                    <p className="text-[11px] text-amber-700/90 font-medium mt-1">
+                      لم يتم العثور على وردية صباحية مقفلة لهذا اليوم. سيتم استخدام رصيد آخر وردية مقفلة إن وُجد.
+                    </p>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
 
@@ -521,29 +597,54 @@ export default function CashShiftManagement() {
             </div>
           </motion.div>
 
-          {/* Cash Inventory - Total Amount */}
+          {/* Cash Inventory - Total Amount (إلزامي) */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3"
+            className={`bg-white rounded-2xl p-5 border-2 shadow-sm space-y-3 transition-all ${cashValidationError ? 'border-rose-400 shadow-rose-100' : 'border-slate-200'}`}
           >
             <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
-              <Wallet className="h-4 w-4 text-emerald-500" /> جرد الخزنة — بدء الوردية
+              <Wallet className="h-4 w-4 text-emerald-500" /> 💵 تفقيط الخزنة — إلزامي
+              <span className="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-extrabold">مطلوب</span>
             </h3>
             <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-slate-600">المبلغ الإجمالي بالخزنة (ج.م)</label>
+              <label className="block text-[11px] font-bold text-slate-600">المبلغ الفعلي بالخزنة بعد العد (ج.م)</label>
               <input
                 type="text"
                 inputMode="decimal"
                 value={openingCashAmount}
-                onChange={e => { if (e.target.value === '' || /^[0-9]*\.?[0-9]*$/.test(e.target.value)) setOpeningCashAmount(e.target.value); }}
-                placeholder="أدخل المبلغ الإجمالي..."
-                className="w-full h-12 border-2 border-emerald-200 focus:border-emerald-400 rounded-xl px-4 font-black text-xl text-center outline-none transition-all bg-emerald-50/30 focus:bg-white"
+                onChange={e => { if (e.target.value === '' || /^[0-9]*\.?[0-9]*$/.test(e.target.value)) { setOpeningCashAmount(e.target.value); setCashValidationError(false); } }}
+                placeholder="أدخل المبلغ الفعلي بعد عد الخزنة..."
+                className={`w-full h-12 border-2 rounded-xl px-4 font-black text-xl text-center outline-none transition-all focus:bg-white ${
+                  cashValidationError ? 'border-rose-400 bg-rose-50/30 focus:border-rose-500 animate-pulse' : 'border-emerald-200 focus:border-emerald-400 bg-emerald-50/30'
+                }`}
               />
+              {cashValidationError && (
+                <div className="flex items-center gap-1.5 text-rose-600 text-[11px] font-extrabold">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>التفقيط إلزامي — أدخل المبلغ الفعلي الموجود بالخزنة</span>
+                </div>
+              )}
               {toNum(openingCashAmount) > 0 && (
                 <div className="flex justify-between items-center bg-emerald-50 rounded-xl px-4 py-2.5 border border-emerald-100">
                   <span className="text-xs font-bold text-emerald-700">💰 رصيد الخزنة الافتتاحي</span>
                   <span className="font-black text-sm text-emerald-900">{fmt(toNum(openingCashAmount))} ج.م</span>
                 </div>
               )}
+              {/* مقارنة فورية: الفعلي مقابل المرحّل */}
+              {shiftType === 'مسائي' && todayMorningShift && toNum(openingCashAmount) > 0 && (() => {
+                const expected = todayMorningShift.closingCashActual || 0;
+                const actual = toNum(openingCashAmount);
+                const diff = actual - expected;
+                return (
+                  <div className={`flex justify-between items-center rounded-xl px-3 py-2 text-[11px] font-extrabold border ${
+                    Math.abs(diff) < 0.01 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    diff > 0 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
+                    <span>{Math.abs(diff) < 0.01 ? '✅ مطابق للرصيد المرحّل' : diff > 0 ? '⬆️ زيادة عن المرحّل' : '⬇️ عجز عن المرحّل'}</span>
+                    {Math.abs(diff) >= 0.01 && <span>{diff > 0 ? '+' : ''}{formatMoney(diff)}</span>}
+                  </div>
+                );
+              })()}
             </div>
           </motion.div>
 
@@ -554,7 +655,7 @@ export default function CashShiftManagement() {
             className="w-full h-14 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white font-black rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer text-base hover:scale-[1.01] active:scale-[0.99]"
           >
             <CheckCircle2 className="h-6 w-6 text-indigo-200" />
-            تفعيل الوردية وبدء العمل
+            {shiftType === 'مسائي' ? 'استلام الوردية المسائية وبدء العمل' : 'استلام الوردية الصباحية وبدء العمل'}
           </motion.button>
 
           {/* Past Shifts */}
@@ -581,6 +682,15 @@ export default function CashShiftManagement() {
           transactions={transactions}
           expenses={expenses}
           receiptRef={closeReceiptRef}
+        />
+
+        {/* Day Close Report Modal (accessible from opening screen too) */}
+        <DayCloseReportModal
+          show={showDayCloseReport}
+          onClose={() => setShowDayCloseReport(false)}
+          shifts={shifts}
+          transactions={transactions}
+          expenses={expenses}
         />
       </div>
     );
@@ -638,6 +748,14 @@ export default function CashShiftManagement() {
           >
             <Lock className="h-4 w-4 text-rose-200" /> تقفيل الوردية
           </button>
+          {/* Day Close Report for evening shifts */}
+          {activeShift.shiftType === 'مسائي' && todayMorningShift && (
+            <button onClick={() => setShowDayCloseReport(true)}
+              className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer text-xs"
+            >
+              <FileText className="h-4 w-4 text-emerald-200" /> تقرير اليوم
+            </button>
+          )}
         </div>
       </div>
 
@@ -1442,6 +1560,15 @@ export default function CashShiftManagement() {
         expenses={expenses}
         receiptRef={closeReceiptRef}
       />
+
+      {/* ═══ Day Close Report (Grand Total) Modal ═══ */}
+      <DayCloseReportModal
+        show={showDayCloseReport}
+        onClose={() => setShowDayCloseReport(false)}
+        shifts={shifts}
+        transactions={transactions}
+        expenses={expenses}
+      />
     </div>
   );
 }
@@ -1910,6 +2037,296 @@ function CloseReceiptModal({ show, onClose, shiftId, shifts, transactions, expen
               <button onClick={onClose} className="flex-1 h-10 border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 text-xs cursor-pointer">إغلاق</button>
               <button onClick={() => receiptRef.current && printContent(receiptRef.current)} className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-1.5">
                 <Printer className="h-3.5 w-3.5" /> طباعة
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// ═══ Day Close Report (Grand Total) Modal ═══════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+function DayCloseReportModal({ show, onClose, shifts, transactions, expenses }: {
+  show: boolean;
+  onClose: () => void;
+  shifts: CashShift[];
+  transactions: Transaction[];
+  expenses: Expense[];
+}) {
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  if (!show) return null;
+
+  // جلب ورديات اليوم
+  const todayKey = new Date().toISOString().split('T')[0];
+  const todayShifts = shifts.filter(s => s.isClosed && s.openedAt.split('T')[0] === todayKey);
+  
+  if (todayShifts.length === 0) return null;
+
+  const morningShift = todayShifts.find(s => s.shiftType === 'صباحي');
+  const eveningShift = todayShifts.find(s => s.shiftType === 'مسائي');
+
+  // حساب بيانات كل شيفت
+  const getShiftSummary = (shift: CashShift) => {
+    const metrics = getShiftCalculations(shift, transactions, expenses);
+    const machineNet = getMachineNetSales(shift);
+    const actual = shift.closingCashActual || 0;
+    const totalExpected = metrics.expectedCash + machineNet;
+    const diff = actual - totalExpected;
+    return { metrics, machineNet, actual, totalExpected, diff };
+  };
+
+  const morningSummary = morningShift ? getShiftSummary(morningShift) : null;
+  const eveningSummary = eveningShift ? getShiftSummary(eveningShift) : null;
+
+  // حساب الإجمالي اليومي
+  const dayOpening = (morningShift || todayShifts[0]).openingCash;
+  const dayClosing = (eveningShift || todayShifts[todayShifts.length - 1])?.closingCashActual || 0;
+
+  let grandCashSales = 0;
+  let grandInflows = 0;
+  let grandOutflows = 0;
+  let grandExpenses = 0;
+  let grandMachineNet = 0;
+  let grandManualInflow = 0;
+  let grandManualOutflow = 0;
+
+  todayShifts.forEach(s => {
+    const m = getShiftCalculations(s, transactions, expenses);
+    const mn = getMachineNetSales(s);
+    grandCashSales += m.cashSales;
+    grandInflows += m.totalInflows;
+    grandOutflows += m.totalOutflows;
+    grandExpenses += m.totalExpenses;
+    grandMachineNet += mn;
+    grandManualInflow += m.manualInflow;
+    grandManualOutflow += m.manualOutflow;
+  });
+
+  const dayDate = new Date(todayKey + 'T00:00:00');
+  const dayLabel = dayDate.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const ShiftBlock = ({ shift, summary, label, icon, colorClass }: {
+    shift: CashShift;
+    summary: ReturnType<typeof getShiftSummary>;
+    label: string;
+    icon: string;
+    colorClass: string;
+  }) => (
+    <div className={`rounded-xl p-3.5 space-y-2 border ${colorClass}`}>
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-black flex items-center gap-1.5">
+          {icon} {label}
+        </span>
+        <span className="text-[10px] text-slate-500 font-medium">
+          {formatTime(shift.openedAt)} → {shift.closedAt ? formatTime(shift.closedAt) : '—'}
+        </span>
+      </div>
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+        <span>👤 {shift.cashierName || '—'}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-slate-400 block font-medium">الافتتاحي</span>
+          <span className="font-black text-blue-900">{formatMoney(shift.openingCash)}</span>
+        </div>
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-slate-400 block font-medium">الختامي الفعلي</span>
+          <span className="font-black text-indigo-900">{formatMoney(summary.actual)}</span>
+        </div>
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-emerald-600 block font-medium">مبيعات نقدية</span>
+          <span className="font-black text-emerald-800">{formatMoney(summary.metrics.cashSales)}</span>
+        </div>
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-blue-600 block font-medium">مبيعات مكن</span>
+          <span className="font-black text-blue-800">{formatMoney(summary.machineNet)}</span>
+        </div>
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-emerald-600 block font-medium">إجمالي الوارد</span>
+          <span className="font-extrabold text-emerald-700">+{formatMoney(summary.metrics.totalInflows)}</span>
+        </div>
+        <div className="bg-white/80 rounded-lg px-2.5 py-1.5">
+          <span className="text-rose-600 block font-medium">إجمالي المنصرف</span>
+          <span className="font-extrabold text-rose-700">-{formatMoney(summary.metrics.totalOutflows)}</span>
+        </div>
+      </div>
+      {Math.abs(summary.diff) > 0.01 && (
+        <div className={`flex justify-between items-center rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold ${
+          summary.diff > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+          'bg-rose-50 text-rose-700 border border-rose-200'
+        }`}>
+          <span>{summary.diff > 0 ? '⬆️ فائض' : '⬇️ عجز'}</span>
+          <span>{summary.diff > 0 ? '+' : ''}{formatMoney(summary.diff)}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto" dir="rtl"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-800 text-white px-5 py-5 text-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-1 right-4 w-16 h-16 rounded-full border-2 border-white/30"></div>
+                <div className="absolute bottom-0 left-6 w-10 h-10 rounded-full border-2 border-white/20"></div>
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-lg font-black flex items-center justify-center gap-2">📊 تقرير تقفيل اليوم</h2>
+                <p className="text-xs text-emerald-100 font-bold mt-1">{dayLabel}</p>
+                <p className="text-[10px] text-emerald-200 font-medium mt-0.5">{todayShifts.length} ورديات مقفلة</p>
+              </div>
+            </div>
+
+            <div ref={reportRef} className="p-5 space-y-4 text-xs">
+
+              {/* تسليم الوردية — Handover Info */}
+              {morningShift && eveningShift && (
+                <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3 space-y-1.5">
+                  <span className="font-extrabold text-blue-800 text-[11px] flex items-center gap-1.5">🔄 تسليم الوردية</span>
+                  <div className="flex justify-between text-[11px] font-bold text-slate-600">
+                    <span>ختامي الصباحي ({morningShift.cashierName || '—'})</span>
+                    <span className="text-blue-800 font-extrabold">{formatMoney(morningShift.closingCashActual || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] font-bold text-slate-600">
+                    <span>افتتاحي المسائي ({eveningShift.cashierName || '—'})</span>
+                    <span className="text-blue-800 font-extrabold">{formatMoney(eveningShift.openingCash)}</span>
+                  </div>
+                  {(() => {
+                    const handoverDiff = eveningShift.openingCash - (morningShift.closingCashActual || 0);
+                    if (Math.abs(handoverDiff) > 0.01) {
+                      return (
+                        <div className={`flex justify-between font-extrabold text-[11px] ${handoverDiff > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <span>{handoverDiff > 0 ? 'إضافة عند التسليم' : 'فرق عند التسليم'}</span>
+                          <span>{handoverDiff > 0 ? '+' : ''}{formatMoney(handoverDiff)}</span>
+                        </div>
+                      );
+                    }
+                    return <div className="text-emerald-600 font-extrabold text-[11px]">✅ تسليم مطابق</div>;
+                  })()}
+                </div>
+              )}
+
+              {/* كتلة الوردية الصباحية */}
+              {morningShift && morningSummary && (
+                <ShiftBlock
+                  shift={morningShift}
+                  summary={morningSummary}
+                  label="الوردية الصباحية"
+                  icon="🌅"
+                  colorClass="bg-amber-50/60 border-amber-200"
+                />
+              )}
+
+              {/* كتلة الوردية المسائية */}
+              {eveningShift && eveningSummary && (
+                <ShiftBlock
+                  shift={eveningShift}
+                  summary={eveningSummary}
+                  label="الوردية المسائية"
+                  icon="🌙"
+                  colorClass="bg-indigo-50/60 border-indigo-200"
+                />
+              )}
+
+              {/* ورديات بدون نوع محدد */}
+              {todayShifts.filter(s => s.shiftType !== 'صباحي' && s.shiftType !== 'مسائي').map(s => {
+                const sum = getShiftSummary(s);
+                return (
+                  <div key={s.id}>
+                    <ShiftBlock
+                      shift={s}
+                      summary={sum}
+                      label={`وردية #${s.id.slice(-5)}`}
+                      icon="📋"
+                      colorClass="bg-slate-50/60 border-slate-200"
+                    />
+                  </div>
+                );
+              })}
+
+              {/* ═══ الإجمالي العام لليوم (Grand Total) ═══ */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border-2 border-emerald-200 space-y-3">
+                <div className="text-center border-b border-emerald-200 pb-2">
+                  <span className="text-sm font-black text-emerald-900 flex items-center justify-center gap-2">
+                    🏆 الإجمالي العام لليوم
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="bg-white/80 rounded-lg px-3 py-2 border border-emerald-100/50">
+                    <span className="text-slate-500 block font-bold">الرصيد الافتتاحي</span>
+                    <span className="font-black text-blue-900 text-sm">{formatMoney(dayOpening)}</span>
+                  </div>
+                  <div className="bg-white/80 rounded-lg px-3 py-2 border border-emerald-100/50">
+                    <span className="text-slate-500 block font-bold">الرصيد الختامي</span>
+                    <span className="font-black text-indigo-900 text-sm">{formatMoney(dayClosing)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] font-bold">
+                  <div className="flex justify-between text-emerald-700">
+                    <span>💰 إجمالي المبيعات النقدية</span>
+                    <span className="font-extrabold">{formatMoney(grandCashSales)}</span>
+                  </div>
+                  <div className="flex justify-between text-blue-700">
+                    <span>🖥️ إجمالي مبيعات المكن</span>
+                    <span className="font-extrabold">{formatMoney(grandMachineNet)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-600">
+                    <span>+ إجمالي الوارد</span>
+                    <span className="font-extrabold">{formatMoney(grandInflows)}</span>
+                  </div>
+                  <div className="flex justify-between text-rose-600">
+                    <span>- إجمالي المنصرف</span>
+                    <span className="font-extrabold">{formatMoney(grandOutflows)}</span>
+                  </div>
+                  <div className="flex justify-between text-rose-700">
+                    <span>- إجمالي المصروفات</span>
+                    <span className="font-extrabold">{formatMoney(grandExpenses)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center bg-emerald-100/70 rounded-xl px-4 py-3 text-sm font-black text-emerald-900 border border-emerald-300/50">
+                  <span>🏆 صافي اليوم الكامل</span>
+                  <span className="text-base">{formatMoney(dayClosing)}</span>
+                </div>
+
+                {/* فرق اليوم */}
+                {(() => {
+                  const netDiff = dayClosing - dayOpening;
+                  return (
+                    <div className={`flex justify-between items-center rounded-lg px-3 py-2 text-[11px] font-extrabold border ${
+                      netDiff > 0.01 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      netDiff < -0.01 ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
+                      <span>{netDiff > 0.01 ? '📈 صافي ربح اليوم' : netDiff < -0.01 ? '📉 صافي خسارة اليوم' : '⚖️ لا فرق'}</span>
+                      <span>{netDiff > 0 ? '+' : ''}{formatMoney(netDiff)}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 px-5 pb-5">
+              <button onClick={onClose} className="flex-1 h-10 border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 text-xs cursor-pointer">إغلاق</button>
+              <button onClick={() => reportRef.current && printContent(reportRef.current)} className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-1.5">
+                <Printer className="h-3.5 w-3.5" /> طباعة التقرير
               </button>
             </div>
           </motion.div>
