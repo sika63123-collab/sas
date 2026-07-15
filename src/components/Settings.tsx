@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { User, UserPermissions } from '../types';
 
@@ -26,6 +26,48 @@ export function Settings() {
   const [walletNumber, setWalletNumber] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Auto Backup Settings ───
+  const AUTO_BACKUP_SETTINGS_KEY = 'xphone_auto_backup_settings';
+  const AUTO_BACKUP_LAST_KEY = 'xphone_auto_backup_last';
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
+    try {
+      const s = localStorage.getItem(AUTO_BACKUP_SETTINGS_KEY);
+      return s ? JSON.parse(s).enabled : true;
+    } catch { return true; }
+  });
+  const [autoBackupInterval, setAutoBackupInterval] = useState(() => {
+    try {
+      const s = localStorage.getItem(AUTO_BACKUP_SETTINGS_KEY);
+      return s ? JSON.parse(s).intervalMinutes : 30;
+    } catch { return 30; }
+  });
+  const [lastAutoBackup, setLastAutoBackup] = useState(() => localStorage.getItem(AUTO_BACKUP_LAST_KEY));
+
+  const saveAutoBackupSettings = (enabled: boolean, interval: number) => {
+    const settings = { enabled, intervalMinutes: interval };
+    localStorage.setItem(AUTO_BACKUP_SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event('auto-backup-settings-changed'));
+  };
+
+  const handleAutoBackupToggle = () => {
+    const newVal = !autoBackupEnabled;
+    setAutoBackupEnabled(newVal);
+    saveAutoBackupSettings(newVal, autoBackupInterval);
+  };
+
+  const handleAutoBackupIntervalChange = (mins: number) => {
+    setAutoBackupInterval(mins);
+    saveAutoBackupSettings(autoBackupEnabled, mins);
+  };
+
+  // Refresh last backup time periodically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLastAutoBackup(localStorage.getItem(AUTO_BACKUP_LAST_KEY));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleEdit = (u: User) => {
     setEditingCode(u.code);
@@ -384,9 +426,67 @@ export function Settings() {
                </div>
             </div>
 
+            {/* Auto Backup Settings */}
+            <div className="bg-white p-6 shadow-sm border border-gray-300">
+                <h3 className="font-bold text-xl mb-6 text-gray-800 border-b pb-2">النسخ الاحتياطي التلقائي</h3>
+
+                <div className="flex flex-col md:flex-row gap-6 items-stretch">
+                   {/* Toggle */}
+                   <div className="flex-1 bg-emerald-50/40 border border-emerald-200 p-6 flex flex-col items-center justify-center text-center gap-4">
+                      <h4 className="text-emerald-900 font-bold text-lg">تفعيل / إيقاف</h4>
+                      <p className="text-sm text-emerald-700 font-medium">عند التفعيل، سيتم حفظ نسخة احتياطية تلقائياً كل فترة زمنية</p>
+                      <button
+                        onClick={handleAutoBackupToggle}
+                        className={`w-48 py-2.5 font-bold text-sm rounded-sm shadow-md transition-colors ${
+                          autoBackupEnabled
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-gray-400 hover:bg-gray-500 text-white'
+                        }`}
+                      >
+                        {autoBackupEnabled ? '✅ مُفعّل' : '❌ مُوقف'}
+                      </button>
+                   </div>
+
+                   {/* Interval */}
+                   <div className="flex-1 bg-indigo-50/40 border border-indigo-200 p-6 flex flex-col items-center justify-center text-center gap-4">
+                      <h4 className="text-indigo-900 font-bold text-lg">الفترة الزمنية</h4>
+                      <p className="text-sm text-indigo-700 font-medium">احفظ نسخة احتياطية كل:</p>
+                      <div className="flex gap-2 flex-wrap justify-center">
+                        {[10, 15, 30, 60].map(mins => (
+                          <button
+                            key={mins}
+                            onClick={() => handleAutoBackupIntervalChange(mins)}
+                            className={`px-4 py-2 text-sm font-bold rounded-sm border shadow-sm transition-colors ${
+                              autoBackupInterval === mins
+                                ? 'bg-indigo-600 text-white border-indigo-700'
+                                : 'bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-50'
+                            }`}
+                          >
+                            {mins} دقيقة
+                          </button>
+                        ))}
+                      </div>
+                   </div>
+
+                   {/* Last Backup Info */}
+                   <div className="flex-1 bg-slate-50/40 border border-slate-200 p-6 flex flex-col items-center justify-center text-center gap-3">
+                      <h4 className="text-slate-900 font-bold text-lg">آخر نسخة تلقائية</h4>
+                      {lastAutoBackup ? (
+                        <p className="text-sm text-slate-700 font-bold">
+                          {new Date(lastAutoBackup).toLocaleDateString('ar-EG', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                          {' - '}
+                          {new Date(lastAutoBackup).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-slate-500 font-medium">لم يتم أخذ نسخة تلقائية بعد</p>
+                      )}
+                   </div>
+                </div>
+            </div>
+
             {/* Bottom Row: Backup & Restore */}
             <div className="bg-white p-6 shadow-sm border border-gray-300">
-                <h3 className="font-bold text-xl mb-6 text-gray-800 border-b pb-2">النسخ الاحتياطي والاسترجاع</h3>
+                <h3 className="font-bold text-xl mb-6 text-gray-800 border-b pb-2">النسخ الاحتياطي اليدوي والاسترجاع</h3>
                 
                 <div className="flex flex-col md:flex-row gap-6">
                    {/* Backup */}

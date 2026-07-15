@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Store, ChevronDown, LogOut, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Cashier from './components/Cashier';
@@ -42,8 +42,108 @@ type ViewMode =
   | 'shift-management';
 
 
+// ─── Auto-Backup Settings ──────────────────────────────────────────────
+const AUTO_BACKUP_SETTINGS_KEY = 'xphone_auto_backup_settings';
+const AUTO_BACKUP_LAST_KEY = 'xphone_auto_backup_last';
+
+interface AutoBackupSettings {
+  enabled: boolean;
+  intervalMinutes: number; // 10, 15, 30, 60
+}
+
+const getAutoBackupSettings = (): AutoBackupSettings => {
+  try {
+    const saved = localStorage.getItem(AUTO_BACKUP_SETTINGS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return { enabled: true, intervalMinutes: 30 };
+};
+
+const saveAutoBackupSettings = (s: AutoBackupSettings) => {
+  localStorage.setItem(AUTO_BACKUP_SETTINGS_KEY, JSON.stringify(s));
+};
+
+const getLastAutoBackupTime = (): string | null => {
+  return localStorage.getItem(AUTO_BACKUP_LAST_KEY);
+};
+
+const setLastAutoBackupTime = (iso: string) => {
+  localStorage.setItem(AUTO_BACKUP_LAST_KEY, iso);
+};
+
+// ─── Auto-Backup Hook ──────────────────────────────────────────────────
+function useAutoBackup(getData: () => Record<string, any>) {
+  const settingsRef = useRef(getAutoBackupSettings());
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(getLastAutoBackupTime());
+
+  const performBackup = useCallback(() => {
+    try {
+      const data = getData();
+      const json = JSON.stringify(data);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const dateStr = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.href = url;
+      a.download = `xphone_auto_backup_${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      const isoNow = now.toISOString();
+      setLastAutoBackupTime(isoNow);
+      setLastBackup(isoNow);
+      console.log('[AutoBackup] Backup saved at', isoNow);
+    } catch (err) {
+      console.error('[AutoBackup] Failed:', err);
+    }
+  }, [getData]);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    const settings = getAutoBackupSettings();
+    settingsRef.current = settings;
+    if (!settings.enabled) return;
+
+    const ms = settings.intervalMinutes * 60 * 1000;
+    timerRef.current = setInterval(() => {
+      performBackup();
+    }, ms);
+  }, [performBackup]);
+
+  // Start/restart timer on mount and when settings change
+  useEffect(() => {
+    startTimer();
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [startTimer]);
+
+  // Listen for settings changes from Settings page
+  useEffect(() => {
+    const handler = () => {
+      startTimer();
+    };
+    window.addEventListener('auto-backup-settings-changed', handler);
+    return () => window.removeEventListener('auto-backup-settings-changed', handler);
+  }, [startTimer]);
+
+  return { lastBackup, performBackup };
+}
+
 function MainApp() {
-  const { currentUser, logout, activeShift, shiftAccounts } = useAppStore();
+  const { currentUser, logout, activeShift, shiftAccounts, products, transactions, installmentContracts, expenses, expenseTypes, users, shifts, paymentTransactions, shiftInventoryItems } = useAppStore();
+
+  // ─── Auto Backup ─────────────────────────────────────────────────
+  const getBackupData = useCallback(() => ({
+    products, transactions, installmentContracts, users, expenses, expenseTypes,
+    shifts, paymentTransactions, shiftAccounts, shiftInventoryItems,
+    _autoBackup: true,
+    _backupDate: new Date().toISOString(),
+  }), [products, transactions, installmentContracts, users, expenses, expenseTypes, shifts, paymentTransactions, shiftAccounts, shiftInventoryItems]);
+
+  useAutoBackup(getBackupData);
   const [activeView, setActiveView] = useState<ViewMode>('home');
 
   const [cashierMode, setCashierMode] = useState<TransactionType>('sale');

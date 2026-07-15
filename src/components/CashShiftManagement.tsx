@@ -171,7 +171,7 @@ export default function CashShiftManagement() {
 
   // ─── Open Shift Form State ──────────────────────────────────────
   const [shiftType, setShiftType] = useState<'صباحي' | 'مسائي'>('صباحي');
-  const [cashierName, setCashierName] = useState('');
+  const [cashierName, setCashierName] = useState(currentUser?.name || '');
   const [openingNotes, setOpeningNotes] = useState('');
   const [setupMachines, setSetupMachines] = useState<ShiftMachine[]>(() => {
     // ترحيل تلقائي: سحب الأرصدة الختامية من آخر وردية مقفلة
@@ -231,12 +231,30 @@ export default function CashShiftManagement() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const closeReceiptRef = useRef<HTMLDivElement>(null);
 
-  // Set default cashier name
+  // اسم الكاشير دائماً من تسجيل الدخول
   useEffect(() => {
-    if (currentUser && !cashierName) {
+    if (currentUser) {
       setCashierName(currentUser.name);
     }
   }, [currentUser]);
+
+  // ─── فتح الوردية الصباحية تلقائياً عند فتح البرنامج ────────────
+  const autoOpenDoneRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenDoneRef.current) return;
+    if (activeShift) return; // وردية مفتوحة بالفعل
+    if (!currentUser) return; // لم يتم تسجيل الدخول بعد
+
+    autoOpenDoneRef.current = true;
+
+    const openingCash = toNum(openingCashAmount) || (inheritedOpeningCash || 0);
+
+    openShift(openingCash, {
+      shiftType: 'صباحي',
+      cashierName: currentUser.name,
+      machines: setupMachines.map(m => ({ ...m })),
+    });
+  }, [currentUser, activeShift]);
 
   // ─── ترحيل تلقائي: تحديث الفورم لما وردية تتقفل ───────────────
   const prevActiveShiftRef = useRef(activeShift);
@@ -442,11 +460,10 @@ export default function CashShiftManagement() {
 
               <div className="space-y-2">
                 <label className="block text-[11px] font-bold text-slate-600">
-                  <span className="flex items-center gap-1"><User className="h-3 w-3" /> اسم الكاشير</span>
+                  <span className="flex items-center gap-1"><User className="h-3 w-3" /> اسم الكاشير (من تسجيل الدخول)</span>
                 </label>
-                <input type="text" value={cashierName} onChange={e => setCashierName(e.target.value)}
-                  placeholder="أدخل اسم الكاشير"
-                  className="w-full h-10 border-2 border-slate-200 focus:border-blue-400 rounded-xl px-3 font-bold text-sm outline-none transition-all bg-slate-50 focus:bg-white"
+                <input type="text" value={cashierName} readOnly
+                  className="w-full h-10 border-2 border-slate-200 rounded-xl px-3 font-bold text-sm outline-none bg-slate-100 text-slate-600 cursor-not-allowed"
                 />
               </div>
             </div>
